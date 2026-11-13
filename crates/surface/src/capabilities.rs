@@ -57,3 +57,32 @@ pub struct Capabilities {
     /// The host can change the font size at run time.
     pub font_zoom: bool,
 }
+
+impl Capabilities {
+    /// A host that paints the cells itself: every effect, true color, a
+    /// pointer it can reshape and the system clipboard.
+    pub fn window() -> Self {
+        Self {
+            effects: EffectSupport::all(),
+            color_depth: ColorDepth::TrueColor,
+            hover: true,
+            pointer_shapes: true,
+            clipboard: ClipboardKind::Native,
+            font_zoom: true,
+        }
+    }
+
+    /// A terminal: cells and colors only. It draws no effects, so the UI
+    /// leaves out what they would have carried, and the font is the one the
+    /// terminal was started with.
+    pub fn terminal(color_depth: ColorDepth) -> Self {
+        Self {
+            effects: EffectSupport::none(),
+            color_depth,
+            hover: true,
+            pointer_shapes: false,
+            clipboard: ClipboardKind::Escape,
+            font_zoom: false,
+        }
+    }
+}

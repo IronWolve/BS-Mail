@@ -2,6 +2,7 @@
 //! regions are shown, the section order, and how tall the content is.
 
 use model::config::{Config, Density, ReaderPosition};
+use surface::EffectSupport;
 
 use super::columns::ColumnSpec;
 use super::sidebar_layout::{SectionKind, SidebarContent};
@@ -44,6 +45,16 @@ impl LayoutOptions {
             reader_header_rows: u16::try_from(config.reader.headers.len()).unwrap_or(0),
             columns: ColumnSpec::from_names(&config.list.columns, &config.list.flex_column),
         }
+    }
+
+    /// Leaves out what the host cannot draw. Without scaled text the banner
+    /// is one row: its second row carries nothing of its own, it is only the
+    /// lower half of the double-size title.
+    pub fn fit_to_host(mut self, effects: &EffectSupport) -> Self {
+        if !effects.scaled_text {
+            self.banner_rows = self.banner_rows.min(1);
+        }
+        self
     }
 }
 

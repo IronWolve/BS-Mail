@@ -11,6 +11,7 @@ use std::time::Instant;
 
 use engine::MockBackend;
 use model::config::Config;
+use surface::{Capabilities, ColorDepth};
 use tty_host::{PaintOptions, paint_frame, terminal_size};
 use ui::AppView;
 use ui::icons::IconSet;
@@ -73,6 +74,7 @@ pub fn draw(options: &Options) -> Result<Stats, RunError> {
         Config::default(),
         IconSet::new(options.icons),
     );
+    view.set_capabilities(Capabilities::terminal(depth(options.color)));
     view.set_now(backend.now());
     for event in backend.startup_events() {
         view.apply_event(event);
@@ -91,6 +93,10 @@ pub fn draw(options: &Options) -> Result<Stats, RunError> {
         fixture,
         millis: started.elapsed().as_millis(),
     })
+}
+
+fn depth(color: bool) -> ColorDepth {
+    if color { ColorDepth::TrueColor } else { ColorDepth::None }
 }
 
 fn write_out(text: &str) -> Result<(), RunError> {

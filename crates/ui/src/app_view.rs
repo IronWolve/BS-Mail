@@ -3,7 +3,7 @@
 
 use model::config::Config;
 use model::{ConnectionState, Event, MailDate};
-use surface::{Frame, Rect};
+use surface::{Capabilities, Frame, Rect};
 
 use crate::app_identity::AppIdentity;
 use crate::format::display_width;
@@ -31,6 +31,7 @@ pub struct AppView {
     theme: Theme,
     config: Config,
     icons: IconSet,
+    capabilities: Capabilities,
     now: MailDate,
     prefs: LayoutPrefs,
     mail: MailSnapshot,
@@ -47,6 +48,7 @@ impl AppView {
             theme,
             config,
             icons,
+            capabilities: Capabilities::window(),
             now: MailDate::default(),
             prefs: LayoutPrefs::default(),
             mail: MailSnapshot::default(),
@@ -61,6 +63,16 @@ impl AppView {
     /// and for clock times.
     pub fn set_now(&mut self, now: MailDate) {
         self.now = now;
+    }
+
+    /// What the host showing these frames can do. A window is assumed until
+    /// a host says otherwise, so the screen is laid out for every effect.
+    pub fn set_capabilities(&mut self, capabilities: Capabilities) {
+        self.capabilities = capabilities;
+    }
+
+    pub fn capabilities(&self) -> Capabilities {
+        self.capabilities
     }
 
     /// Replaces the preferred sizes (a drag or a restored state file).
@@ -103,7 +115,8 @@ impl AppView {
             account_rows: count(self.mail.accounts.len()),
             status_lines: count(StatusLine::list_from_names(&self.config.sidebar.status_lines).len()),
         };
-        let options = LayoutOptions::from_config(&self.config, content);
+        let options = LayoutOptions::from_config(&self.config, content)
+            .fit_to_host(&self.capabilities.effects);
         compute_layout(&self.prefs, &options, GridSize::new(cols, rows))
     }
 
