@@ -170,11 +170,16 @@ impl WindowApp<'_, '_> {
             "0" => self.state.options().points,
             _ => return false,
         };
-        if self.state.set_points(next) {
+        self.set_points(event_loop, next);
+        true
+    }
+
+    /// A new text size: the grid changes with it, so the screen is told.
+    fn set_points(&mut self, event_loop: &ActiveEventLoop, points: u8) {
+        if self.state.set_points(points) {
             self.grid_changed(event_loop);
         }
         self.state.request_redraw();
-        true
     }
 
     fn button(
@@ -202,6 +207,14 @@ impl WindowApp<'_, '_> {
         let cell = self.state.cell_size();
         let (rows, cols) = self.wheel.add(delta, cell);
         if rows == 0 && cols == 0 {
+            return;
+        }
+        // Held down, the modifier turns the wheel into the text size; rows
+        // count down, so a turn away from the user makes the text larger.
+        if self.modifiers.ctrl {
+            let step = if rows < 0 { 1 } else { -1 };
+            let points = WindowOptions::stepped(self.state.points(), step);
+            self.set_points(event_loop, points);
             return;
         }
         let event = InputEvent::Wheel {
