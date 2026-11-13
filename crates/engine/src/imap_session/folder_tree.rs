@@ -53,13 +53,23 @@ fn folder_row(
         id,
         account: account.clone(),
         path: raw.path.clone(),
-        name: mutf7::decode(raw.leaf()),
+        name: display_name(raw, role),
         parent,
         role,
         unread: raw.unread,
         total: raw.total,
         expanded: has_children,
     }
+}
+
+/// The name the sidebar shows. The top-level mailbox every server calls
+/// INBOX is shown as "Inbox", as the rest of the screen writes it; its path
+/// is left alone, because that is what the server is asked for.
+fn display_name(raw: &RawFolder, role: FolderRole) -> String {
+    if role == FolderRole::Inbox && raw.path.eq_ignore_ascii_case("INBOX") {
+        return "Inbox".to_owned();
+    }
+    mutf7::decode(raw.leaf())
 }
 
 fn sort_key(folder: &RawFolder, role: FolderRole) -> (u8, String, String) {
