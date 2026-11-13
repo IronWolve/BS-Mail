@@ -17,6 +17,14 @@ impl Focus {
             Self::Reader => Self::Sidebar,
         }
     }
+
+    pub fn previous(self) -> Self {
+        match self {
+            Self::Sidebar => Self::Reader,
+            Self::List => Self::Sidebar,
+            Self::Reader => Self::List,
+        }
+    }
 }
 
 #[cfg(test)]

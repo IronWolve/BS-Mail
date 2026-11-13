@@ -95,6 +95,10 @@ impl MailSnapshot {
                 total,
                 envelopes,
             } => {
+                // A page for a folder the user has already left is stale.
+                if selection.folder.is_some_and(|chosen| chosen != folder) {
+                    return;
+                }
                 selection.page_loaded(folder, &envelopes);
                 self.page = Some(ListPage {
                     folder,

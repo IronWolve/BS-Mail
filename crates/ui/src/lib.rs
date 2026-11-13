@@ -7,6 +7,7 @@ pub mod app_view;
 pub mod borders;
 pub mod format;
 pub mod icons;
+pub mod input;
 pub mod layout;
 pub mod theme;
 pub mod view_state;

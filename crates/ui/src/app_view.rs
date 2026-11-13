@@ -8,15 +8,14 @@ use surface::{Capabilities, Frame, Rect};
 use crate::app_identity::AppIdentity;
 use crate::format::display_width;
 use crate::icons::{IconId, IconSet};
+use crate::input::CommandQueue;
+use crate::input::viewport::{folders_first, list_first};
 use crate::layout::{
     FolderSpacing, GridSize, Layout, LayoutOptions, LayoutPrefs, ListRegion, MIN_COLS, MIN_ROWS,
     ReaderRegion, SectionKind, SidebarContent, SidebarLayout, compute_layout,
 };
 use crate::theme::{Theme, roles};
-use crate::view_state::{
-    Focus, ListPage, MailSnapshot, Overlays, ScrollState, Selection, first_row_at_offsets,
-    first_row_showing,
-};
+use crate::view_state::{Focus, ListPage, MailSnapshot, Overlays, ScrollState, Selection};
 use crate::widgets::{
     BodyView, DrawContext, FolderTreeView, FooterData, HighlightRules, ListRowsView,
     MailboxSummary, ReaderTitleData, StatusLine, StripData, content_rows, draw_account_list,
@@ -27,18 +26,19 @@ use crate::widgets::{
 };
 
 pub struct AppView {
-    identity: AppIdentity,
-    theme: Theme,
-    config: Config,
-    icons: IconSet,
+    pub(crate) identity: AppIdentity,
+    pub(crate) theme: Theme,
+    pub(crate) config: Config,
+    pub(crate) icons: IconSet,
     capabilities: Capabilities,
-    now: MailDate,
+    pub(crate) now: MailDate,
     prefs: LayoutPrefs,
-    mail: MailSnapshot,
-    selection: Selection,
-    scroll: ScrollState,
-    focus: Focus,
+    pub(crate) mail: MailSnapshot,
+    pub(crate) selection: Selection,
+    pub(crate) scroll: ScrollState,
+    pub(crate) focus: Focus,
     overlays: Overlays,
+    pub(crate) queue: CommandQueue,
 }
 
 impl AppView {
@@ -56,6 +56,7 @@ impl AppView {
             scroll: ScrollState::default(),
             focus: Focus::default(),
             overlays: Overlays::default(),
+            queue: CommandQueue::default(),
         }
     }
 
@@ -234,7 +235,7 @@ impl AppView {
             columns: &list.columns,
             selected: Some(selected),
             offset: page.offset,
-            first: first_row_showing(self.scroll.list, selected, visible, page.envelopes.len()),
+            first: list_first(self.scroll.list, selected, visible, page.envelopes.len()),
             now: self.now,
         };
         draw_list_rows(frame, ctx, list.rows, &view);
@@ -277,10 +278,7 @@ impl AppView {
         let rows = visible_rows(&self.mail.folders);
         let offsets = row_offsets(&rows, spacing);
         let selected = self.selection.folder;
-        let first = match rows.iter().position(|row| Some(row.folder.id) == selected) {
-            Some(index) => first_row_at_offsets(&offsets, self.scroll.folders, index, body.height),
-            None => self.scroll.folders.min(rows.len().saturating_sub(1)),
-        };
+        let first = folders_first(&rows, &offsets, selected, self.scroll.folders, body.height);
         let view = FolderTreeView {
             rows: &rows,
             selected,

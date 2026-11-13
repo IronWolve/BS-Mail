@@ -5,4 +5,4 @@
 pub mod draw;
 pub mod wrap;
 
-pub use draw::{BodyView, draw_reader_body};
+pub use draw::{BodyView, draw_reader_body, visual_len};

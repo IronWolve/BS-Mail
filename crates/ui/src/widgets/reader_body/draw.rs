@@ -70,6 +70,11 @@ fn wrapped(ctx: &DrawContext<'_>, rect: Rect, view: &BodyView<'_>) -> Vec<Vec<Pi
     visual
 }
 
+/// How many visual lines the body wraps to, which is the most it can scroll.
+pub fn visual_len(ctx: &DrawContext<'_>, rect: Rect, view: &BodyView<'_>) -> usize {
+    wrapped(ctx, rect, view).len()
+}
+
 /// Draws the body into `rect` (the reader's text width, below the headers).
 pub fn draw_reader_body(
     frame: &mut Frame,
