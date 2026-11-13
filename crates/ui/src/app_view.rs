@@ -9,18 +9,21 @@ use crate::app_identity::AppIdentity;
 use crate::format::display_width;
 use crate::icons::{IconId, IconSet};
 use crate::layout::{
-    FolderSpacing, GridSize, Layout, LayoutOptions, LayoutPrefs, MIN_COLS, MIN_ROWS, SectionKind,
-    SidebarContent, SidebarLayout, compute_layout,
+    FolderSpacing, GridSize, Layout, LayoutOptions, LayoutPrefs, ListRegion, MIN_COLS, MIN_ROWS,
+    ReaderRegion, SectionKind, SidebarContent, SidebarLayout, compute_layout,
 };
 use crate::theme::{Theme, roles};
 use crate::view_state::{
-    Focus, MailSnapshot, Overlays, ScrollState, Selection, first_row_at_offsets,
+    Focus, ListPage, MailSnapshot, Overlays, ScrollState, Selection, first_row_at_offsets,
+    first_row_showing,
 };
 use crate::widgets::{
-    DrawContext, FolderTreeView, FooterData, MailboxSummary, StatusLine, StripData,
-    content_rows, draw_account_list, draw_account_strip, draw_banner, draw_chrome_lines,
-    draw_folder_tree, draw_footer, draw_key_bar, draw_section_title, draw_status_panel,
-    fill_cells, put_text, row_offsets, visible_rows,
+    BodyView, DrawContext, FolderTreeView, FooterData, HighlightRules, ListRowsView,
+    MailboxSummary, ReaderTitleData, StatusLine, StripData, content_rows, draw_account_list,
+    draw_account_strip, draw_banner, draw_chrome_lines, draw_folder_tree, draw_footer,
+    draw_key_bar, draw_list_header, draw_list_rows, draw_list_title, draw_reader_body,
+    draw_reader_headers, draw_reader_title, draw_section_title, draw_status_panel, fill_cells,
+    put_text, row_offsets, visible_rows,
 };
 
 pub struct AppView {
@@ -115,15 +118,16 @@ impl AppView {
             draw_too_small(&mut frame, &ctx);
             return frame;
         }
-        // The list and the reader are filled in by a later batch; for now
-        // they are just the screen background, under the lines drawn next.
-        for rect in layout.list.iter().map(|l| l.rect).chain(layout.reader.iter().map(|r| r.rect)) {
-            fill_cells(&mut frame, rect, ctx.full(roles::BASE));
-        }
         draw_chrome_lines(&mut frame, &ctx, &layout);
         self.draw_bands(&mut frame, &ctx, &layout);
         if let Some(sidebar) = &layout.sidebar {
             self.draw_sidebar(&mut frame, &ctx, sidebar);
+        }
+        if let Some(list) = &layout.list {
+            self.draw_list(&mut frame, &ctx, list);
+        }
+        if let Some(reader) = &layout.reader {
+            self.draw_reader(&mut frame, &ctx, reader);
         }
         frame
     }
@@ -195,6 +199,58 @@ impl AppView {
                     draw_status_panel(frame, ctx, section.body, &self.mail.status, &lines);
                 }
             }
+        }
+    }
+
+    /// The envelope of the selected message, from the loaded page.
+    fn selected_envelope(&self) -> Option<&model::Envelope> {
+        self.mail.page.as_ref()?.envelopes.get(self.selection.message_index)
+    }
+
+    fn draw_list(&self, frame: &mut Frame, ctx: &DrawContext<'_>, list: &ListRegion) {
+        let mailbox = self.mailbox_summary();
+        draw_list_title(frame, ctx, list.title, mailbox.as_ref());
+        draw_list_header(frame, ctx, list.header, &list.columns);
+        let Some(page) = &self.mail.page else {
+            return;
+        };
+        let visible = usize::from(list.rows.height);
+        let selected = self.selection.message_index;
+        let view = ListRowsView {
+            envelopes: &page.envelopes,
+            columns: &list.columns,
+            selected: Some(selected),
+            offset: page.offset,
+            first: first_row_showing(self.scroll.list, selected, visible, page.envelopes.len()),
+            now: self.now,
+        };
+        draw_list_rows(frame, ctx, list.rows, &view);
+    }
+
+    fn reader_title_data<'a>(&'a self, page: &'a ListPage) -> Option<ReaderTitleData<'a>> {
+        let envelope = page.envelopes.get(self.selection.message_index)?;
+        let unread = self.mailbox_summary().map_or(0, |mailbox| mailbox.unread);
+        Some(ReaderTitleData {
+            subject: &envelope.subject,
+            position: u64::from(page.offset) + self.selection.message_index as u64 + 1,
+            total: u64::from(page.total),
+            unread,
+        })
+    }
+
+    fn draw_reader(&self, frame: &mut Frame, ctx: &DrawContext<'_>, reader: &ReaderRegion) {
+        let title = self.mail.page.as_ref().and_then(|page| self.reader_title_data(page));
+        draw_reader_title(frame, ctx, reader.title, title.as_ref());
+        draw_reader_headers(frame, ctx, reader.headers, self.selected_envelope());
+        let open = self.mail.body.as_ref().filter(|(id, _)| Some(*id) == self.selection.message);
+        if let Some((_, body)) = open {
+            let view = BodyView {
+                lines: &body.lines,
+                first: self.scroll.reader,
+                app_name: &self.identity.name,
+                rules: HighlightRules::default(),
+            };
+            draw_reader_body(frame, ctx, reader.body, &view);
         }
     }
 
