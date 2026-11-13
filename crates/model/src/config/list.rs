@@ -125,6 +125,7 @@ impl Default for ListConfig {
 fn default_subject_tags() -> BTreeMap<String, String> {
     BTreeMap::from([
         ("Project".to_string(), "subject.tag.project".to_string()),
+        ("PR".to_string(), "subject.tag.default".to_string()),
         ("ALERT".to_string(), "subject.tag.alert".to_string()),
     ])
 }

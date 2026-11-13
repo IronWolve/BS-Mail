@@ -112,6 +112,16 @@ impl ColumnSpec {
     }
 }
 
+/// Cells between two columns that sit next to each other. The flag and star
+/// columns form one group, like their shared header bar, so nothing comes
+/// between them.
+pub fn gutter_between(left: ColumnId, right: ColumnId) -> u16 {
+    match (left, right) {
+        (ColumnId::Flag, ColumnId::Star) | (ColumnId::Star, ColumnId::Flag) => 0,
+        _ => GUTTER,
+    }
+}
+
 /// Working set while columns give up width.
 struct Cols {
     items: Vec<(ColumnId, u16)>,
@@ -121,7 +131,11 @@ struct Cols {
 
 impl Cols {
     fn flex_width(&self, width: u16) -> i32 {
-        let gutters = self.items.len().saturating_sub(1) as i32 * i32::from(GUTTER);
+        let gutters: i32 = self
+            .items
+            .windows(2)
+            .map(|pair| i32::from(gutter_between(pair[0].0, pair[1].0)))
+            .sum();
         let fixed: i32 = self
             .items
             .iter()
@@ -190,7 +204,7 @@ fn place(cols: &Cols, x: u16, width: u16) -> ColumnLayout {
     let flex = cols.flex_width(width).max(0) as u16;
     let mut at = x;
     let mut slots = Vec::with_capacity(cols.items.len());
-    for (id, fixed) in &cols.items {
+    for (index, (id, fixed)) in cols.items.iter().enumerate() {
         let slot_width = if *id == cols.flex { flex } else { *fixed };
         if slot_width > 0 {
             slots.push(ColumnSlot {
@@ -198,7 +212,11 @@ fn place(cols: &Cols, x: u16, width: u16) -> ColumnLayout {
                 x: at,
                 width: slot_width,
             });
-            at = at.saturating_add(slot_width).saturating_add(GUTTER);
+            let gutter = cols
+                .items
+                .get(index + 1)
+                .map_or(0, |(next, _)| gutter_between(*id, *next));
+            at = at.saturating_add(slot_width).saturating_add(gutter);
         }
     }
     ColumnLayout {
