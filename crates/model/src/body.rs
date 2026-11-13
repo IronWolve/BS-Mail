@@ -1,0 +1,46 @@
+//! A message body as styled lines, plus its attachment list.
+
+/// What a run of body text is; each role maps to a `body.*` theme role.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum BodyRole {
+    #[default]
+    Text,
+    Quote,
+    /// The display name inside a body.
+    Name,
+    BulletDone,
+    BulletOpen,
+    Lead,
+    LeadNext,
+    Token,
+    Path,
+    Link,
+    Signature,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StyledSpan {
+    pub text: String,
+    pub role: BodyRole,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct StyledLine {
+    pub spans: Vec<StyledSpan>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttachmentInfo {
+    /// Index of the part in the message's part tree.
+    pub part: u32,
+    pub name: String,
+    pub content_type: String,
+    /// Size in bytes.
+    pub size: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Body {
+    pub lines: Vec<StyledLine>,
+    pub attachments: Vec<AttachmentInfo>,
+}
