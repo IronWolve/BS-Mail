@@ -1,0 +1,176 @@
+# The default theme: the look of the reference picture.
+#
+# A palette of named colors, then roles that name palette colors (or write a
+# #rrggbb value directly). Role names contain dots, so every key is quoted:
+# the file is a flat table of role name to role. A field a role leaves out
+# comes from its parent role (the name without its last dot part), then from
+# "base". The window background is the background of "base".
+
+name = "neon-night"
+
+[palette]
+bg         = "#03080f"   # screen background
+bg_raised  = "#0b1522"   # menus, dialogs, hover row
+border     = "#2fd9dc"   # frame lines and rules
+text       = "#f4f8fc"   # normal text
+text_dim   = "#9ba8ba"   # hollow circles, placeholders, quotes
+green      = "#3fe56a"   # unread dot, online, checks, gauge fill
+green_hi   = "#35f070"   # banner name, start color
+lime       = "#66e655"   # titles and slashes
+mint       = "#30f092"   # banner name, end color
+cyan       = "#3ee6e8"   # addresses, host, key hints, inline tokens, labels
+cyan_hi    = "#02d3f7"   # selected folder bar
+ice        = "#8ff2ec"   # outline icons
+blue       = "#4d9fff"   # not used by the default roles; free for overrides
+blue_sel   = "#0051c7"   # selected message row
+keycap     = "#2cc8ec"   # keycap background
+yellow     = "#ffd028"   # stars, unread counts, alert marker
+lemon      = "#f0ee40"   # Sent icon
+orange     = "#f7b52a"   # alert subject text
+red        = "#ff5a66"   # warning triangle, alert tag, Alerts and Spam icons
+magenta    = "#e07fe6"   # tags, Drafts icon, branch-name tokens
+on_accent  = "#04121c"   # dark text on cyan and keycap blocks
+
+[roles]
+# Window and frame lines.
+"base"                   = { fg = "text", bg = "bg" }
+"border"                 = { fg = "border" }
+"border.focused"         = { fg = "green" }
+"border.hover"           = { fg = "yellow", bold = true }
+"border.drag"            = { fg = "yellow", bold = true }
+"border.rule"            = {}
+"separator"              = { fg = "text" }
+
+# Title banner.
+"banner.slashes"         = { fg = "lime", italic = true }
+"banner.icon"            = { fg = "lime" }
+"banner.name"            = { gradient = ["green_hi", "mint"], bold = true }
+"banner.divider"         = { fg = "text" }
+"banner.tagline"         = { fg = "text" }
+"banner.version"         = { fg = "cyan", bold = true }
+
+# Account strip.
+"strip.label"            = { fg = "text" }
+"strip.icon"             = { fg = "ice" }
+"strip.value"            = { fg = "cyan", bold = true }
+"strip.unread"           = { fg = "yellow", bold = true }
+"strip.online"           = { fg = "green", bold = true }
+"strip.connecting"       = { fg = "yellow", bold = true }
+"strip.offline"          = { fg = "red", bold = true }
+
+# Sidebar: section titles, folders, accounts, status.
+"section.title"          = { fg = "lime", bold = true }
+"section.icon"           = { fg = "lime" }
+"sidebar.item"           = { fg = "text" }
+"sidebar.count"          = { fg = "text" }
+"sidebar.chevron"        = { fg = "text" }
+"sidebar.selected"       = { fg = "on_accent", bg = "cyan_hi", bold = true }
+"sidebar.hover"          = { bg = "bg_raised" }
+"sidebar.account"        = { fg = "text" }
+"sidebar.account.active" = { fg = "cyan", bold = true }
+"sidebar.account.dot"    = { fg = "green" }
+"sidebar.account.ring"   = { fg = "text_dim" }
+"status.label"           = { fg = "text" }
+"status.value"           = { fg = "text" }
+"status.ok"              = { fg = "green" }
+"status.count"           = { fg = "yellow" }
+"gauge.fill"             = { fg = "green" }
+"gauge.track"            = { fg = "text_dim" }
+"gauge.outline"          = { fg = "text" }
+
+# Folder icons.
+"icon.inbox"             = { fg = "cyan" }
+"icon.starred"           = { fg = "yellow" }
+"icon.sent"              = { fg = "lemon" }
+"icon.drafts"            = { fg = "magenta" }
+"icon.archive"           = { fg = "text" }
+"icon.folder"            = { fg = "ice" }
+"icon.alerts"            = { fg = "red" }
+"icon.spam"              = { fg = "red" }
+"icon.trash"             = { fg = "text" }
+
+# Message list.
+"list.title"             = { fg = "lime", bold = true }
+"list.icon"              = { fg = "lime" }
+"list.hint.key"          = { fg = "cyan", bold = true }
+"list.hint.label"        = { fg = "text" }
+"list.header"            = { fg = "text" }
+"list.header.bar"        = { fg = "cyan" }
+"list.row"               = { fg = "text" }
+"list.row.unread"        = { fg = "text" }
+"list.row.hover"         = { bg = "bg_raised" }
+"list.selected"          = { fg = "text", bg = "blue_sel", bold = true }
+"list.marked"            = { bg = "bg_raised", bold = true }
+"list.flag.unread"       = { fg = "green" }
+"list.flag.alert"        = { fg = "yellow", bold = true }
+"list.star"              = { fg = "yellow" }
+"list.date.recent"       = { fg = "text" }
+"list.date"              = { fg = "text" }
+"list.size"              = { fg = "text" }
+"subject.tag.default"    = { fg = "cyan" }
+"subject.tag.project"    = { fg = "green" }
+"subject.tag.alert"      = { fg = "red" }
+"subject.alert"          = { fg = "orange" }
+"subject.warning"        = { fg = "red" }
+"subject.number"         = { fg = "cyan" }
+
+# Reader box: title, counter, header block, body.
+"reader.title"           = { fg = "lime", bold = true }
+"reader.icon"            = { fg = "lime" }
+"reader.counter"         = { fg = "text" }
+"reader.counter.unread"  = { fg = "yellow", bold = true }
+"reader.header.label"    = { fg = "cyan", bold = true }
+"reader.header.value"    = { fg = "text" }
+"reader.header.tags"     = { fg = "magenta" }
+"body.text"              = { fg = "text" }
+"body.quote"             = { fg = "text_dim" }
+"body.name"              = { fg = "green_hi", bold = true }
+"body.bullet.done"       = { fg = "green" }
+"body.bullet.open"       = { fg = "text" }
+"body.lead"              = { fg = "lime", bold = true }
+"body.lead.next"         = { fg = "yellow", bold = true }
+"body.token"             = { fg = "cyan" }
+"body.path"              = { fg = "magenta" }
+"body.link"              = { fg = "cyan", underline = true }
+"body.signature"         = { fg = "green" }
+
+# Key bar and footer.
+"keybar.cap"             = { fg = "on_accent", bg = "keycap", bold = true }
+"keybar.label"           = { fg = "text" }
+"keybar.hover"           = { bg = "bg_raised" }
+"footer.slashes"         = { fg = "lime", italic = true }
+"footer.text"            = { fg = "text" }
+"footer.ok"              = { fg = "green" }
+"footer.unread"          = { fg = "yellow", bold = true }
+"footer.key"             = { fg = "cyan", bold = true }
+"footer.error"           = { fg = "red", bold = true }
+
+# Scrollbars and menus.
+"scrollbar.thumb"        = { fg = "cyan" }
+"scrollbar.track"        = { fg = "text_dim" }
+"menu.base"              = { fg = "text", bg = "bg_raised" }
+"menu.selected"          = { fg = "on_accent", bg = "cyan_hi" }
+"menu.border"            = { fg = "border" }
+
+# Used only in terminal mode on 16-color terminals; ignored by the window.
+[ansi16]
+bg        = "black"
+bg_raised = "black"
+text      = "white"
+text_dim  = "bright-black"
+border    = "bright-cyan"
+green     = "bright-green"
+green_hi  = "bright-green"
+lime      = "bright-green"
+mint      = "bright-green"
+cyan      = "bright-cyan"
+cyan_hi   = "cyan"
+ice       = "bright-cyan"
+blue_sel  = "blue"
+keycap    = "cyan"
+yellow    = "bright-yellow"
+lemon     = "bright-yellow"
+orange    = "yellow"
+red       = "bright-red"
+magenta   = "bright-magenta"
+on_accent = "black"
