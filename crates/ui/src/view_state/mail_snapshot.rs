@@ -33,6 +33,8 @@ pub struct MailSnapshot {
     pub status: SyncStatus,
     pub page: Option<ListPage>,
     pub body: Option<(MessageId, Body)>,
+    /// The last failure the backend reported, until something succeeds.
+    pub error: Option<String>,
 }
 
 impl MailSnapshot {
@@ -70,6 +72,9 @@ impl MailSnapshot {
                 if let Some(entry) = self.accounts.iter_mut().find(|a| a.id == account) {
                     entry.state = state;
                 }
+                if state == model::ConnectionState::Online {
+                    self.error = None;
+                }
             }
             Event::Quota { account, quota } => {
                 if is_shown(selection, &account) {
@@ -100,6 +105,7 @@ impl MailSnapshot {
                     return;
                 }
                 selection.page_loaded(folder, &envelopes);
+                self.error = None;
                 self.page = Some(ListPage {
                     folder,
                     offset,
@@ -107,7 +113,13 @@ impl MailSnapshot {
                     envelopes,
                 });
             }
-            Event::BodyReady { message, body } => self.body = Some((message, body)),
+            Event::BodyReady { message, body } => {
+                self.error = None;
+                self.body = Some((message, body));
+            }
+            Event::OpFailed {
+                operation, reason, ..
+            } => self.error = Some(format!("{operation}: {reason}")),
             Event::FlagsChanged { updates } => {
                 let Some(page) = self.page.as_mut() else {
                     return;

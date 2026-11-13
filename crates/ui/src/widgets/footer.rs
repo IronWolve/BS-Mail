@@ -28,6 +28,9 @@ pub struct FooterData<'a> {
     pub connection: ConnectionState,
     pub mailbox: Option<&'a MailboxSummary>,
     pub status: &'a SyncStatus,
+    /// The last failure the backend reported, shown in place of the usual
+    /// segments until something succeeds.
+    pub error: Option<&'a str>,
 }
 
 fn text_run(ctx: &DrawContext<'_>, text: impl Into<String>) -> Run {
@@ -77,6 +80,27 @@ fn segment(ctx: &DrawContext<'_>, name: &str, data: &FooterData<'_>) -> Option<V
     }
 }
 
+/// The connection state and the failure, the failure cut to what is left.
+fn error_segments(
+    ctx: &DrawContext<'_>,
+    data: &FooterData<'_>,
+    error: &str,
+    width: u16,
+) -> Vec<Vec<Run>> {
+    // The connection segment and its separator take about this much.
+    const TAKEN: usize = 22;
+    let room = usize::from(width).saturating_sub(TAKEN).max(8);
+    let mut text: String = error.chars().take(room).collect();
+    if error.chars().count() > room {
+        text.pop();
+        text.push('\u{2026}');
+    }
+    vec![
+        connection_segment(ctx, data.connection),
+        vec![Run::new(text, ctx.fg(roles::FOOTER_ERROR))],
+    ]
+}
+
 /// Draws the footer into the one-row `rect` (inside the frame). Segments
 /// that do not fit are dropped from the right.
 pub fn draw_footer(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, data: &FooterData<'_>) {
@@ -95,11 +119,14 @@ pub fn draw_footer(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, data: &
         let right = right_x.saturating_sub(SLASH_GAP);
         area = Rect::new(left, rect.y, right.saturating_sub(left), 1);
     }
-    let mut segments: Vec<Vec<Run>> = footer
-        .segments
-        .iter()
-        .filter_map(|name| segment(ctx, name, data))
-        .collect();
+    let mut segments: Vec<Vec<Run>> = match data.error {
+        Some(error) => error_segments(ctx, data, error, area.width),
+        None => footer
+            .segments
+            .iter()
+            .filter_map(|name| segment(ctx, name, data))
+            .collect(),
+    };
     while segments.len() > 1 && !segments_fit(&segments, area.width) {
         segments.pop();
     }

@@ -203,6 +203,7 @@ impl AppView {
                 connection: self.connection(),
                 mailbox: mailbox.as_ref(),
                 status: &self.mail.status,
+                error: self.mail.error.as_deref(),
             };
             draw_footer(frame, ctx, rect, &data);
         }
