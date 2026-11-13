@@ -1,13 +1,23 @@
-//! Program entry: reads the arguments, draws one screen and reports what
-//! went wrong when it cannot.
+//! Program entry: reads the arguments, shows the screen the way this run
+//! asks for, and reports what went wrong when it cannot.
 
 mod cli;
+mod errors;
+mod fonts;
 mod identity;
+mod launch_mode;
 mod paths;
+mod picture;
 mod report;
 mod run;
+mod scene;
+mod screen;
+mod stats;
+mod window_run;
 
 use std::process::ExitCode;
+
+use launch_mode::{Launch, decide};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -27,12 +37,18 @@ fn main() -> ExitCode {
             println!("{}", report::version_line());
             ExitCode::SUCCESS
         }
-        cli::Action::Draw => draw(&options),
+        cli::Action::Draw => show(&options),
     }
 }
 
-fn draw(options: &cli::Options) -> ExitCode {
-    match run::draw(options) {
+/// Shows the screen whichever way this run decided on.
+fn show(options: &cli::Options) -> ExitCode {
+    let result = match decide(&options.mode) {
+        Launch::Terminal => run::draw(options),
+        Launch::Window => window_run::run(options),
+        Launch::Picture(path) => picture::render(options, &path),
+    };
+    match result {
         Ok(stats) => {
             if options.stats {
                 report::print_stats(&stats);

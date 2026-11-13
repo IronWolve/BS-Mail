@@ -2,11 +2,15 @@
 
 use std::path::PathBuf;
 
+use model::config::font::{FONT_SIZE_MAX, FONT_SIZE_MIN, LINE_SPACING_MAX, LINE_SPACING_MIN};
 use ui::icons::IconKind;
+use ui::layout::{MIN_COLS, MIN_ROWS};
 
 /// The reference grid of the look spec; the size used when none is asked for.
 pub const REF_COLS: u16 = 145;
 pub const REF_ROWS: u16 = 48;
+/// The text size the window opens at.
+pub const DEFAULT_POINTS: u8 = 12;
 
 /// What to do once the arguments are read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,27 +30,59 @@ pub enum SizeChoice {
     Fixed(u16, u16),
 }
 
+/// Where the screen is shown.
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Mode {
+    /// The console it was started from, or a window when there is none.
+    Auto,
+    Terminal,
+    Window,
+    /// One frame into a picture file, with no window.
+    Picture(PathBuf),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Options {
     pub action: Action,
+    pub mode: Mode,
     pub mock: Option<PathBuf>,
     pub size: SizeChoice,
     pub icons: IconKind,
     pub color: bool,
     pub stats: bool,
+    /// Text size in points, for the window and for pictures.
+    pub points: u8,
+    pub line_spacing: f32,
+    /// Open the window, draw one frame and stop, for a check with nobody
+    /// watching.
+    pub smoke: bool,
 }
 
 impl Default for Options {
     fn default() -> Self {
         Self {
             action: Action::Draw,
+            mode: Mode::Auto,
             mock: None,
             size: SizeChoice::Reference,
             icons: IconKind::Nerd,
             color: true,
             stats: true,
+            points: DEFAULT_POINTS,
+            line_spacing: 1.0,
+            smoke: false,
         }
     }
+}
+
+/// The grid a window or a picture uses. A terminal's own size is not one of
+/// the answers here, so asking to fit gives the reference grid.
+pub fn window_grid(size: SizeChoice) -> (u16, u16) {
+    let (cols, rows) = match size {
+        SizeChoice::Fixed(cols, rows) => (cols, rows),
+        SizeChoice::Reference | SizeChoice::Fit => (REF_COLS, REF_ROWS),
+    };
+    (cols.max(MIN_COLS), rows.max(MIN_ROWS))
 }
 
 /// Reads the arguments. `--flag value` and `--flag=value` both work.
@@ -57,6 +93,19 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
         match argument.as_str() {
             "--help" | "-h" => options.action = Action::Help,
             "--version" | "-V" => options.action = Action::Version,
+            "--window" => options.mode = Mode::Window,
+            "--smoke" => {
+                options.mode = Mode::Window;
+                options.smoke = true;
+            }
+            "--tty" => options.mode = Mode::Terminal,
+            "--render-once" => {
+                options.mode = Mode::Picture(PathBuf::from(value(&mut rest, &argument)?));
+            }
+            "--points" => options.points = parse_points(&value(&mut rest, &argument)?)?,
+            "--line-spacing" => {
+                options.line_spacing = parse_spacing(&value(&mut rest, &argument)?)?;
+            }
             "--mock" => options.mock = Some(PathBuf::from(value(&mut rest, &argument)?)),
             "--size" => options.size = parse_size(&value(&mut rest, &argument)?)?,
             "--fit" => options.size = SizeChoice::Fit,
@@ -104,6 +153,32 @@ fn parse_size(text: &str) -> Result<SizeChoice, String> {
         number(cols, "width")?,
         number(rows, "height")?,
     ))
+}
+
+fn parse_points(text: &str) -> Result<u8, String> {
+    let points: u8 = text
+        .trim()
+        .parse()
+        .map_err(|_| format!("--points is not a number: {text}"))?;
+    if !(FONT_SIZE_MIN..=FONT_SIZE_MAX).contains(&points) {
+        return Err(format!(
+            "--points wants {FONT_SIZE_MIN} to {FONT_SIZE_MAX}, not {points}"
+        ));
+    }
+    Ok(points)
+}
+
+fn parse_spacing(text: &str) -> Result<f32, String> {
+    let spacing: f32 = text
+        .trim()
+        .parse()
+        .map_err(|_| format!("--line-spacing is not a number: {text}"))?;
+    if !(LINE_SPACING_MIN..=LINE_SPACING_MAX).contains(&spacing) {
+        return Err(format!(
+            "--line-spacing wants {LINE_SPACING_MIN} to {LINE_SPACING_MAX}, not {spacing}"
+        ));
+    }
+    Ok(spacing)
 }
 
 fn parse_icons(text: &str) -> Result<IconKind, String> {
