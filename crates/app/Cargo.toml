@@ -10,4 +10,9 @@ model = { path = "../model" }
 surface = { path = "../surface" }
 ui = { path = "../ui" }
 host = { path = "../host" }
+tty_host = { path = "../tty_host" }
 engine = { path = "../engine" }
+
+# The build script carries the display name out of the workspace manifest.
+[build-dependencies]
+toml.workspace = true

@@ -5,6 +5,7 @@ members = [
     "crates/surface",
     "crates/ui",
     "crates/host",
+    "crates/tty_host",
     "crates/engine",
     "crates/app",
 ]
@@ -46,3 +47,5 @@ unicode-width = "0.2" # verify: version not checked against the registry
 unicode-segmentation = "1" # verify: version not checked against the registry
 # Stage 1: frame-to-image output for --render-once and snapshots (host).
 png = "0.18" # verify: version not checked against the registry
+# Stage 1: the terminal's size; Stage 4 adds its raw mode and its events (tty_host).
+crossterm = { version = "0.29", default-features = false }

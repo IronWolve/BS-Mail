@@ -1,0 +1,11 @@
+[package]
+name = "tty_host"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+surface = { path = "../surface" }
+unicode-width.workspace = true
+crossterm.workspace = true
