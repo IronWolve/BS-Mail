@@ -2,4 +2,5 @@
 //! This file only declares and re-exports the modules; later batches add the
 //! rest of the module map.
 
+pub mod icons;
 pub mod theme;
