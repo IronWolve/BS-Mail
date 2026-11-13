@@ -5,4 +5,5 @@
 pub mod borders;
 pub mod format;
 pub mod icons;
+pub mod layout;
 pub mod theme;
