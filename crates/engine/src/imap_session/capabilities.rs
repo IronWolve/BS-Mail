@@ -1,0 +1,63 @@
+//! What the server says it can do, reduced to the few things the client
+//! branches on.
+
+use async_imap::types::{Capabilities, Capability};
+
+use super::error::SessionError;
+use super::session::ImapSession;
+use super::timeouts::bounded;
+
+/// The extensions this client cares about.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ServerCaps {
+    /// Folder roles come as LIST attributes (RFC 6154).
+    pub special_use: bool,
+    /// The LIST command accepts return options (RFC 5258).
+    pub list_extended: bool,
+    /// Mailbox storage figures (RFC 2087).
+    pub quota: bool,
+    /// The server can push changes while idle (RFC 2177).
+    pub idle: bool,
+}
+
+impl ServerCaps {
+    /// Reads capability atoms, any letter case.
+    pub fn from_atoms<'a>(atoms: impl IntoIterator<Item = &'a str>) -> Self {
+        let mut caps = Self::default();
+        for atom in atoms {
+            match atom.to_ascii_uppercase().as_str() {
+                "SPECIAL-USE" => caps.special_use = true,
+                "LIST-EXTENDED" => caps.list_extended = true,
+                "QUOTA" => caps.quota = true,
+                "IDLE" => caps.idle = true,
+                _ => {}
+            }
+        }
+        caps
+    }
+
+    fn from_capabilities(found: &Capabilities) -> Self {
+        let atoms: Vec<&str> = found
+            .iter()
+            .filter_map(|capability| match capability {
+                Capability::Atom(name) => Some(name.as_str()),
+                _ => None,
+            })
+            .collect();
+        Self::from_atoms(atoms)
+    }
+}
+
+impl ImapSession {
+    /// Asks the server what it supports and remembers the answer.
+    pub async fn load_capabilities(&mut self) -> Result<(), SessionError> {
+        let limit = self.limits.command;
+        let result = bounded(limit, self.inner.capabilities()).await;
+        let found = self.settle(result)?;
+        self.caps = ServerCaps::from_capabilities(&found);
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+include!("capabilities.tests.rs");

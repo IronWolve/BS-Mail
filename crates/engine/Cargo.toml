@@ -9,3 +9,16 @@ publish = false
 model = { path = "../model" }
 serde = { workspace = true }
 toml = { workspace = true }
+tokio = { workspace = true }
+async-imap = { workspace = true }
+rustls = { workspace = true }
+tokio-rustls = { workspace = true }
+webpki-roots = { workspace = true }
+mail-parser = { workspace = true }
+html2text = { workspace = true }
+futures-util = { workspace = true }
+
+[features]
+# Hooks for the integration tests (short reconnect delays). Never enabled by
+# the app.
+test-support = []
