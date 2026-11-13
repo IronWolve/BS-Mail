@@ -3,5 +3,6 @@
 //! rest of the module map.
 
 pub mod borders;
+pub mod format;
 pub mod icons;
 pub mod theme;
