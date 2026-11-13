@@ -9,6 +9,9 @@ pub struct Account {
     pub name: String,
     pub address: String,
     pub state: ConnectionState,
+    /// The account whose mailbox the UI shows first. The backend names one at
+    /// start-up; after that the UI owns the live selection.
+    pub selected: bool,
 }
 
 /// What a folder is for; drives its icon and its place in the list.

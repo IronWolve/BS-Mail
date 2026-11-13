@@ -3,12 +3,21 @@
 use crate::body::Body;
 use crate::envelope::Envelope;
 use crate::flags::Flags;
-use crate::folder::Folder;
+use crate::folder::{Account, Folder};
 use crate::ids::{AccountId, FolderId, MessageId, RequestId};
 use crate::sync_status::{ConnectionState, Quota, SyncStatus};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
+    /// All configured accounts, in the order the sidebar lists them.
+    AccountList(Vec<Account>),
+    /// The machine the engine runs on, for the account strip's host segment.
+    HostInfo {
+        /// Short host name, such as `hydra`.
+        host_name: String,
+        /// Operating system and kernel, such as `Linux 6.8.12`.
+        system: String,
+    },
     /// The full folder tree of one account.
     FolderList {
         account: AccountId,
