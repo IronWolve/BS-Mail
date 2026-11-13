@@ -11,14 +11,21 @@ pub mod folder_tree;
 pub mod footer;
 pub mod gauge;
 pub mod key_bar;
+pub mod list_header;
+pub mod list_rows;
+pub mod list_title;
+pub mod scrollbar;
 pub mod section_title;
 pub mod segment_row;
 pub mod status_panel;
+pub mod subject_style;
 
 pub use account_list::draw_account_list;
 pub use account_strip::{MailboxSummary, StripData, draw_account_strip};
 pub use banner::draw_banner;
-pub use cell_text::{Run, fill_cells, put_cut, put_runs, put_text};
+pub use cell_text::{
+    Align, Run, cut_runs, fill_cells, put_aligned, put_cut, put_runs, put_runs_cut, put_text,
+};
 pub use chrome_lines::draw_chrome_lines;
 pub use draw_context::DrawContext;
 pub use folder_tree::{
@@ -27,5 +34,10 @@ pub use folder_tree::{
 pub use footer::{FooterData, draw_footer};
 pub use gauge::draw_gauge;
 pub use key_bar::draw_key_bar;
+pub use list_header::{column_align, column_label, draw_list_header};
+pub use list_rows::{ListRowsView, draw_list_rows};
+pub use list_title::draw_list_title;
+pub use scrollbar::draw_scrollbar;
 pub use section_title::draw_section_title;
 pub use status_panel::{StatusLine, draw_status_panel};
+pub use subject_style::subject_runs;
