@@ -13,9 +13,9 @@ pub enum Event {
     AccountList(Vec<Account>),
     /// The machine the engine runs on, for the account strip's host segment.
     HostInfo {
-        /// Short host name, such as `hydra`.
+        /// Short host name, without the domain.
         host_name: String,
-        /// Operating system and kernel, such as `Linux 6.8.12`.
+        /// Operating system and kernel, as one line.
         system: String,
     },
     /// The full folder tree of one account.

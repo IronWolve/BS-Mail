@@ -43,7 +43,7 @@ fn single_line(text: &str) -> String {
 }
 
 /// The longest prefix of whole characters that fits in `limit` cells.
-fn take_width(text: &str, limit: usize) -> String {
+pub fn take_width(text: &str, limit: usize) -> String {
     let mut used = 0;
     let mut out = String::new();
     for grapheme in text.graphemes(true) {
