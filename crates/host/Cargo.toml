@@ -7,3 +7,9 @@ publish = false
 
 [dependencies]
 surface = { path = "../surface" }
+swash.workspace = true
+tiny-skia.workspace = true
+unicode-width.workspace = true
+winit.workspace = true
+softbuffer.workspace = true
+png.workspace = true
