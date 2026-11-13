@@ -4,6 +4,7 @@
 pub mod capabilities;
 pub mod effect;
 pub mod frame;
+pub mod frame_text;
 pub mod input_event;
 pub mod pointer_shape;
 pub mod presenter;
@@ -11,6 +12,7 @@ pub mod presenter;
 pub use capabilities::{Capabilities, ClipboardKind, ColorDepth, EffectSupport};
 pub use effect::{Effect, GaugeOutline, Glow, HalfRowShift, RoundedFill, ScaledText, TextFill};
 pub use frame::{Buffer, Color, CursorRequest, CursorShape, Frame, Modifier, Rect, Style};
+pub use frame_text::{CellView, cell_at, dump_text, row_text, text_between};
 pub use input_event::{
     ButtonState, CellPosition, CompositionEvent, InputEvent, KeyEvent, LogicalKey, Modifiers,
     NamedKey, PhysicalKey, PointerButton,

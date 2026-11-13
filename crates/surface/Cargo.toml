@@ -7,3 +7,4 @@ publish = false
 
 [dependencies]
 ratatui-core = { workspace = true }
+unicode-width = { workspace = true }
