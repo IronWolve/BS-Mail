@@ -7,3 +7,5 @@ publish = false
 
 [dependencies]
 model = { path = "../model" }
+serde = { workspace = true }
+toml = { workspace = true }
