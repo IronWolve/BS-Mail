@@ -8,6 +8,7 @@ pub mod body_highlight;
 pub mod cell_text;
 pub mod chrome_lines;
 pub mod draw_context;
+pub mod focus_mark;
 pub mod folder_tree;
 pub mod footer;
 pub mod gauge;
@@ -33,6 +34,7 @@ pub use cell_text::{
 };
 pub use chrome_lines::draw_chrome_lines;
 pub use draw_context::DrawContext;
+pub use focus_mark::mark_focused;
 pub use folder_tree::{
     FolderRowInfo, FolderTreeView, content_rows, draw_folder_tree, row_offsets, visible_rows,
 };

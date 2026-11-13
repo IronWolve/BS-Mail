@@ -20,7 +20,7 @@ use crate::widgets::{
     BodyView, DrawContext, FolderTreeView, FooterData, HighlightRules, ListRowsView,
     MailboxSummary, ReaderTitleData, StatusLine, StripData, content_rows, draw_account_list,
     draw_account_strip, draw_banner, draw_chrome_lines, draw_folder_tree, draw_footer,
-    draw_key_bar, draw_list_header, draw_list_rows, draw_list_title, draw_reader_body,
+    draw_key_bar, mark_focused, draw_list_header, draw_list_rows, draw_list_title, draw_reader_body,
     draw_reader_headers, draw_reader_title, draw_section_title, draw_status_panel, fill_cells,
     put_text, row_offsets, visible_rows,
 };
@@ -143,7 +143,24 @@ impl AppView {
         if let Some(reader) = &layout.reader {
             self.draw_reader(&mut frame, &ctx, reader);
         }
+        self.mark_focus(&mut frame, &layout);
         frame
+    }
+
+    /// Underlines the title of the pane that has focus.
+    fn mark_focus(&self, frame: &mut Frame, layout: &Layout) {
+        let title = match self.focus {
+            Focus::Sidebar => layout
+                .sidebar
+                .as_ref()
+                .and_then(|sidebar| sidebar.section(SectionKind::Folders))
+                .map(|section| section.title),
+            Focus::List => layout.list.as_ref().map(|list| list.title),
+            Focus::Reader => layout.reader.as_ref().map(|reader| reader.title),
+        };
+        if let Some(title) = title {
+            mark_focused(frame, title);
+        }
     }
 
     fn mailbox_summary(&self) -> Option<MailboxSummary> {

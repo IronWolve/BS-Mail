@@ -80,9 +80,11 @@ pub fn help_text() -> String {
          --version, -V      print the version\n  \
          --help, -h         print this text\n\
          \n\
-         In the window: Ctrl and plus or minus, or Ctrl and the wheel, change\n\
-         the text size, Ctrl 0 puts it back, F11 is full screen, Escape or\n\
-         Ctrl Q closes it.\n\
+         In the window: arrows, Page Up and Down, Home and End move in the pane\n\
+         that has focus; Tab changes pane, Enter goes in, Escape comes back; a\n\
+         click selects and the wheel scrolls. Ctrl and plus or minus, or Ctrl\n\
+         and the wheel, change the text size, Ctrl 0 puts it back, F11 is full\n\
+         screen, q or Ctrl Q closes it.\n\
          The terminal draw leaves out the double-size banner title and the\n\
          rounded shapes, which only the window can draw.\n",
         display_name(),
