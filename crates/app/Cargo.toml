@@ -1,0 +1,13 @@
+[package]
+name = "app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+model = { path = "../model" }
+surface = { path = "../surface" }
+ui = { path = "../ui" }
+host = { path = "../host" }
+engine = { path = "../engine" }

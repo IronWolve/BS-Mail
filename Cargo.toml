@@ -1,0 +1,48 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/model",
+    "crates/surface",
+    "crates/ui",
+    "crates/host",
+    "crates/engine",
+    "crates/app",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+
+[workspace.metadata.app]
+display_name = "BS Mail"
+tagline = "Mail for Power Users"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+# Third-party crates, with the stage that first uses each. Members inherit
+# from here with `workspace = true`; internal crates use path dependencies.
+[workspace.dependencies]
+# Stage 1: config and theme data types (model), embedded theme loading.
+serde = { version = "1", features = ["derive"] }
+# Stage 1: parsing the embedded default theme and, later, config files.
+toml = "0.9" # verify: version not checked against the registry
+# Stage 1: cell buffer, rect, style and color types behind surface/src/frame.rs.
+ratatui-core = { version = "0.1", default-features = false } # verify: split out of the 0.30 widget crate
+# Stage 1: the window and its input events (host).
+winit = "0.30.13"
+# Stage 1: CPU presentation of the pixel buffer (host).
+softbuffer = "0.4.8"
+# Stage 1: glyph rasterizing from the embedded fonts (host).
+swash = "0.2.10"
+# Stage 1: rounded shapes, lines and gradients (host).
+tiny-skia = "0.12.0"
+# Stage 1: cell widths for layout and painting (ui, host).
+unicode-width = "0.2" # verify: version not checked against the registry
+# Stage 1: grapheme splitting for cells (ui, host).
+unicode-segmentation = "1" # verify: version not checked against the registry
+# Stage 1: frame-to-image output for --render-once and snapshots (host).
+png = "0.18" # verify: version not checked against the registry
