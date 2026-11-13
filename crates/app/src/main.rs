@@ -2,17 +2,20 @@
 //! asks for, and reports what went wrong when it cannot.
 
 mod cli;
+mod clock;
 mod errors;
 mod fonts;
 mod identity;
 mod launch_mode;
 mod paths;
 mod picture;
+mod pump;
 mod report;
 mod run;
 mod scene;
 mod screen;
 mod stats;
+mod ticker;
 mod window_run;
 
 use std::process::ExitCode;

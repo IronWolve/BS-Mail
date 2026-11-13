@@ -23,7 +23,8 @@ const PROMPT_ROWS: u16 = 1;
 
 pub fn draw(options: &Options) -> Result<Stats, AppError> {
     let started = Instant::now();
-    let scene = scene::build(options, Capabilities::terminal(depth(options.color)))?;
+    let mut scene = scene::build(options, Capabilities::terminal(depth(options.color)))?;
+    scene.prime();
     let (cols, rows) = grid_size(options.size);
     let frame = scene.view.render(cols, rows);
     let text = paint_frame(&frame, &PaintOptions {
@@ -35,7 +36,7 @@ pub fn draw(options: &Options) -> Result<Stats, AppError> {
         rows,
         messages: scene.messages,
         effects: frame.effects.len(),
-        fixture: scene.fixture,
+        fixture: scene.source,
         millis: started.elapsed().as_millis(),
         shown: Shown::Terminal,
     })

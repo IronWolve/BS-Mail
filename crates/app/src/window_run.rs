@@ -17,7 +17,8 @@ use crate::{fonts, scene};
 pub fn run(options: &Options) -> Result<Stats, AppError> {
     let started = Instant::now();
     let fonts = fonts::embedded().map_err(|error| AppError::Fonts(error.to_string()))?;
-    let scene = scene::build(options, Capabilities::window())?;
+    let mut scene = scene::build(options, Capabilities::window())?;
+    scene.prime();
     let (cols, rows) = window_grid(options.size);
     let window = WindowOptions {
         title: display_name().to_string(),
@@ -30,7 +31,7 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         palette: Palette::new(scene.base.0, scene.base.1),
     };
     let effects = scene.view.render(cols, rows).effects.len();
-    let mut screen = Screen::new(scene.view, cols, rows);
+    let mut screen = Screen::new(scene.view, scene.backend, (cols, rows), scene.fixed_now);
     if options.smoke {
         screen = screen.stop_after(1);
     }
@@ -41,7 +42,7 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         rows,
         messages: scene.messages,
         effects,
-        fixture: scene.fixture,
+        fixture: scene.source,
         millis: started.elapsed().as_millis(),
         shown: Shown::Window {
             frames: screen.frames(),

@@ -19,7 +19,8 @@ use crate::{fonts, scene};
 pub fn render(options: &Options, path: &Path) -> Result<Stats, AppError> {
     let started = Instant::now();
     let fonts = fonts::embedded().map_err(|error| AppError::Fonts(error.to_string()))?;
-    let scene = scene::build(options, Capabilities::window())?;
+    let mut scene = scene::build(options, Capabilities::window())?;
+    scene.prime();
     let (cols, rows) = window_grid(options.size);
     let metrics = CellMetrics::new(
         &fonts,
@@ -39,7 +40,7 @@ pub fn render(options: &Options, path: &Path) -> Result<Stats, AppError> {
         rows,
         messages: scene.messages,
         effects: frame.effects.len(),
-        fixture: scene.fixture,
+        fixture: scene.source,
         millis: started.elapsed().as_millis(),
         shown: Shown::Picture {
             path: PathBuf::from(path),

@@ -1,4 +1,4 @@
-//! The screen with the mock data already in it.
+//! The screen with its mail source.
 //!
 //! Every way of showing it — a terminal, a window, a picture file — starts
 //! from here, so all three show the same thing.
@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 use engine::MockBackend;
 use model::config::Config;
+use model::{MailBackend, MailDate};
 use surface::Capabilities;
 use ui::AppView;
 use ui::icons::IconSet;
@@ -17,23 +18,33 @@ use crate::cli::Options;
 use crate::errors::AppError;
 use crate::identity::identity;
 use crate::paths::installed_fixture;
+use crate::pump::pump;
 
 pub struct Scene {
     pub view: AppView,
+    pub backend: Box<dyn MailBackend>,
+    /// Messages the mock holds; zero for a real account.
     pub messages: usize,
-    pub fixture: PathBuf,
+    /// Where the mail comes from, for the stats block.
+    pub source: PathBuf,
     /// What the theme means by plain text on the plain background.
     pub base: (host::Rgb, host::Rgb),
+    /// A clock that stands still, so a picture of mock data never changes
+    /// with the day it is taken; `None` follows the system clock.
+    pub fixed_now: Option<MailDate>,
 }
 
-/// Loads the mock data and the theme and fills the screen with them.
+impl Scene {
+    /// Takes everything the backend has ready and answers what the screen
+    /// then asks for, so the first frame has data in it.
+    pub fn prime(&mut self) {
+        pump(&mut self.view, self.backend.as_mut());
+    }
+}
+
+/// Builds the screen and its mail source.
 pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, AppError> {
-    let fixture = match &options.mock {
-        Some(path) => path.clone(),
-        None => installed_fixture().ok_or(AppError::NoFixture)?,
-    };
-    let backend = MockBackend::from_file(&fixture)
-        .map_err(|error| AppError::Fixture(fixture.clone(), error.to_string()))?;
+    let source = mock_source(options)?;
     let theme = default_theme().map_err(|error| AppError::Theme(error.to_string()))?;
     let base = base_colors(&theme);
     let mut view = AppView::new(
@@ -43,16 +54,32 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
         IconSet::new(options.icons),
     );
     view.set_capabilities(capabilities);
-    view.set_now(backend.now());
-    for event in backend.startup_events() {
-        view.apply_event(event);
-    }
+    view.set_now(source.backend.now());
     Ok(Scene {
         view,
-        messages: backend.fixture().messages.len(),
-        fixture,
+        messages: source.backend.fixture().messages.len(),
+        fixed_now: Some(source.backend.now()),
+        backend: Box::new(source.backend),
+        source: source.path,
         base,
     })
+}
+
+struct MockSource {
+    backend: MockBackend,
+    path: PathBuf,
+}
+
+/// The mock mail: the file named on the command line, else the one beside
+/// the program.
+fn mock_source(options: &Options) -> Result<MockSource, AppError> {
+    let path = match &options.mock {
+        Some(path) => path.clone(),
+        None => installed_fixture().ok_or(AppError::NoFixture)?,
+    };
+    let backend = MockBackend::from_file(&path)
+        .map_err(|error| AppError::Fixture(path.clone(), error.to_string()))?;
+    Ok(MockSource { backend, path })
 }
 
 /// The theme's plain text and plain background, which is what a cell means

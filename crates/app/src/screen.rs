@@ -1,32 +1,50 @@
 //! The screen on the other end of a host's loop: it answers events and hands
 //! back a frame whenever the host asks for one.
 //!
-//! There is no key map yet, so only the keys that close a window are read
-//! here; everything else is accepted and ignored.
+//! Input goes to the view, which moves the selection; the commands that
+//! selection needs go to the backend; what the backend says comes back to the
+//! view. Only the keys that close the program are read here.
 
-use surface::{EventSink, Flow, InputEvent, KeyEvent, LogicalKey, NamedKey, Presenter};
+use model::{MailBackend, MailDate};
+use surface::{EventSink, Flow, InputEvent, KeyEvent, LogicalKey, Presenter};
 use ui::AppView;
+
+use crate::clock::system_now;
+use crate::pump::pump;
+use crate::ticker::Ticker;
 
 pub struct Screen {
     view: AppView,
+    backend: Box<dyn MailBackend>,
     cols: u16,
     rows: u16,
     frames: u32,
+    /// A clock that stands still; `None` follows the system clock.
+    fixed_now: Option<MailDate>,
     /// Frames after which the run stops itself, for a check with nobody
     /// watching; `None` runs until the window is closed.
     stop_after: Option<u32>,
     done: bool,
+    ticker: Option<Ticker>,
 }
 
 impl Screen {
-    pub fn new(view: AppView, cols: u16, rows: u16) -> Self {
+    pub fn new(
+        view: AppView,
+        backend: Box<dyn MailBackend>,
+        grid: (u16, u16),
+        fixed_now: Option<MailDate>,
+    ) -> Self {
         Self {
             view,
-            cols,
-            rows,
+            backend,
+            cols: grid.0,
+            rows: grid.1,
             frames: 0,
+            fixed_now,
             stop_after: None,
             done: false,
+            ticker: None,
         }
     }
 
@@ -44,29 +62,49 @@ impl Screen {
     pub fn grid(&self) -> (u16, u16) {
         (self.cols, self.rows)
     }
+
+    /// Moves mail both ways until quiet; returns whether the view changed.
+    fn exchange(&mut self) -> bool {
+        pump(&mut self.view, self.backend.as_mut()) > 0
+    }
 }
 
 impl EventSink for Screen {
     fn on_input(&mut self, event: InputEvent, host: &mut dyn Presenter) -> Flow {
-        match event {
+        match &event {
             InputEvent::Resized { cols, rows } => {
-                self.cols = cols;
-                self.rows = rows;
+                self.cols = *cols;
+                self.rows = *rows;
                 host.request_redraw();
-                Flow::Continue
+                return Flow::Continue;
             }
-            InputEvent::CloseRequested => Flow::Quit,
-            InputEvent::Key(key) if closes(&key) => Flow::Quit,
-            _ => Flow::Continue,
+            InputEvent::CloseRequested => return Flow::Quit,
+            InputEvent::Key(key) if closes(key) => return Flow::Quit,
+            _ => {}
         }
+        if self.view.handle_input(&event, (self.cols, self.rows)) {
+            self.exchange();
+            host.request_redraw();
+        }
+        Flow::Continue
     }
 
-    fn on_wake(&mut self, _host: &mut dyn Presenter) -> Flow {
-        if self.done { Flow::Quit } else { Flow::Continue }
+    fn on_wake(&mut self, host: &mut dyn Presenter) -> Flow {
+        if self.done {
+            return Flow::Quit;
+        }
+        if self.exchange() {
+            host.request_redraw();
+        }
+        Flow::Continue
     }
 
     fn on_redraw(&mut self, host: &mut dyn Presenter) {
+        if self.ticker.is_none() {
+            self.ticker = Some(Ticker::start(host.waker()));
+        }
         self.view.set_capabilities(host.capabilities());
+        self.view.set_now(self.fixed_now.unwrap_or_else(system_now));
         let frame = self.view.render(self.cols, self.rows);
         host.present(&frame);
         self.frames = self.frames.saturating_add(1);
@@ -79,11 +117,11 @@ impl EventSink for Screen {
     }
 }
 
-/// The keys that close the window while there is no key map.
+/// The keys that close the program: `q`, as the key bar says, and `Ctrl+Q`.
 fn closes(key: &KeyEvent) -> bool {
+    let held = key.modifiers;
     match key.key {
-        LogicalKey::Named(NamedKey::Escape) => true,
-        LogicalKey::Char('q') => key.modifiers.ctrl,
+        LogicalKey::Char('q') => !held.alt && !held.meta && (held.ctrl || !held.shift),
         _ => false,
     }
 }
