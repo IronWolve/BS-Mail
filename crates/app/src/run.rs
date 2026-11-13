@@ -14,7 +14,7 @@ use ui::layout::{MIN_COLS, MIN_ROWS};
 
 use crate::cli::{Options, REF_COLS, REF_ROWS, SizeChoice};
 use crate::errors::AppError;
-use crate::scene;
+use crate::scene::{self, SETTLE_LIMIT};
 use crate::stats::{Shown, Stats};
 
 /// Rows kept free below the screen when the terminal's own size is used, so
@@ -24,7 +24,7 @@ const PROMPT_ROWS: u16 = 1;
 pub fn draw(options: &Options) -> Result<Stats, AppError> {
     let started = Instant::now();
     let mut scene = scene::build(options, Capabilities::terminal(depth(options.color)))?;
-    scene.prime();
+    scene.settle(SETTLE_LIMIT);
     let (cols, rows) = grid_size(options.size);
     let frame = scene.view.render(cols, rows);
     let text = paint_frame(&frame, &PaintOptions {
@@ -36,7 +36,8 @@ pub fn draw(options: &Options) -> Result<Stats, AppError> {
         rows,
         messages: scene.messages,
         effects: frame.effects.len(),
-        fixture: scene.source,
+        source: scene.source,
+        real: scene.real,
         millis: started.elapsed().as_millis(),
         shown: Shown::Terminal,
     })

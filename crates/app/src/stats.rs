@@ -7,7 +7,10 @@ pub struct Stats {
     pub rows: u16,
     pub messages: usize,
     pub effects: usize,
-    pub fixture: PathBuf,
+    /// The account file or the mock file the mail came from.
+    pub source: PathBuf,
+    /// Real mail from an account, not the mock.
+    pub real: bool,
     pub millis: u128,
     pub shown: Shown,
 }

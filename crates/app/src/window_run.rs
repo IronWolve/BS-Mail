@@ -42,7 +42,8 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         rows,
         messages: scene.messages,
         effects,
-        fixture: scene.source,
+        source: scene.source,
+        real: scene.real,
         millis: started.elapsed().as_millis(),
         shown: Shown::Window {
             frames: screen.frames(),

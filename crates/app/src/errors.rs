@@ -4,12 +4,13 @@ use std::fmt;
 use std::io;
 use std::path::PathBuf;
 
-use crate::paths::FIXTURE_NAME;
+use crate::paths::{ACCOUNT_NAME, FIXTURE_NAME};
 
 #[derive(Debug)]
 pub enum AppError {
-    NoFixture,
+    NoSource,
     Fixture(PathBuf, String),
+    Account(PathBuf, String),
     Theme(String),
     Fonts(String),
     Output(io::Error),
@@ -20,10 +21,14 @@ pub enum AppError {
 impl fmt::Display for AppError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::NoFixture => write!(
+            Self::NoSource => write!(
                 f,
-                "no mock data: expected {FIXTURE_NAME} beside the program, or --mock <file>"
+                "no mail to show: put {ACCOUNT_NAME} or {FIXTURE_NAME} beside the program, \
+                 or use --account <file> or --mock <file>"
             ),
+            Self::Account(path, reason) => {
+                write!(f, "the account file {} cannot be used: {reason}", path.display())
+            }
             Self::Fixture(path, reason) => {
                 write!(f, "the mock file {} did not load: {reason}", path.display())
             }

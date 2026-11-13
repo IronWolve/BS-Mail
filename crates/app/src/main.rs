@@ -14,6 +14,7 @@ mod report;
 mod run;
 mod scene;
 mod screen;
+mod source;
 mod stats;
 mod ticker;
 mod window_run;

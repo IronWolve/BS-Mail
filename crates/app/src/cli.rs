@@ -46,6 +46,8 @@ pub struct Options {
     pub action: Action,
     pub mode: Mode,
     pub mock: Option<PathBuf>,
+    /// A mail account file: the program reads that account's real mail.
+    pub account: Option<PathBuf>,
     pub size: SizeChoice,
     pub icons: IconKind,
     pub color: bool,
@@ -64,6 +66,7 @@ impl Default for Options {
             action: Action::Draw,
             mode: Mode::Auto,
             mock: None,
+            account: None,
             size: SizeChoice::Reference,
             icons: IconKind::Nerd,
             color: true,
@@ -107,6 +110,7 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
                 options.line_spacing = parse_spacing(&value(&mut rest, &argument)?)?;
             }
             "--mock" => options.mock = Some(PathBuf::from(value(&mut rest, &argument)?)),
+            "--account" => options.account = Some(PathBuf::from(value(&mut rest, &argument)?)),
             "--size" => options.size = parse_size(&value(&mut rest, &argument)?)?,
             "--fit" => options.size = SizeChoice::Fit,
             "--icons" => options.icons = parse_icons(&value(&mut rest, &argument)?)?,

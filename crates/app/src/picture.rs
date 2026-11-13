@@ -13,14 +13,15 @@ use surface::Capabilities;
 use crate::cli::{Options, window_grid};
 use crate::errors::AppError;
 use crate::stats::{Shown, Stats};
-use crate::{fonts, scene};
+use crate::scene::{self, SETTLE_LIMIT};
+use crate::fonts;
 
 /// Draws the screen once and writes it to `path`.
 pub fn render(options: &Options, path: &Path) -> Result<Stats, AppError> {
     let started = Instant::now();
     let fonts = fonts::embedded().map_err(|error| AppError::Fonts(error.to_string()))?;
     let mut scene = scene::build(options, Capabilities::window())?;
-    scene.prime();
+    scene.settle(SETTLE_LIMIT);
     let (cols, rows) = window_grid(options.size);
     let metrics = CellMetrics::new(
         &fonts,
@@ -40,7 +41,8 @@ pub fn render(options: &Options, path: &Path) -> Result<Stats, AppError> {
         rows,
         messages: scene.messages,
         effects: frame.effects.len(),
-        fixture: scene.source,
+        source: scene.source,
+        real: scene.real,
         millis: started.elapsed().as_millis(),
         shown: Shown::Picture {
             path: PathBuf::from(path),

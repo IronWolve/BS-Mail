@@ -6,7 +6,7 @@ use std::io::{IsTerminal, Write};
 
 use crate::cli::{DEFAULT_POINTS, REF_COLS, REF_ROWS};
 use crate::identity::{display_name, slug, version};
-use crate::paths::FIXTURE_NAME;
+use crate::paths::{ACCOUNT_NAME, FIXTURE_NAME};
 use crate::stats::{Shown, Stats};
 
 struct Paint {
@@ -69,7 +69,8 @@ pub fn help_text() -> String {
          --smoke            open a window, draw one frame and stop\n\
          \n\
          Options:\n  \
-         --mock <file>      mock data to draw (default: {FIXTURE_NAME} beside the program)\n  \
+         --account <file>   real mail from this account file (default: {ACCOUNT_NAME} beside the program)\n  \
+         --mock <file>      draw mock data instead (default: {FIXTURE_NAME} beside the program)\n  \
          --size <COLSxROWS> grid to draw (default: {REF_COLS}x{REF_ROWS}, the reference size)\n  \
          --fit              use the size of this terminal instead\n  \
          --points <n>       text size of the window and of pictures (default: {DEFAULT_POINTS})\n  \
@@ -104,7 +105,9 @@ pub fn print_stats(stats: &Stats) {
         paint.green,
         format!("{} x {} cells", stats.cols, stats.rows),
     );
-    line("messages", paint.green, stats.messages.to_string());
+    if !stats.real {
+        line("messages", paint.green, stats.messages.to_string());
+    }
     match &stats.shown {
         Shown::Terminal => {
             line("effects", paint.green, format!("{} (not drawn here)", stats.effects));
@@ -131,7 +134,8 @@ pub fn print_stats(stats: &Stats) {
         }
     }
     line("drawn in", paint.green, format!("{} ms", stats.millis));
-    line("mock data", paint.dim, stats.fixture.display().to_string());
+    let label = if stats.real { "account" } else { "mock data" };
+    line(label, paint.dim, stats.source.display().to_string());
 }
 
 /// A byte count in the largest unit that keeps it short.

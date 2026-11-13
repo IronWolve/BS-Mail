@@ -1,17 +1,18 @@
 //! The moment the screen treats as now, for Today, Yesterday and clock times.
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
+use chrono::Local;
 use model::MailDate;
 
-/// The system clock, in UTC. The offset is zero until the local time zone is
-/// read, so Today and Yesterday turn over at midnight UTC for now.
+/// The system clock with this machine's time zone, so Today and Yesterday
+/// turn over at local midnight.
 pub fn system_now() -> MailDate {
-    let seconds = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |elapsed| i64::try_from(elapsed.as_secs()).unwrap_or(i64::MAX));
+    let now = Local::now();
+    let minutes = now.offset().local_minus_utc() / 60;
     MailDate {
-        unix: seconds,
-        offset_minutes: 0,
+        unix: now.timestamp(),
+        offset_minutes: i16::try_from(minutes).unwrap_or(0),
     }
 }
+
+#[cfg(test)]
+include!("clock.tests.rs");

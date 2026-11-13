@@ -12,6 +12,7 @@ ui = { path = "../ui" }
 host = { path = "../host" }
 tty_host = { path = "../tty_host" }
 engine = { path = "../engine" }
+chrono = { workspace = true }
 
 # The build script carries the display name out of the workspace manifest.
 [build-dependencies]
