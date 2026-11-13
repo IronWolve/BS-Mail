@@ -1,0 +1,30 @@
+# Deny-all allowlist. Order matters: the last matching pattern wins, so the
+# blanket deny comes first, the allow rules after it, and the test denials
+# last so they override the allow rules above them.
+*
+
+# Allowed files.
+!.gitignore
+!Cargo.toml
+!Cargo.lock
+!README.md
+!LICENSE
+!NOTICE
+
+# Assets and everything under them.
+!assets/
+!assets/**
+
+# Every directory is re-included, because a negation cannot re-include a
+# file whose parent directory is excluded. Files inside stay denied by `*`
+# unless an allow rule below names them.
+!*/
+
+# Crate manifests, build scripts and sources.
+!crates/**/Cargo.toml
+!crates/**/build.rs
+!crates/**/*.rs
+
+# Tests are never tracked. These come after the allow rules on purpose.
+*.tests.rs
+**/tests/
