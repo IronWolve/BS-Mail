@@ -6,7 +6,7 @@ use surface::{Effect, Frame, Rect, RoundedFill};
 
 use super::cell_text::{cells, put_text};
 use super::draw_context::DrawContext;
-use crate::layout::{bar_offset, inset_h, spread_items};
+use crate::layout::{Spread, bar_offset, inset_h, spread_items};
 use crate::theme::roles;
 
 /// Fewest cells between two buttons.
@@ -92,15 +92,38 @@ fn plan_buttons(actions: &[String], available: u16) -> Vec<Placed> {
     placed
 }
 
-/// Draws the key bar into the one-row `rect` (inside the frame).
-pub fn draw_key_bar(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, actions: &[String]) {
+/// Where the buttons of a key bar sit: the cells they spread over, which
+/// buttons fit, and where each starts.
+struct Row {
+    area: Rect,
+    placed: Vec<Placed>,
+    spread: Spread,
+}
+
+fn plan_row(rect: Rect, actions: &[String]) -> Option<Row> {
     if rect.is_empty() {
-        return;
+        return None;
     }
     let area = inset_h(rect, 1);
     let placed = plan_buttons(actions, area.width);
     let widths: Vec<u16> = placed.iter().map(Placed::width).collect();
-    let Some(spread) = spread_items(&widths, area.width, MIN_GAP) else {
+    let spread = spread_items(&widths, area.width, MIN_GAP)?;
+    Some(Row { area, placed, spread })
+}
+
+/// The action of the button at column `col` of the key bar in `rect`, for a
+/// click. Cells between buttons belong to none.
+pub fn button_at(rect: Rect, actions: &[String], col: u16) -> Option<&'static str> {
+    let row = plan_row(rect, actions)?;
+    row.placed.iter().enumerate().find_map(|(index, button)| {
+        let x = row.area.x.saturating_add(row.spread.starts[index]);
+        (col >= x && col < x.saturating_add(button.width())).then_some(button.button.action)
+    })
+}
+
+/// Draws the key bar into the one-row `rect` (inside the frame).
+pub fn draw_key_bar(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, actions: &[String]) {
+    let Some(Row { area, placed, spread }) = plan_row(rect, actions) else {
         return;
     };
     for (index, button) in placed.iter().enumerate() {

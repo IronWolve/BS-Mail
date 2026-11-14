@@ -137,9 +137,25 @@ impl AppView {
             Hit::Sidebar => self.focus = Focus::Sidebar,
             Hit::ListChrome => self.focus = Focus::List,
             Hit::Reader => self.focus = Focus::Reader,
+            Hit::KeyBar(action) => self.press_button(action, grid),
             Hit::Nothing => return false,
         }
         true
+    }
+
+    /// A click on a key bar button does what its key does.
+    fn press_button(&mut self, action: &str, grid: (u16, u16)) {
+        match action {
+            "compose" => self.act(Action::Compose, grid),
+            "reply" => self.act(Action::Reply, grid),
+            "reply_all" => self.act(Action::ReplyAll, grid),
+            "forward" => self.act(Action::Forward, grid),
+            "delete" => self.act(Action::Delete, grid),
+            "sync" => self.act(Action::Sync, grid),
+            "help" => self.act(Action::Help, grid),
+            "quit" => self.quit_requested = true,
+            other => self.mail.error = Some(format!("{other} is not built yet")),
+        }
     }
 
     fn wheel(&mut self, col: u16, row: u16, rows: i16, grid: (u16, u16)) -> bool {
@@ -153,7 +169,7 @@ impl AppView {
             Hit::Folder(_) | Hit::Sidebar => Focus::Sidebar,
             Hit::Message(_) | Hit::ListChrome => Focus::List,
             Hit::Reader => Focus::Reader,
-            Hit::Nothing => return false,
+            Hit::KeyBar(_) | Hit::Nothing => return false,
         };
         for _ in 0..notches {
             match target {
@@ -182,6 +198,7 @@ impl AppView {
             ),
             list_first: self.list_first(layout),
             messages: self.shown_page().map_or(0, |page| page.envelopes.len()),
+            key_bar_actions: &self.config.key_bar.buttons,
         };
         hit_at(&view, col, row)
     }

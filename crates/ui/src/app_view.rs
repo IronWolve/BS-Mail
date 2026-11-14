@@ -53,6 +53,8 @@ pub struct AppView {
     pub(crate) drag: Option<Drag>,
     /// The message being written, when the composer is open.
     pub(crate) composer: Option<ComposeForm>,
+    /// The user clicked Quit; the program closes it, the screen cannot.
+    pub(crate) quit_requested: bool,
 }
 
 impl AppView {
@@ -75,6 +77,7 @@ impl AppView {
             auto_marked: None,
             drag: None,
             composer: None,
+            quit_requested: false,
         }
     }
 
@@ -124,6 +127,11 @@ impl AppView {
     pub fn apply_event(&mut self, event: Event) {
         self.note_send_outcome(&event);
         self.mail.apply(event, &mut self.selection);
+    }
+
+    /// Whether the user asked to quit from the screen, by the Quit button.
+    pub fn wants_quit(&self) -> bool {
+        self.quit_requested
     }
 
     /// Whether the composer is open, so the program leaves the letters to it.

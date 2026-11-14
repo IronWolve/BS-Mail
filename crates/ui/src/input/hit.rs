@@ -3,6 +3,7 @@
 use surface::Rect;
 
 use super::viewport::folder_at;
+use crate::widgets::button_at;
 use crate::layout::{Layout, SectionKind};
 
 /// The part of the screen a pointer position falls on.
@@ -17,6 +18,8 @@ pub enum Hit {
     /// The list's title or column header.
     ListChrome,
     Reader,
+    /// A key bar button, by the name of its action.
+    KeyBar(&'static str),
     Nothing,
 }
 
@@ -27,10 +30,17 @@ pub struct HitView<'a> {
     pub folders_first: usize,
     pub list_first: usize,
     pub messages: usize,
+    /// The actions the key bar offers, in order.
+    pub key_bar_actions: &'a [String],
 }
 
 /// What lies at column `col`, row `row` of the grid.
 pub fn hit_at(view: &HitView<'_>, col: u16, row: u16) -> Hit {
+    if let Some(bar) = view.layout.key_bar
+        && inside(bar, col, row)
+    {
+        return button_at(bar, view.key_bar_actions, col).map_or(Hit::Nothing, Hit::KeyBar);
+    }
     if let Some(sidebar) = &view.layout.sidebar
         && inside(sidebar.rect, col, row)
     {

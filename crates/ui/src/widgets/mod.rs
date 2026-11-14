@@ -42,7 +42,7 @@ pub use folder_tree::{
 pub use footer::{FooterData, draw_footer};
 pub use gauge::draw_gauge;
 pub use help_overlay::draw_help;
-pub use key_bar::draw_key_bar;
+pub use key_bar::{button_at, draw_key_bar};
 pub use list_header::{column_align, column_label, draw_list_header};
 pub use list_rows::{ListRowsView, draw_list_rows};
 pub use list_title::draw_list_title;

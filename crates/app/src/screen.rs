@@ -110,6 +110,9 @@ impl EventSink for Screen {
             _ => {}
         }
         let used = self.view.handle_input(&event, (self.cols, self.rows));
+        if self.view.wants_quit() {
+            return Flow::Quit;
+        }
         if let Some(text) = self.view.take_copied() {
             host.set_clipboard(&text);
         }
