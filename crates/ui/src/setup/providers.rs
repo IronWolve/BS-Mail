@@ -3,7 +3,7 @@
 //! form says so, and a domain not listed gets the usual `imap.` and `smtp.`
 //! names.
 
-use super::form::Security;
+use super::fields::Security;
 
 /// What a provider needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +17,15 @@ pub struct Preset {
     /// A line for the user, shown while the form is open: an app password
     /// is needed, a bridge must be running.
     pub note: &'static str,
+    /// The name the engine knows this provider's browser sign-in by, when it
+    /// has one.
+    pub oauth: Option<&'static str>,
+    /// Signing in through the browser is the way in, because a password no
+    /// longer works here.
+    pub browser_first: bool,
+    /// The provider files a copy of mail sent through it, so the program must
+    /// not add a second one.
+    pub files_sent_itself: bool,
 }
 
 /// The preset for the domain of `email`, or the generic guess.
@@ -37,26 +46,17 @@ fn hosts(imap: &str, smtp: &str, smtp_port: u16, smtp_security: Security, note: 
         smtp_port,
         smtp_security,
         note,
+        oauth: None,
+        browser_first: false,
+        files_sent_itself: false,
     }
 }
 
 fn known(domain: &str) -> Option<Preset> {
     let tls = Security::Starttls;
     Some(match domain {
-        "gmail.com" | "googlemail.com" => hosts(
-            "imap.gmail.com",
-            "smtp.gmail.com",
-            587,
-            tls,
-            "This provider needs an app password, not your usual one. It files sent mail itself.",
-        ),
-        "outlook.com" | "hotmail.com" | "live.com" | "msn.com" => hosts(
-            "outlook.office365.com",
-            "smtp.office365.com",
-            587,
-            tls,
-            "This provider may need an app password if two-step sign-in is on.",
-        ),
+        "gmail.com" | "googlemail.com" => with_browser_sign_in(),
+        "outlook.com" | "hotmail.com" | "live.com" | "msn.com" => browser_only(),
         "yahoo.com" | "ymail.com" | "rocketmail.com" => hosts(
             "imap.mail.yahoo.com",
             "smtp.mail.yahoo.com",
@@ -79,17 +79,57 @@ fn known(domain: &str) -> Option<Preset> {
             "This provider needs an app password, made in your account settings.",
         ),
         "gmx.com" | "gmx.net" | "gmx.de" => hosts("imap.gmx.net", "mail.gmx.net", 587, tls, ""),
-        "protonmail.com" | "proton.me" | "pm.me" | "protonmail.ch" => Preset {
-            imap_host: "127.0.0.1".to_string(),
-            imap_port: 1143,
-            imap_security: Security::Starttls,
-            smtp_host: "127.0.0.1".to_string(),
-            smtp_port: 1025,
-            smtp_security: Security::Starttls,
-            note: "This provider needs its companion mail program running on this computer; use the password that program shows you.",
-        },
+        "protonmail.com" | "proton.me" | "pm.me" | "protonmail.ch" => local_bridge(),
         _ => return None,
     })
+}
+
+/// A provider that takes an app password and also offers a sign-in through
+/// the browser, which needs a client id the owner registers.
+fn with_browser_sign_in() -> Preset {
+    Preset {
+        oauth: Some("google"),
+        files_sent_itself: true,
+        ..hosts(
+            "imap.gmail.com",
+            "smtp.gmail.com",
+            587,
+            Security::Starttls,
+            "This provider needs an app password, not your usual one, or a sign-in through your browser (it needs a client id you register once).",
+        )
+    }
+}
+
+/// A provider that no longer takes a password for mail programs.
+fn browser_only() -> Preset {
+    Preset {
+        oauth: Some("microsoft"),
+        browser_first: true,
+        files_sent_itself: true,
+        ..hosts(
+            "outlook.office365.com",
+            "smtp.office365.com",
+            587,
+            Security::Starttls,
+            "This provider no longer takes a password here: sign in through your browser. It needs a client id you register once (see docs/oauth-setup.md).",
+        )
+    }
+}
+
+/// A provider reached through a companion program on this computer.
+fn local_bridge() -> Preset {
+    Preset {
+        imap_host: "127.0.0.1".to_string(),
+        imap_port: 1143,
+        imap_security: Security::Starttls,
+        smtp_host: "127.0.0.1".to_string(),
+        smtp_port: 1025,
+        smtp_security: Security::Starttls,
+        note: "This provider needs its companion mail program running on this computer; use the password that program shows you.",
+        oauth: None,
+        browser_first: false,
+        files_sent_itself: false,
+    }
 }
 
 /// The usual names for a domain nobody has listed.

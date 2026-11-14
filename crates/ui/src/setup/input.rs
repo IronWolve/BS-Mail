@@ -7,7 +7,10 @@
 
 use surface::{KeyEvent, LogicalKey, NamedKey};
 
-use super::form::{SetupField, SetupForm};
+use super::fields::SetupField;
+use super::form::SetupForm;
+use super::link_panel::PanelChoice;
+use super::link_panel_input;
 
 /// What the form wants done after an input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -20,6 +23,8 @@ pub enum Outcome {
     Submit,
     /// Leave without saving.
     Quit,
+    /// A button on the sign-in link page, by key or click.
+    Panel(PanelChoice),
 }
 
 const QUIT_NOTE: &str = "press Esc again to leave without saving";
@@ -28,6 +33,9 @@ pub fn handle_key(form: &mut SetupForm, key: &KeyEvent) -> Outcome {
     let held = key.modifiers;
     if held.alt || held.meta {
         return Outcome::Ignored;
+    }
+    if form.link.is_some() {
+        return link_panel_input::key(key);
     }
     if let LogicalKey::Named(NamedKey::Escape) = key.key {
         return escape(form);
@@ -47,6 +55,9 @@ pub fn handle_key(form: &mut SetupForm, key: &KeyEvent) -> Outcome {
 
 /// Typed or pasted text. On a choice a space changes it.
 pub fn handle_text(form: &mut SetupForm, text: &str) -> Outcome {
+    if form.link.is_some() {
+        return link_panel_input::text(text);
+    }
     if form.waiting {
         return Outcome::Ignored;
     }
@@ -121,8 +132,7 @@ fn named_key(form: &mut SetupForm, key: NamedKey, shift: bool, ctrl: bool) -> Ou
 }
 
 fn step(form: &mut SetupForm, forward: bool) {
-    let to = if forward { form.focus.next() } else { form.focus.previous() };
-    form.move_focus(to);
+    form.step_focus(forward);
 }
 
 /// Cursor movement on the focused text field; nothing on a choice.

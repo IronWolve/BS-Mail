@@ -1,109 +1,30 @@
 //! The account form on screen: a column of labelled fields in the middle of
 //! the window, a Connect button, the provider's note and what went wrong.
+//! While the program waits for the browser, the sign-in link page is drawn
+//! instead (`link_panel.rs`).
 
 use surface::{CursorRequest, CursorShape, Frame, Modifier, Rect};
 
-use super::form::{SetupField, SetupForm};
+use super::fields::{SetupField, SignIn};
+use super::form::SetupForm;
+use super::layout::{BUTTON, FORM_COLS, FORM_ROWS, SetupRects, layout};
+use super::link_panel::draw_panel;
 use crate::composer::draw::{horizontal_skip, put_cell};
 use crate::composer::graphemes::{cells_between, list};
 use crate::theme::roles;
 use crate::widgets::{DrawContext, fill_cells, put_text};
 
-/// Cells the labels take, including the gap before the field.
-const LABEL_CELLS: u16 = 20;
-/// Widest the form grows.
-const MAX_WIDTH: u16 = 84;
-/// Rows the form needs: title, intro, three blocks of fields, button, notes.
-pub const FORM_ROWS: u16 = 22;
-/// Narrowest it works in.
-pub const FORM_COLS: u16 = 56;
-/// Cells a port field takes, and the label before it.
-const PORT_CELLS: u16 = 6;
-const PORT_LABEL_CELLS: u16 = 5;
-const BUTTON: &str = " Connect and save ";
 const WAITING_BUTTON: &str = " Connecting\u{2026} ";
 const HINT: &str = "Tab next   Shift+Tab back   Space or arrows change a choice   F10 connect   Esc quit";
 
-/// Where each part sits, for drawing and for clicks.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SetupRects {
-    pub title: Rect,
-    pub intro: Rect,
-    /// The input area of each field, in `SetupField::ALL` order.
-    pub fields: [Rect; 12],
-    pub note: Rect,
-    pub notice: Rect,
-    pub hint: Rect,
-}
-
-impl SetupRects {
-    pub fn field(&self, field: SetupField) -> Rect {
-        self.fields[field.index()]
-    }
-
-    /// The field under a cell, if any. A label counts with its field.
-    pub fn field_at(&self, col: u16, row: u16) -> Option<SetupField> {
-        SetupField::ALL.into_iter().find(|field| {
-            let rect = self.field(*field);
-            let from = rect.x.saturating_sub(self.label_cells(*field));
-            row == rect.y && col >= from && col < rect.right()
-        })
-    }
-
-    fn label_cells(&self, field: SetupField) -> u16 {
-        match field {
-            SetupField::ImapPort | SetupField::SmtpPort => PORT_LABEL_CELLS,
-            _ => LABEL_CELLS,
-        }
-    }
-}
-
-/// The parts of the form inside `area`, or `None` when it is too small.
-pub fn layout(area: Rect) -> Option<SetupRects> {
-    if area.width < FORM_COLS || area.height < FORM_ROWS {
-        return None;
-    }
-    let width = area.width.saturating_sub(2).min(MAX_WIDTH);
-    let x = area.x + (area.width - width) / 2;
-    let top = area.y + (area.height - FORM_ROWS) / 3;
-    let row = |offset: u16| Rect::new(x, top + offset, width, 1);
-    let field_width = width - LABEL_CELLS;
-    let field = |offset: u16| Rect::new(x + LABEL_CELLS, top + offset, field_width, 1);
-    let host = |offset: u16| Rect::new(x + LABEL_CELLS, top + offset, field_width - PORT_LABEL_CELLS - PORT_CELLS - 1, 1);
-    let port = |offset: u16| Rect::new(x + width - PORT_CELLS, top + offset, PORT_CELLS, 1);
-    let save = Rect::new(x + LABEL_CELLS, top + 16, button_cells(), 1);
-    let mut fields = [Rect::default(); 12];
-    let mut put = |which: SetupField, rect: Rect| fields[which.index()] = rect;
-    put(SetupField::Email, field(3));
-    put(SetupField::Password, field(4));
-    put(SetupField::Name, field(5));
-    put(SetupField::ImapHost, host(7));
-    put(SetupField::ImapPort, port(7));
-    put(SetupField::ImapSecurity, field(8));
-    put(SetupField::SmtpHost, host(9));
-    put(SetupField::SmtpPort, port(9));
-    put(SetupField::SmtpSecurity, field(10));
-    put(SetupField::Username, field(12));
-    put(SetupField::AllowChanges, field(13));
-    put(SetupField::Save, save);
-    Some(SetupRects {
-        title: row(0),
-        intro: row(1),
-        fields,
-        note: Rect::new(x, top + 18, width, 2),
-        notice: row(20),
-        hint: Rect::new(area.x + 1, area.bottom() - 1, area.width.saturating_sub(2), 1),
-    })
-}
-
-fn button_cells() -> u16 {
-    u16::try_from(BUTTON.chars().count()).unwrap_or(18)
-}
-
 /// Draws the whole screen: the form fills it.
 pub fn draw_setup(frame: &mut Frame, ctx: &DrawContext<'_>, area: Rect, form: &SetupForm) {
+    if let Some(link) = &form.link {
+        draw_panel(frame, ctx, area, form, link);
+        return;
+    }
     fill_cells(frame, area, ctx.full(roles::BASE));
-    let Some(rects) = layout(area) else {
+    let Some(rects) = layout(area, form.signin) else {
         let text = format!("Window too small for setup (needs {FORM_COLS} x {FORM_ROWS})");
         put_text(frame, area, area.x + 1, area.y, &text, ctx.fg(roles::FOOTER_ERROR));
         return;
@@ -111,10 +32,10 @@ pub fn draw_setup(frame: &mut Frame, ctx: &DrawContext<'_>, area: Rect, form: &S
     put_text(frame, rects.title, rects.title.x, rects.title.y, "Add your email account", ctx.fg(roles::LIST_TITLE));
     let intro = "Your details are kept in a file on this computer that only you can read.";
     put_text(frame, rects.intro, rects.intro.x, rects.intro.y, intro, ctx.fg(roles::READER_HEADER_LABEL));
-    for field in SetupField::ALL {
+    for field in SetupField::ALL.into_iter().filter(|field| form.is_shown(*field)) {
         draw_field(frame, ctx, &rects, form, field);
     }
-    put_text(frame, rects.note, rects.note.x, rects.note.y, form.provider_note, ctx.fg(roles::LIST_HINT_LABEL));
+    draw_note(frame, ctx, rects.note, form.provider_note);
     draw_notice(frame, ctx, rects.notice, form);
     let hint = Rect::new(rects.hint.x, rects.hint.y, rects.hint.width, 1);
     put_text(frame, hint, hint.x, hint.y, HINT, ctx.fg(roles::LIST_HINT_LABEL));
@@ -145,6 +66,7 @@ fn choice_text(form: &SetupForm, field: SetupField) -> String {
     match field {
         SetupField::ImapSecurity => format!("< {} >", form.imap_security.label()),
         SetupField::SmtpSecurity => format!("< {} >", form.smtp_security.label()),
+        SetupField::SignIn => format!("< {} >", form.signin.label()),
         _ if form.allow_changes => "Yes: mail can be changed and sent".to_string(),
         _ => "No: read-only, nothing is changed or sent".to_string(),
     }
@@ -154,10 +76,14 @@ fn draw_text(frame: &mut Frame, rect: Rect, form: &SetupForm, field: SetupField,
     let Some(buffer) = form.buffer(field) else {
         return;
     };
-    let room = usize::from(rect.width.saturating_sub(2));
-    let masked = field == SetupField::Password;
-    let skip = if masked { masked_skip(buffer.cursor().col, room) } else { horizontal_skip(buffer, room) };
     let inner = Rect::new(rect.x + 1, rect.y, rect.width.saturating_sub(1), 1);
+    if buffer.is_empty() && form.focus != field && !field.placeholder().is_empty() {
+        put_text(frame, inner, inner.x, rect.y, field.placeholder(), style.add_modifier(Modifier::DIM));
+        return;
+    }
+    let room = usize::from(rect.width.saturating_sub(2));
+    let masked = field.is_secret();
+    let skip = if masked { masked_skip(buffer.cursor().col, room) } else { horizontal_skip(buffer, room) };
     let selection = buffer.selection().filter(|_| form.focus == field);
     let line = &buffer.lines()[0];
     let mut x = inner.x;
@@ -180,16 +106,46 @@ fn draw_button(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, form: &Setu
     } else {
         ctx.full(roles::KEYBAR_CAP)
     };
-    let text = if form.waiting { WAITING_BUTTON } else { BUTTON };
+    let text = if form.waiting {
+        WAITING_BUTTON
+    } else if form.signin == SignIn::Browser {
+        " Sign in and save "
+    } else {
+        BUTTON
+    };
     fill_cells(frame, rect, style);
     put_text(frame, rect, rect.x, rect.y, text, style);
 }
 
+/// The provider's note, over as many of its rows as it takes.
+fn draw_note(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, note: &str) {
+    for (offset, line) in (0..rect.height).zip(wrap_words(note, usize::from(rect.width))) {
+        let row = Rect::new(rect.x, rect.y + offset, rect.width, 1);
+        put_text(frame, row, row.x, row.y, &line, ctx.fg(roles::LIST_HINT_LABEL));
+    }
+}
+
+/// Text broken at spaces into lines of at most `width` characters.
+pub fn wrap_words(text: &str, width: usize) -> Vec<String> {
+    let mut lines: Vec<String> = Vec::new();
+    for word in text.split_whitespace() {
+        match lines.last_mut() {
+            Some(line) if line.chars().count() + 1 + word.chars().count() <= width => {
+                line.push(' ');
+                line.push_str(word);
+            }
+            _ => lines.push(word.to_string()),
+        }
+    }
+    lines
+}
+
 fn draw_notice(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, form: &SetupForm) {
-    let (text, style) = match (&form.notice, form.waiting) {
-        (Some(notice), _) => (notice.as_str(), ctx.fg(roles::FOOTER_ERROR)),
-        (None, true) => ("Connecting to the server\u{2026}", ctx.fg(roles::FOOTER_TEXT)),
-        (None, false) => return,
+    let (text, style) = match (&form.notice, &form.info, form.waiting) {
+        (Some(notice), _, _) => (notice.as_str(), ctx.fg(roles::FOOTER_ERROR)),
+        (None, Some(info), _) => (info.as_str(), ctx.fg(roles::FOOTER_TEXT)),
+        (None, None, true) => ("Connecting to the server\u{2026}", ctx.fg(roles::FOOTER_TEXT)),
+        (None, None, false) => return,
     };
     put_text(frame, rect, rect.x, rect.y, text, style);
 }
@@ -202,7 +158,7 @@ fn cursor_request(rects: &SetupRects, form: &SetupForm) -> Option<CursorRequest>
     let rect = rects.field(form.focus);
     let room = usize::from(rect.width.saturating_sub(2));
     let col = buffer.cursor().col;
-    let cell = if form.focus == SetupField::Password {
+    let cell = if form.focus.is_secret() {
         col - masked_skip(col, room)
     } else {
         let skip = horizontal_skip(buffer, room);

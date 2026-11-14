@@ -125,6 +125,9 @@ impl AppView {
     /// Text the user cut or copied in the composer, once, for the host to put
     /// on the system clipboard.
     pub fn take_copied(&mut self) -> Option<String> {
+        if let Some(link) = self.setup.as_mut().and_then(|form| form.copied.take()) {
+            return Some(link);
+        }
         self.composer.as_mut()?.copied.take()
     }
 

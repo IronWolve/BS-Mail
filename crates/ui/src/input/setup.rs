@@ -8,12 +8,15 @@
 //! drawn and no key reaches the screen beneath.
 
 use model::{ConnectionState, Event};
-use surface::{ButtonState, InputEvent, PointerButton, Rect};
+use surface::{ButtonState, InputEvent, PointerButton};
 
 use crate::app_view::AppView;
-use crate::setup::draw::layout;
-use crate::setup::input::{Outcome, click, handle_key, handle_text};
 use crate::setup::SetupForm;
+use crate::setup::input::{Outcome, click, handle_key, handle_text};
+use crate::setup::layout::{area_of, layout};
+use crate::setup::link_panel::PanelChoice;
+use crate::setup::link_panel_input;
+use crate::setup::SetupAction;
 
 impl AppView {
     /// Shows the account form instead of the mail, with `note` under the
@@ -22,6 +25,7 @@ impl AppView {
         self.setup = Some(SetupForm::new());
         self.setup_request = None;
         self.setup_online = false;
+        self.setup_actions.clear();
     }
 
     /// Whether the account form is open.
@@ -46,6 +50,49 @@ impl AppView {
         std::mem::take(&mut self.setup_online)
     }
 
+    /// What the form asks the program to do for it (open the link, copy it,
+    /// stop waiting), once each.
+    pub fn take_setup_actions(&mut self) -> Vec<SetupAction> {
+        std::mem::take(&mut self.setup_actions)
+    }
+
+    /// The program is waiting for the user to sign in through a browser: the
+    /// link page shows `url` until the sign-in ends one way or the other.
+    pub fn setup_browser_link(&mut self, url: &str) {
+        if let Some(form) = self.setup.as_mut() {
+            form.waiting = true;
+            form.notice = None;
+            form.info = None;
+            form.link = Some(url.to_string());
+        }
+    }
+
+    /// The browser step is over and the program goes on to the mail server.
+    pub fn setup_browser_done(&mut self) {
+        if let Some(form) = self.setup.as_mut() {
+            form.link = None;
+            form.info = Some("Signed in. Connecting to the mail server\u{2026}".to_string());
+        }
+    }
+
+    /// Something to tell the user on the form or the link page that is not a
+    /// problem, such as that the link was copied.
+    pub fn setup_info(&mut self, text: &str) {
+        if let Some(form) = self.setup.as_mut() {
+            form.notice = None;
+            form.info = Some(text.to_string());
+        }
+    }
+
+    /// Something went wrong on the form or the link page that does not end
+    /// the wait, such as no browser being found to open the link with.
+    pub fn setup_problem(&mut self, text: &str) {
+        if let Some(form) = self.setup.as_mut() {
+            form.info = None;
+            form.notice = Some(text.to_string());
+        }
+    }
+
     /// The account was saved and is working: the form closes and the mail
     /// that has arrived shows.
     pub fn finish_setup(&mut self) {
@@ -57,6 +104,8 @@ impl AppView {
     pub fn setup_failed(&mut self, reason: &str) {
         if let Some(form) = self.setup.as_mut() {
             form.waiting = false;
+            form.link = None;
+            form.info = None;
             form.notice = Some(reason.to_string());
         }
     }
@@ -75,10 +124,14 @@ impl AppView {
                 pos,
                 ..
             } => {
-                let area = Rect::new(0, 0, grid.0, grid.1);
-                match layout(area).and_then(|rects| rects.field_at(pos.col, pos.row)) {
-                    Some(field) => click(form, field),
-                    None => Outcome::Ignored,
+                if form.link.is_some() {
+                    link_panel_input::click(grid, pos.col, pos.row)
+                } else {
+                    let area = area_of(grid);
+                    match layout(area, form.signin).and_then(|rects| rects.field_at(pos.col, pos.row)) {
+                        Some(field) => click(form, field),
+                        None => Outcome::Ignored,
+                    }
                 }
             }
             _ => Outcome::Ignored,
@@ -93,6 +146,36 @@ impl AppView {
             Outcome::Submit => {
                 self.submit_setup();
                 true
+            }
+            Outcome::Panel(choice) => {
+                self.setup_panel(choice);
+                true
+            }
+        }
+    }
+
+    /// A button on the sign-in link page.
+    fn setup_panel(&mut self, choice: PanelChoice) {
+        let Some(form) = self.setup.as_mut() else {
+            return;
+        };
+        let Some(link) = form.link.clone() else {
+            return;
+        };
+        match choice {
+            PanelChoice::Open => {
+                form.info = Some("Opening your browser\u{2026}".to_string());
+                self.setup_actions.push(SetupAction::OpenLink(link));
+            }
+            PanelChoice::Copy => {
+                form.info = Some("The link is on the clipboard (if your terminal allows it).".to_string());
+                form.copied = Some(link);
+            }
+            PanelChoice::Cancel => {
+                form.link = None;
+                form.waiting = false;
+                form.info = None;
+                self.setup_actions.push(SetupAction::CancelSignIn);
             }
         }
     }

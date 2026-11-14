@@ -83,6 +83,8 @@ pub struct AppView {
     pub(crate) setup_request: Option<String>,
     /// The account that was tried has signed in; the program saves it next.
     pub(crate) setup_online: bool,
+    /// What the form asked the program to do, not yet taken.
+    pub(crate) setup_actions: Vec<crate::setup::SetupAction>,
 }
 
 impl AppView {
@@ -115,6 +117,7 @@ impl AppView {
             setup: None,
             setup_request: None,
             setup_online: false,
+            setup_actions: Vec::new(),
         }
     }
 
