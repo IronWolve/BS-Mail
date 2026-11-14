@@ -307,7 +307,7 @@ impl MailBackend for MockBackend {
             Command::Send { message } => vec![Event::MessageSent {
                 account: message.account,
             }],
-            Command::Unlock { .. } => Vec::new(),
+            Command::Unlock { .. } | Command::SelectAccount { .. } => Vec::new(),
         }
     }
 

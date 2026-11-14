@@ -64,6 +64,11 @@ pub enum Command {
     },
     /// Sync one account now.
     SyncNow { account: AccountId },
+    /// The user switched to this account. A backend that serves several
+    /// accounts sends again what the screen needs about it (folders,
+    /// connection, sync status, quota, whether changes are allowed); one that
+    /// serves a single account has nothing to add.
+    SelectAccount { account: AccountId },
     /// Open the credential vault.
     Unlock { passphrase: Secret },
 }

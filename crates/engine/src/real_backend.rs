@@ -173,6 +173,10 @@ fn run_worker(worker: Worker, mut commands: tokio::sync::mpsc::UnboundedReceiver
 
 impl MailBackend for RealBackend {
     fn handle(&mut self, command: Command) -> Vec<Event> {
+        // One account: there is nothing to switch to.
+        if matches!(command, Command::SelectAccount { .. }) {
+            return Vec::new();
+        }
         if let Some(operation) = unavailable_operation(&command, self.writes) {
             return self.unavailable(operation, unavailable_reason(&command, self.writes));
         }
