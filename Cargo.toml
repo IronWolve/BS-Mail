@@ -47,8 +47,8 @@ unicode-width = "0.2" # verify: version not checked against the registry
 unicode-segmentation = "1" # verify: version not checked against the registry
 # Stage 1: frame-to-image output for --render-once and snapshots (host).
 png = "0.18" # verify: version not checked against the registry
-# Stage 1: the terminal's size; Stage 4 adds its raw mode and its events (tty_host).
-crossterm = { version = "0.29", default-features = false }
+# Stage 4: the terminal's size, raw mode and input events (tty_host).
+crossterm = { version = "0.29", default-features = false, features = ["events", "bracketed-paste"] }
 # Stage 5: async runtime for the mail worker thread (engine).
 tokio = { version = "1.54", default-features = false, features = ["rt", "net", "time", "sync", "io-util", "macros"] }
 # Stage 5: IMAP client over any async stream (engine).
@@ -69,3 +69,5 @@ futures-util = { version = "0.3", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 # Stage 8: the system clipboard, for copy and paste in the composer (host).
 arboard = { version = "3", default-features = false, features = ["wayland-data-control"] }
+# Stage 4: leaving the terminal in good order when it is hung up or told to stop (tty_host).
+signal-hook = { version = "0.3", default-features = false }

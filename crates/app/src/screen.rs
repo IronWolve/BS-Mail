@@ -34,6 +34,9 @@ pub struct Screen {
     started: Instant,
     /// Where the sizes are remembered, and what was last written there.
     remember: Option<(PathBuf, State)>,
+    /// Whether the window's grid is part of what is remembered. A terminal's
+    /// grid is the terminal's, so it keeps whatever the window last saved.
+    track_grid: bool,
     /// The title last given to the window, so it is set only when it changes.
     title: String,
 }
@@ -57,6 +60,7 @@ impl Screen {
             ticker: None,
             started: Instant::now(),
             remember: None,
+            track_grid: true,
             title: String::new(),
         }
     }
@@ -68,11 +72,24 @@ impl Screen {
         self
     }
 
+    /// Remembers only the bar sizes, starting from what was loaded: for a
+    /// terminal, whose grid is not the window's.
+    pub fn remember_layout_in(mut self, dir: PathBuf, loaded: State) -> Self {
+        self.track_grid = false;
+        self.remember = Some((dir, loaded));
+        self
+    }
+
     /// What would be remembered now.
     fn state_now(&self) -> State {
+        let grid = if self.track_grid {
+            Some((self.cols, self.rows))
+        } else {
+            self.remember.as_ref().and_then(|(_, saved)| saved.grid)
+        };
         State {
             layout: self.view.prefs().clone(),
-            grid: Some((self.cols, self.rows)),
+            grid,
         }
     }
 

@@ -17,7 +17,13 @@ pub struct Stats {
 
 /// Where the screen went, and what only that way has to report.
 pub enum Shown {
+    /// One draw into the terminal, then exit.
     Terminal,
+    /// A run inside the terminal until the user quits.
+    Tty {
+        frames: u32,
+        depth: &'static str,
+    },
     Window {
         frames: u32,
         points: u8,

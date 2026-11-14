@@ -61,6 +61,11 @@ pub struct Options {
     /// Open the window, draw one frame and stop, for a check with nobody
     /// watching.
     pub smoke: bool,
+    /// In a terminal, draw once and exit instead of running there.
+    pub print: bool,
+    /// How many colors the terminal shows, when named; otherwise it is read
+    /// from the environment.
+    pub color_depth: Option<surface::ColorDepth>,
 }
 
 impl Default for Options {
@@ -78,6 +83,8 @@ impl Default for Options {
             points: DEFAULT_POINTS,
             line_spacing: 1.0,
             smoke: false,
+            print: false,
+            color_depth: None,
         }
     }
 }
@@ -101,6 +108,8 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
             "--help" | "-h" => options.action = Action::Help,
             "--version" | "-V" => options.action = Action::Version,
             "--window" => options.mode = Mode::Window,
+            "--print" => options.print = true,
+            "--color-depth" => options.color_depth = Some(parse_depth(&value(&mut rest, &argument)?)?),
             "--smoke" => {
                 options.mode = Mode::Window;
                 options.smoke = true;
@@ -162,6 +171,11 @@ fn parse_size(text: &str) -> Result<SizeChoice, String> {
         number(cols, "width")?,
         number(rows, "height")?,
     ))
+}
+
+fn parse_depth(text: &str) -> Result<surface::ColorDepth, String> {
+    tty_host::parse_depth(text)
+        .ok_or_else(|| format!("--color-depth wants truecolor, 256, 16 or none, not {text}"))
 }
 
 fn parse_points(text: &str) -> Result<u8, String> {

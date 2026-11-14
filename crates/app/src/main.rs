@@ -18,6 +18,7 @@ mod source;
 mod state_file;
 mod stats;
 mod ticker;
+mod tty_run;
 mod window_run;
 
 use std::process::ExitCode;
@@ -49,6 +50,7 @@ fn main() -> ExitCode {
 /// Shows the screen whichever way this run decided on.
 fn show(options: &cli::Options) -> ExitCode {
     let result = match decide(&options.mode) {
+        Launch::Terminal if live_terminal(options) => tty_run::run(options),
         Launch::Terminal => run::draw(options),
         Launch::Window => window_run::run(options),
         Launch::Picture(path) => picture::render(options, &path),
@@ -65,4 +67,11 @@ fn show(options: &cli::Options) -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// Whether to run inside the terminal rather than draw once: when there is a
+/// terminal to run in on both ends, and a one-shot draw was not asked for.
+fn live_terminal(options: &cli::Options) -> bool {
+    use std::io::IsTerminal;
+    !options.print && std::io::stdin().is_terminal() && std::io::stdout().is_terminal()
 }

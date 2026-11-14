@@ -1,7 +1,9 @@
 //! One cell style as a single SGR escape sequence. Every sequence starts from
 //! a reset, so a terminal never inherits the colors of the cell before it.
 
-use surface::{Color, Modifier, Style};
+use surface::{Color, ColorDepth, Modifier, Style};
+
+use super::color_map::map_color;
 
 /// Turns every attribute off.
 pub const RESET: &str = "\x1b[0m";
@@ -12,15 +14,21 @@ const BG_BASE: u8 = 40;
 /// Added to the base for the bright half of the sixteen.
 const BRIGHT: u8 = 60;
 
-/// The style as one sequence: `ESC [ 0 ; … m`.
+/// The style as one sequence: `ESC [ 0 ; … m`, in true color.
 pub fn sgr(style: &Style) -> String {
+    sgr_at(style, ColorDepth::TrueColor)
+}
+
+/// The style as one sequence, its colors brought down to what the terminal
+/// shows. With no color at all only weight, slant and the like are written.
+pub fn sgr_at(style: &Style, depth: ColorDepth) -> String {
     let mut codes = vec!["0".to_string()];
     codes.extend(modifier_codes(style.add_modifier));
     if let Some(color) = style.fg {
-        codes.push(color_code(color, FG_BASE));
+        codes.push(color_code(map_color(color, depth), FG_BASE));
     }
     if let Some(color) = style.bg {
-        codes.push(color_code(color, BG_BASE));
+        codes.push(color_code(map_color(color, depth), BG_BASE));
     }
     format!("\x1b[{}m", codes.join(";"))
 }

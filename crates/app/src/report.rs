@@ -64,7 +64,9 @@ pub fn help_text() -> String {
          Where it draws (default: a window when started on its own, this\n\
          terminal when started from one):\n  \
          --window           open a window and draw there\n  \
-         --tty              draw in this terminal and exit\n  \
+         --tty              run in this terminal (with --print: draw once and exit)\n  \
+         --print            draw once into the terminal and exit\n  \
+         --color-depth <d>  truecolor, 256, 16 or none (default: from the environment)\n  \
          --render-once <f>  draw once into a picture file and exit\n  \
          --smoke            open a window, draw one frame and stop\n\
          \n\
@@ -91,8 +93,9 @@ pub fn help_text() -> String {
          Ctrl and plus or minus, or Ctrl\n\
          and the wheel, change the text size, Ctrl 0 puts it back, F11 is full\n\
          screen, q or Ctrl Q closes it.\n\
-         The terminal draw leaves out the double-size banner title and the\n\
-         rounded shapes, which only the window can draw.\n",
+         The terminal run takes the same keys and the mouse, and leaves out the\n\
+         double-size banner title and the rounded shapes, which only the\n\
+         window can draw. Ctrl+C is a key in the terminal run: quit with q.\n",
         display_name(),
         version(),
     )
@@ -114,6 +117,10 @@ pub fn print_stats(stats: &Stats) {
         line("messages", paint.green, stats.messages.to_string());
     }
     match &stats.shown {
+        Shown::Tty { frames, depth } => {
+            line("frames", paint.green, frames.to_string());
+            line("colors", paint.green, (*depth).to_string());
+        }
         Shown::Terminal => {
             line("effects", paint.green, format!("{} (not drawn here)", stats.effects));
         }

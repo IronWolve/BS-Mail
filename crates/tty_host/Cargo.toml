@@ -9,3 +9,4 @@ publish = false
 surface = { path = "../surface" }
 unicode-width.workspace = true
 crossterm.workspace = true
+signal-hook.workspace = true
