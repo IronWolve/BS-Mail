@@ -12,13 +12,16 @@ use super::movement::{WHEEL_ROWS, step};
 use super::viewport::{folders_first, list_first};
 use crate::app_view::AppView;
 use crate::layout::{Layout, SectionKind};
-use crate::view_state::{Focus, ListPage};
+use crate::view_state::{Focus, ListPage, OverlayKind};
 use crate::widgets::{BodyView, DrawContext, HighlightRules, row_offsets, visible_rows, visual_len};
 
 impl AppView {
     /// Reacts to one input event on a `cols` x `rows` grid. Returns whether
     /// anything on screen may have changed, so the host knows to redraw.
     pub fn handle_input(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
+        if self.overlays.is_open() {
+            return self.input_over_overlay(event);
+        }
         match event {
             InputEvent::Key(key) => match action_for(key) {
                 Some(action) => {
@@ -47,6 +50,23 @@ impl AppView {
             InputEvent::Wheel { pos, rows, .. } => self.wheel(pos.col, pos.row, *rows, grid),
             _ => false,
         }
+    }
+
+    /// While a screen is open over this one, a key press or a click closes
+    /// it and nothing else reaches the screen underneath.
+    fn input_over_overlay(&mut self, event: &InputEvent) -> bool {
+        let closes = matches!(
+            event,
+            InputEvent::Key(_)
+                | InputEvent::Button {
+                    state: ButtonState::Pressed,
+                    ..
+                }
+        );
+        if closes {
+            self.overlays.open = None;
+        }
+        closes
     }
 
     /// The commands the backend is due, in order. Call after every input
@@ -79,6 +99,7 @@ impl AppView {
             Action::ToggleStar => self.toggle_star(),
             Action::Delete => self.delete_selected(),
             Action::Sync => self.refresh(),
+            Action::Help => self.overlays.open = Some(OverlayKind::Help),
             movement => {
                 let layout = self.layout(grid.0, grid.1);
                 match self.focus {

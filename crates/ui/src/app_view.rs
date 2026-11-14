@@ -15,12 +15,14 @@ use crate::layout::{
     ReaderRegion, SectionKind, SidebarContent, SidebarLayout, compute_layout,
 };
 use crate::theme::{Theme, roles};
-use crate::view_state::{Focus, ListPage, MailSnapshot, Overlays, ScrollState, Selection};
+use crate::view_state::{
+    Focus, ListPage, MailSnapshot, OverlayKind, Overlays, ScrollState, Selection,
+};
 use crate::widgets::{
     BodyView, DrawContext, FolderTreeView, FooterData, HighlightRules, ListRowsView,
     MailboxSummary, ReaderTitleData, StatusLine, StripData, content_rows, draw_account_list,
     draw_account_strip, draw_banner, draw_chrome_lines, draw_folder_tree, draw_footer,
-    draw_key_bar, mark_focused, draw_list_header, draw_list_rows, draw_list_title, draw_reader_body,
+    draw_help, draw_key_bar, mark_focused, draw_list_header, draw_list_rows, draw_list_title, draw_reader_body,
     draw_reader_headers, draw_reader_title, draw_section_title, draw_status_panel, fill_cells,
     put_text, row_offsets, visible_rows,
 };
@@ -37,7 +39,7 @@ pub struct AppView {
     pub(crate) selection: Selection,
     pub(crate) scroll: ScrollState,
     pub(crate) focus: Focus,
-    overlays: Overlays,
+    pub(crate) overlays: Overlays,
     pub(crate) queue: CommandQueue,
     /// The message that will be marked read, and when (milliseconds on the
     /// caller's clock).
@@ -160,6 +162,9 @@ impl AppView {
             self.draw_reader(&mut frame, &ctx, reader);
         }
         self.mark_focus(&mut frame, &layout);
+        if self.overlays.open == Some(OverlayKind::Help) {
+            draw_help(&mut frame, &ctx, area);
+        }
         frame
     }
 
