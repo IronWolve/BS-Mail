@@ -26,6 +26,9 @@ impl AppView {
         if self.picker.is_some() {
             return self.picker_input(event);
         }
+        if self.search_bar.is_some() {
+            return self.search_input(event);
+        }
         if self.overlays.is_open() {
             return self.input_over_overlay(event);
         }
@@ -97,6 +100,7 @@ impl AppView {
             Action::FocusPrevious => self.focus = self.focus.previous(),
             Action::Enter => self.focus = deeper(self.focus),
             Action::Back if self.focus == Focus::List && !self.marked.is_empty() => self.clear_marks(),
+            Action::Back if self.focus == Focus::List && self.search.is_some() => self.end_search(),
             Action::Back => self.focus = shallower(self.focus),
             Action::Right if self.focus == Focus::Sidebar => self.open_folder_or_go_in(),
             Action::Right => self.focus = deeper(self.focus),
@@ -115,6 +119,7 @@ impl AppView {
             Action::Sync => self.refresh(),
             Action::Help => self.overlays.open = Some(OverlayKind::Help),
             Action::Move => self.start_move(),
+            Action::Search => self.start_search(),
             Action::Compose => self.start_compose(ComposeKind::New),
             Action::Reply => self.start_compose(ComposeKind::Reply),
             Action::ReplyAll => self.start_compose(ComposeKind::ReplyAll),
@@ -167,6 +172,7 @@ impl AppView {
             "forward" => self.act(Action::Forward, grid),
             "delete" => self.act(Action::Delete, grid),
             "move" => self.act(Action::Move, grid),
+            "search" => self.act(Action::Search, grid),
             "sync" => self.act(Action::Sync, grid),
             "help" => self.act(Action::Help, grid),
             "quit" => self.quit_requested = true,
@@ -248,6 +254,7 @@ impl AppView {
             self.selection.folder = Some(chosen);
             self.selection.message = None;
             self.selection.message_index = 0;
+            self.search = None;
             self.scroll.list = 0;
             self.scroll.reader = 0;
         }
@@ -269,6 +276,7 @@ impl AppView {
             self.selection.folder = Some(chosen);
             self.selection.message = None;
             self.selection.message_index = 0;
+            self.search = None;
             self.scroll.list = 0;
             self.scroll.reader = 0;
         }

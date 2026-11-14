@@ -57,6 +57,7 @@ impl AppView {
             self.selection.folder = Some(parent);
             self.selection.message = None;
             self.selection.message_index = 0;
+            self.search = None;
             self.scroll.list = 0;
             self.scroll.reader = 0;
         }

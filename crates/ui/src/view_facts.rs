@@ -40,4 +40,19 @@ impl AppView {
     pub(crate) fn selected_account(&self) -> Option<&model::Account> {
         self.selection.account.as_ref().and_then(|id| self.mail.account(id))
     }
+
+    /// What the list's title names: the open mailbox, or the search whose
+    /// results are showing, with how many of them are unread.
+    pub(crate) fn list_summary(&self) -> Option<MailboxSummary> {
+        let Some(search) = &self.search else {
+            return self.mailbox_summary();
+        };
+        let page = self.mail.page.as_ref()?;
+        let unread = page.envelopes.iter().filter(|envelope| !envelope.flags.seen).count();
+        Some(MailboxSummary {
+            name: format!("Search: {}", search.query),
+            unread: u32::try_from(unread).unwrap_or(u32::MAX),
+            total: page.total,
+        })
+    }
 }

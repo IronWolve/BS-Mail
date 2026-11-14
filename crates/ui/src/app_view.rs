@@ -11,7 +11,10 @@ use crate::app_identity::AppIdentity;
 use crate::format::display_width;
 use crate::icons::{IconId, IconSet};
 use crate::composer::ComposeForm;
+use crate::composer::EditorBuffer;
 use crate::move_picker::MovePicker;
+use crate::search::ActiveSearch;
+use crate::search::draw::draw_search_bar;
 use crate::move_picker::draw::draw_picker;
 use crate::composer::draw::draw_composer;
 use crate::input::{CommandQueue, Drag};
@@ -63,6 +66,12 @@ pub struct AppView {
     pub(crate) marked: BTreeSet<MessageId>,
     /// The folder picker, while one is open to move messages.
     pub(crate) picker: Option<MovePicker>,
+    /// The search box, while one is open to take a query.
+    pub(crate) search_bar: Option<EditorBuffer>,
+    /// The search whose results are showing in the list.
+    pub(crate) search: Option<ActiveSearch>,
+    /// The number of the last search asked for, so answers can be told apart.
+    pub(crate) next_request: u64,
 }
 
 impl AppView {
@@ -88,6 +97,9 @@ impl AppView {
             quit_requested: false,
             marked: BTreeSet::new(),
             picker: None,
+            search_bar: None,
+            search: None,
+            next_request: 0,
         }
     }
 
@@ -120,6 +132,7 @@ impl AppView {
     /// Stores what one backend event carries for the regions.
     pub fn apply_event(&mut self, event: Event) {
         self.note_send_outcome(&event);
+        self.note_search_event(&event);
         self.mail.apply(event, &mut self.selection);
         self.prune_marks();
     }
@@ -203,6 +216,9 @@ impl AppView {
         if let Some(picker) = &self.picker {
             draw_picker(&mut frame, &ctx, area, picker, &self.mail.folders);
         }
+        if let Some(bar) = &self.search_bar {
+            draw_search_bar(&mut frame, &ctx, area, bar);
+        }
         if self.overlays.open == Some(OverlayKind::Help) {
             draw_help(&mut frame, &ctx, area);
         }
@@ -285,7 +301,7 @@ impl AppView {
     }
 
     fn draw_list(&self, frame: &mut Frame, ctx: &DrawContext<'_>, list: &ListRegion) {
-        let mailbox = self.mailbox_summary();
+        let mailbox = self.list_summary();
         draw_list_title(frame, ctx, list.title, mailbox.as_ref());
         draw_list_header(frame, ctx, list.header, &list.columns);
         let Some(page) = &self.mail.page else {

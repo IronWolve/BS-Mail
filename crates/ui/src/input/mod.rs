@@ -13,6 +13,7 @@ pub mod hit;
 pub mod marks;
 pub mod movement;
 pub mod picker;
+pub mod search;
 pub mod tree;
 pub mod viewport;
 

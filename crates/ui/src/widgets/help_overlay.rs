@@ -26,6 +26,7 @@ pub const HELP_ROWS: &[(&str, &str)] = &[
     ("d", "delete"),
     ("m", "move to another folder"),
     ("s", "sync now"),
+    ("/", "search the account; Esc brings the folder back"),
     ("c  F2", "write a new message"),
     ("r  R  f", "reply, reply to everyone, forward"),
     ("Ctrl+Enter  F10", "send the message being written"),
