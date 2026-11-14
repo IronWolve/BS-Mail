@@ -10,17 +10,26 @@ use super::attempt::{Attempt, Stage};
 use super::flow::SetupFlow;
 
 impl SetupFlow {
-    /// Starts listening for the browser and shows the link. The tokens will
-    /// be kept in the account's own folder.
+    /// Starts listening for the browser, shows the link and opens it in the
+    /// user's browser at once; the page keeps Open and Copy for when nothing
+    /// appears. The tokens will be kept in the account's own folder.
     pub(super) fn start_browser(&mut self, plan: Plan, view: &mut AppView) {
         let config = plan.config.clone().with_state_dir(&plan.folder);
         match self.logins.start(&config) {
             Ok(login) => {
-                view.setup_browser_link(login.url());
+                let url = login.url().to_string();
+                view.setup_browser_link(&url);
+                self.opener.open(&url);
                 self.attempt = Some(Attempt { plan, stage: Stage::Browser(login) });
             }
             Err(reason) => view.setup_failed(&reason),
         }
+    }
+
+    /// Whether the link page is up and the program is waiting for the user to
+    /// finish in the browser.
+    pub(super) fn waiting_for_browser(&self) -> bool {
+        matches!(&self.attempt, Some(Attempt { stage: Stage::Browser(_), .. }))
     }
 
     /// Looks at whether the user has finished in the browser.

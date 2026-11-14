@@ -1,7 +1,7 @@
 //! The page that shows the sign-in link while the program waits for the user
-//! to finish in their web browser: the link, and buttons to open it, copy it
-//! or give up. The program never opens a browser by itself; the user presses
-//! Open.
+//! to finish in their web browser: the link, and buttons to open it again,
+//! copy it or give up. The program opens the browser itself when the page
+//! comes up; Open and Copy are for when nothing appeared.
 
 use surface::{Frame, Modifier, Rect};
 
@@ -13,10 +13,10 @@ use crate::widgets::{DrawContext, fill_cells, put_text};
 pub const OPEN: &str = " Open in browser ";
 pub const COPY: &str = " Copy link ";
 pub const CANCEL: &str = " Cancel ";
-const HINT: &str = "o or Enter open in your browser   c copy the link   Esc cancel";
+const HINT: &str = "o or Enter open again   c copy the link   Esc cancel";
 const INTRO: [&str; 2] = [
-    "Open this link in a web browser, sign in, and allow access.",
-    "This page finishes by itself when you are done there.",
+    "A browser window is opening: sign in there and allow access.",
+    "This page finishes by itself when you are done.",
 ];
 
 /// A button on the page.

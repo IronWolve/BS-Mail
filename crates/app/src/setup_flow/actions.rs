@@ -20,10 +20,13 @@ impl SetupFlow {
                 SetupAction::CancelSignIn | SetupAction::Abandon => self.abandon(),
             }
         }
+        // The browser's answer can come after the user has given up; the form
+        // they are back on has nothing to say about it.
+        let waiting = self.waiting_for_browser();
         match self.opener.poll() {
-            Some(Ok(())) => view.setup_info(OPENED),
-            Some(Err(reason)) => view.setup_problem(&reason),
-            None => return changed,
+            Some(Ok(())) if waiting => view.setup_info(OPENED),
+            Some(Err(reason)) if waiting => view.setup_problem(&reason),
+            _ => return changed,
         }
         true
     }

@@ -1,10 +1,16 @@
-//! Hands a link to the system's web browser, and only when the user pressed
-//! Open on the sign-in page: nothing here runs by itself, and the tests use a
-//! stand-in that opens nothing.
+//! Hands a link to the user's web browser: the sign-in page does it by itself
+//! when a sign-in starts, and again when the user presses Open. The tests use a
+//! stand-in that opens nothing, and a test that runs the built program sets
+//! `BROWSER` to a command of its own.
+//!
+//! `BROWSER` is the usual way to choose a browser: a command, or several
+//! separated like a `PATH` is, with the link added after its arguments (or put
+//! where a `%s` stands). It is split on spaces and never run through a shell.
 //!
 //! The work happens on its own short thread so the screen never waits for a
 //! browser to start; the answer is picked up with `poll`.
 
+use std::ffi::OsStr;
 use std::io::ErrorKind;
 use std::process::{Command, Stdio};
 use std::sync::mpsc::{Receiver, channel};
@@ -29,22 +35,53 @@ pub trait LinkOpener {
 /// One way of asking the system to open a link.
 #[derive(Debug, Clone)]
 pub struct Launcher {
-    pub program: &'static str,
-    /// Arguments before the link.
-    pub args: &'static [&'static str],
+    pub program: String,
+    /// Arguments before the link. One with `%s` in it has the link put there
+    /// instead, and then the link is not added after.
+    pub args: Vec<String>,
     /// Whether a quick non-zero exit means it failed. Some launchers exit
     /// non-zero after working.
     pub exit_code_counts: bool,
 }
 
 impl Launcher {
-    const fn new(program: &'static str, args: &'static [&'static str]) -> Self {
-        Self { program, args, exit_code_counts: true }
+    fn new(program: &str, args: &[&str]) -> Self {
+        Self { program: program.to_string(), args: args.iter().map(|arg| (*arg).to_string()).collect(), exit_code_counts: true }
+    }
+
+    /// The command line of a launcher with the link in it.
+    fn arguments(&self, url: &str) -> Vec<String> {
+        let placed = self.args.iter().any(|arg| arg.contains("%s"));
+        let mut all: Vec<String> = self.args.iter().map(|arg| arg.replace("%s", url)).collect();
+        if !placed {
+            all.push(url.to_string());
+        }
+        all
     }
 }
 
-/// The launchers to try, in order, for this system.
+/// The launchers a `BROWSER` setting names: each command split on spaces.
+pub fn launchers_from_setting(setting: &OsStr) -> Vec<Launcher> {
+    std::env::split_paths(setting)
+        .filter_map(|command| {
+            let text = command.to_string_lossy().into_owned();
+            let mut words = text.split_whitespace();
+            let program = words.next()?.to_string();
+            let args: Vec<String> = words.map(str::to_string).collect();
+            Some(Launcher { program, args, exit_code_counts: true })
+        })
+        .collect()
+}
+
+/// The launchers to try, in order: what `BROWSER` says, then what this
+/// system has.
 pub fn launchers() -> Vec<Launcher> {
+    let mut all = std::env::var_os("BROWSER").map(|setting| launchers_from_setting(&setting)).unwrap_or_default();
+    all.extend(system_launchers());
+    all
+}
+
+fn system_launchers() -> Vec<Launcher> {
     if cfg!(target_os = "macos") {
         vec![Launcher::new("open", &[])]
     } else if cfg!(target_os = "windows") {
@@ -121,9 +158,8 @@ fn try_each(launchers: &[Launcher], url: &str, settle: Duration) -> Result<(), S
 /// Starts one launcher. `Ok(true)` it worked, `Ok(false)` try the next one
 /// (it is not here, or it failed straight away), `Err` it cannot be used.
 fn run(launcher: &Launcher, url: &str, settle: Duration) -> Result<bool, String> {
-    let spawned = Command::new(launcher.program)
-        .args(launcher.args)
-        .arg(url)
+    let spawned = Command::new(&launcher.program)
+        .args(launcher.arguments(url))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
