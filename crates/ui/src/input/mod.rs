@@ -7,6 +7,7 @@ pub mod action;
 pub mod changes;
 pub mod compose;
 pub mod command_queue;
+pub mod delete_prompt;
 pub mod dispatch;
 pub mod drag;
 pub mod dragging;

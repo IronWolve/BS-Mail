@@ -4,6 +4,7 @@
 pub mod focus;
 pub mod mail_snapshot;
 pub mod overlays;
+pub mod page_merge;
 pub mod scroll;
 pub mod selection;
 

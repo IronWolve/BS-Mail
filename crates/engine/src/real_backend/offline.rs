@@ -41,8 +41,10 @@ impl Worker {
                 self.wanted.body = Some(message);
                 ("fetch body", true)
             }
-            // A search is asked again by the person, never replayed.
+            // A search is asked again by the person, never replayed; nor is a
+            // request for older mail, which the list asks for again.
             Command::Search { .. } => ("search", false),
+            Command::LoadMore { .. } => ("load older mail", false),
             _ => ("sync", false),
         };
         let reason = if remembered {

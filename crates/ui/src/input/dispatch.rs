@@ -29,6 +29,9 @@ impl AppView {
         if self.composer.is_some() {
             return self.composer_input(event, grid);
         }
+        if self.delete_prompt.is_some() {
+            return self.delete_prompt_input(event, grid);
+        }
         if self.picker.is_some() {
             return self.picker_input(event);
         }
@@ -88,7 +91,13 @@ impl AppView {
     /// The commands the backend is due, in order. Call after every input
     /// event and every backend event.
     pub fn take_commands(&mut self) -> Vec<Command> {
-        self.queue.take(&self.selection, &self.mail)
+        let mut commands = self.queue.take(&self.selection, &self.mail);
+        // Older mail is only asked for while the folder's own list is shown,
+        // not while the results of a search are.
+        if self.search.is_none() {
+            commands.extend(self.queue.take_more(&self.selection, &self.mail));
+        }
+        commands
     }
 
     /// Asks the backend to look at the server again, for the open folder and

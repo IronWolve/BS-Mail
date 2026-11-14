@@ -25,6 +25,7 @@ impl MemberCache {
             Event::AccountList(_)
             | Event::HostInfo { .. }
             | Event::EnvelopePage { .. }
+            | Event::OlderEnvelopes { .. }
             | Event::BodyReady { .. }
             | Event::FlagsChanged { .. }
             | Event::SearchResults { .. }

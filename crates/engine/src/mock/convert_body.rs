@@ -22,6 +22,7 @@ pub(crate) fn body_from_rows(rows: &[Vec<SpanRow>], field: &str) -> Result<Body,
     Ok(Body {
         lines,
         attachments: Vec::new(),
+        reply_to: Vec::new(),
     })
 }
 

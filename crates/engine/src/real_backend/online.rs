@@ -120,6 +120,10 @@ impl Worker {
                 let page = self.open_folder(session, folder).await;
                 self.settle("open folder", page)
             }
+            Command::LoadMore { folder, have } => {
+                let page = self.load_more(session, folder, have).await;
+                self.settle("load older mail", page)
+            }
             Command::FetchBody { message } => {
                 let body = self.fetch_body(session, message).await;
                 self.settle("fetch body", body)

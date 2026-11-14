@@ -28,6 +28,7 @@ impl FailedBackend {
 fn operation_name(command: &Command) -> Option<&'static str> {
     match command {
         Command::OpenFolder { .. } => Some("open folder"),
+        Command::LoadMore { .. } => Some("load older mail"),
         Command::FetchBody { .. } => Some("fetch body"),
         Command::SetFlags { .. } => Some("set flags"),
         Command::Move { .. } => Some("move"),

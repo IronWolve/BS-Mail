@@ -32,6 +32,16 @@ pub enum Event {
         total: u32,
         envelopes: Vec<Envelope>,
     },
+    /// A page of older messages for a folder whose first page is already
+    /// listed, to go after the ones listed. `offset` is where it starts in
+    /// the folder's full ordering. Asked for with `Command::LoadMore`.
+    OlderEnvelopes {
+        folder: FolderId,
+        offset: u32,
+        /// Messages in the folder.
+        total: u32,
+        envelopes: Vec<Envelope>,
+    },
     BodyReady {
         message: MessageId,
         body: Body,

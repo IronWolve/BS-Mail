@@ -4,6 +4,7 @@ use model::{
     Account, AccountId, Body, Envelope, Event, Folder, FolderId, MessageId, SyncStatus,
 };
 
+use super::page_merge::{append_older, merge_newest};
 use super::selection::Selection;
 
 /// The machine the engine runs on, for the strip's host segment.
@@ -108,26 +109,44 @@ impl MailSnapshot {
         }
     }
 
+    /// A page of a folder. The newest page read again keeps the older mail
+    /// that was loaded below it; any other page replaces what is shown.
+    fn apply_page(&mut self, folder: FolderId, offset: u32, total: u32, envelopes: Vec<Envelope>, selection: &mut Selection) {
+        // A page for a folder the user has already left is stale.
+        if selection.folder.is_some_and(|chosen| chosen != folder) {
+            return;
+        }
+        let shown = self.page.take().filter(|page| page.folder == folder && offset == 0);
+        let envelopes = match shown {
+            Some(shown) => merge_newest(shown.envelopes, total, envelopes),
+            None => envelopes,
+        };
+        selection.page_loaded(folder, &envelopes);
+        self.error = None;
+        self.page = Some(ListPage { folder, offset, total, envelopes });
+    }
+
+    /// A page of older mail. It only means something next to the list it
+    /// follows: the same folder, still open.
+    fn apply_older(&mut self, folder: FolderId, total: u32, envelopes: Vec<Envelope>, selection: &Selection) {
+        let Some(page) = self.page.as_mut().filter(|page| page.folder == folder) else {
+            return;
+        };
+        if selection.folder != Some(folder) {
+            return;
+        }
+        page.envelopes = append_older(std::mem::take(&mut page.envelopes), envelopes);
+        page.total = total;
+        self.error = None;
+    }
+
     fn apply_list_event(&mut self, event: Event, selection: &mut Selection) {
         match event {
-            Event::EnvelopePage {
-                folder,
-                offset,
-                total,
-                envelopes,
-            } => {
-                // A page for a folder the user has already left is stale.
-                if selection.folder.is_some_and(|chosen| chosen != folder) {
-                    return;
-                }
-                selection.page_loaded(folder, &envelopes);
-                self.error = None;
-                self.page = Some(ListPage {
-                    folder,
-                    offset,
-                    total,
-                    envelopes,
-                });
+            Event::EnvelopePage { folder, offset, total, envelopes } => {
+                self.apply_page(folder, offset, total, envelopes, selection);
+            }
+            Event::OlderEnvelopes { folder, total, envelopes, .. } => {
+                self.apply_older(folder, total, envelopes, selection);
             }
             Event::BodyReady { message, body } => {
                 self.error = None;

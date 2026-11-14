@@ -276,6 +276,7 @@ fn placeholder_body() -> Body {
             }],
         }],
         attachments: Vec::new(),
+        reply_to: Vec::new(),
     }
 }
 
@@ -294,6 +295,8 @@ impl MailBackend for MockBackend {
     fn handle(&mut self, command: Command) -> Vec<Event> {
         match command {
             Command::OpenFolder { folder } => self.open_folder(folder),
+            // The mock's first page already holds every message it has.
+            Command::LoadMore { .. } => Vec::new(),
             Command::FetchBody { message } => self.fetch_body(message),
             Command::SetFlags { messages, change } => self.set_flags(&messages, change),
             Command::Move { messages, to } => self.move_to(&messages, to),

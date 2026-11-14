@@ -28,14 +28,25 @@ pub struct Original<'a> {
     pub text: String,
     /// Its date as the reader shows it.
     pub date: String,
+    /// Where its sender asks answers to go (Reply-To); empty when it has no
+    /// such header.
+    pub reply_to: Vec<Address>,
 }
 
-/// A reply to the sender; with `everyone`, also to the others on the message
-/// except the user's own address.
+/// The addresses a reply goes to: where the sender asked for answers when the
+/// message says so, else the sender.
+fn answer_to(original: &Original<'_>) -> Vec<Address> {
+    if original.reply_to.is_empty() { original.envelope.from.clone() } else { original.reply_to.clone() }
+}
+
+/// A reply to the sender, or to where the sender asked answers to go; with
+/// `everyone`, also to the others on the message except the user's own
+/// address.
 pub fn reply(original: &Original<'_>, own: &str, everyone: bool) -> Draft {
     let envelope = original.envelope;
-    let to: Vec<Address> = envelope.from.iter().filter(|a| !is_same(&a.email, own)).cloned().collect();
-    let to = if to.is_empty() { envelope.from.clone() } else { to };
+    let target = answer_to(original);
+    let to: Vec<Address> = target.iter().filter(|a| !is_same(&a.email, own)).cloned().collect();
+    let to = if to.is_empty() { target } else { to };
     let mut cc = Vec::new();
     if everyone {
         for address in envelope.to.iter().chain(&envelope.cc) {

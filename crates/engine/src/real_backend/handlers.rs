@@ -91,6 +91,36 @@ impl Worker {
         }])
     }
 
+    /// The page of older messages that follows the `have` newest ones: the
+    /// mailbox is opened read-only, so nothing changes on the server. Nothing
+    /// older, or a folder that was rebuilt in between, says so instead.
+    pub(super) async fn load_more(
+        &mut self,
+        session: &mut ImapSession,
+        folder: FolderId,
+        have: u32,
+    ) -> Result<Vec<Event>, SessionError> {
+        let Some(path) = self.state.folder_path(folder).map(str::to_owned) else {
+            let reason = format!("unknown folder id: {}", folder.0);
+            return Ok(vec![self.sink.failure("load older mail", reason)]);
+        };
+        let info = session.examine(&path).await?;
+        if self.state.note_validity(folder, info.uid_validity) {
+            let reason = "the folder was rebuilt on the server; refresh it";
+            return Ok(vec![self.sink.failure("load older mail", reason)]);
+        }
+        let fetched = session.fetch_page(info.exists, have, PAGE_SIZE).await?;
+        if fetched.is_empty() {
+            return Ok(Vec::new());
+        }
+        Ok(vec![Event::OlderEnvelopes {
+            folder,
+            offset: have,
+            total: info.exists,
+            envelopes: self.envelopes_of(folder, &fetched),
+        }])
+    }
+
     /// One message's body, rendered for the reading pane.
     pub(super) async fn fetch_body(
         &mut self,

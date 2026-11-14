@@ -66,6 +66,10 @@ pub(super) fn plan(command: Command, slot_of: SlotOf<'_>) -> Plan {
             Some((slot, folder)) => Plan::to(slot, Command::OpenFolder { folder }),
             None => Plan::not_an_id(),
         },
+        Command::LoadMore { folder, have } => match decode_folder(folder) {
+            Some((slot, folder)) => Plan::to(slot, Command::LoadMore { folder, have }),
+            None => Plan::not_an_id(),
+        },
         Command::FetchBody { message } => match decode_message(message) {
             Some((slot, message)) => Plan::to(slot, Command::FetchBody { message }),
             None => Plan::not_an_id(),

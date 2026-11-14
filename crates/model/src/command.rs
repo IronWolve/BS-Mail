@@ -44,6 +44,10 @@ pub struct OutgoingMessage {
 pub enum Command {
     /// Load the newest page of a folder's envelopes.
     OpenFolder { folder: FolderId },
+    /// Load the page of older messages that follows the `have` newest ones
+    /// of a folder whose first page is already shown. The answer is an
+    /// `OlderEnvelopes` whose `offset` is `have`.
+    LoadMore { folder: FolderId, have: u32 },
     /// Load and render one message body.
     FetchBody { message: MessageId },
     /// Change flags on one or more messages.

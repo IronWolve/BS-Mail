@@ -34,6 +34,17 @@ pub(super) fn remap_event(slot: Slot, event: Event) -> Mapped<Event> {
             total,
             envelopes: remap_envelopes(slot, envelopes)?,
         },
+        Event::OlderEnvelopes {
+            folder,
+            offset,
+            total,
+            envelopes,
+        } => Event::OlderEnvelopes {
+            folder: folder_id(slot, folder)?,
+            offset,
+            total,
+            envelopes: remap_envelopes(slot, envelopes)?,
+        },
         Event::BodyReady { message, body } => Event::BodyReady {
             message: message_id(slot, message)?,
             body,

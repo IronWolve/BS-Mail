@@ -73,7 +73,8 @@ impl AppView {
 
     /// Deletes the marked messages, or the selected one, and moves the
     /// selection to the nearest message that stays, so the refreshed page
-    /// keeps the user's place.
+    /// keeps the user's place. In the Trash that removes mail for good, so
+    /// the user is asked first.
     pub(crate) fn delete_selected(&mut self) {
         let ids = self.targets();
         if ids.is_empty() {
@@ -82,10 +83,11 @@ impl AppView {
         if !self.changes_allowed_or_note() {
             return;
         }
-        let neighbor = self.neighbor_outside(&ids);
-        self.selection.message = neighbor;
-        self.clear_marks();
-        self.queue.push(Command::Delete { messages: ids });
+        if self.deleting_for_good() {
+            self.ask_before_deleting(ids);
+            return;
+        }
+        self.send_delete(ids);
     }
 
     fn current_selected_id(&self) -> Option<MessageId> {

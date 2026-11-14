@@ -1,4 +1,7 @@
-//! A message body as styled lines, plus its attachment list.
+//! A message body as styled lines, plus its attachment list and the
+//! address its answers should go to.
+
+use crate::address::Address;
 
 /// What a run of body text is; each role maps to a `body.*` theme role.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -43,4 +46,7 @@ pub struct AttachmentInfo {
 pub struct Body {
     pub lines: Vec<StyledLine>,
     pub attachments: Vec<AttachmentInfo>,
+    /// Where the sender asks answers to go (the Reply-To header); empty when
+    /// the message has none.
+    pub reply_to: Vec<Address>,
 }

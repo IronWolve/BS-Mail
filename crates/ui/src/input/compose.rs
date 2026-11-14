@@ -61,18 +61,15 @@ impl AppView {
         let folder = self.selection.folder?;
         let page = self.mail.page.as_ref().filter(|page| page.folder == folder)?;
         let envelope = page.envelopes.get(self.selection.message_index)?;
-        let text = self
-            .mail
-            .body
-            .as_ref()
-            .filter(|(id, _)| *id == envelope.id)
-            .map(|(_, body)| body_text(body))
-            .unwrap_or_default();
+        let body = self.mail.body.as_ref().filter(|(id, _)| *id == envelope.id).map(|(_, body)| body);
+        let text = body.map(body_text).unwrap_or_default();
+        let reply_to = body.map(|body| body.reply_to.clone()).unwrap_or_default();
         let time = CivilTime::from_unix(envelope.date.unix, envelope.date.offset_minutes);
         let original = Original {
             envelope,
             text,
             date: format_pattern(&self.config.reader.date_format, &time),
+            reply_to,
         };
         Some(match kind {
             ComposeKind::Forward => (forward(&original), None),

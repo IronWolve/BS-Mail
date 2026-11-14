@@ -12,6 +12,8 @@ use crate::format::display_width;
 use crate::icons::IconSet;
 use crate::composer::ComposeForm;
 use crate::composer::EditorBuffer;
+use crate::delete_prompt::DeletePrompt;
+use crate::delete_prompt::draw::draw_delete_prompt;
 use crate::move_picker::MovePicker;
 use crate::options::OptionsState;
 use crate::options::draw::draw_options;
@@ -72,6 +74,8 @@ pub struct AppView {
     pub(crate) marked: BTreeSet<MessageId>,
     /// The folder picker, while one is open to move messages.
     pub(crate) picker: Option<MovePicker>,
+    /// The question before mail is deleted for good, while it is open.
+    pub(crate) delete_prompt: Option<DeletePrompt>,
     /// The search box, while one is open to take a query.
     pub(crate) search_bar: Option<EditorBuffer>,
     /// The search whose results are showing in the list.
@@ -121,6 +125,7 @@ impl AppView {
             quit_requested: false,
             marked: BTreeSet::new(),
             picker: None,
+            delete_prompt: None,
             search_bar: None,
             search: None,
             next_request: 0,
@@ -165,6 +170,9 @@ impl AppView {
     pub fn apply_event(&mut self, event: Event) {
         self.note_send_outcome(&event);
         self.note_search_event(&event);
+        if matches!(event, Event::EnvelopePage { offset: 0, .. }) {
+            self.queue.first_page_arrived();
+        }
         self.mail.apply(event, &mut self.selection);
         self.prune_marks();
     }
@@ -255,6 +263,9 @@ impl AppView {
         }
         if let Some(picker) = &self.picker {
             draw_picker(&mut frame, &ctx, area, picker, &self.mail.folders);
+        }
+        if let Some(prompt) = &self.delete_prompt {
+            draw_delete_prompt(&mut frame, &ctx, area, prompt);
         }
         if let Some(bar) = &self.search_bar {
             draw_search_bar(&mut frame, &ctx, area, bar);

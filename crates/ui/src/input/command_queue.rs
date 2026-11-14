@@ -9,11 +9,18 @@ use model::{Command, FolderId, MessageId};
 
 use crate::view_state::{MailSnapshot, Selection};
 
+/// How close to the end of the loaded messages the selection gets before the
+/// next older page is asked for.
+const NEAR_END: usize = 10;
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct CommandQueue {
     explicit: Vec<Command>,
     asked_folder: Option<FolderId>,
     asked_body: Option<MessageId>,
+    /// The folder and the number of messages loaded when older mail was last
+    /// asked for, so it is asked for once.
+    asked_more: Option<(FolderId, usize)>,
 }
 
 impl CommandQueue {
@@ -27,6 +34,30 @@ impl CommandQueue {
     pub fn forget(&mut self) {
         self.asked_folder = None;
         self.asked_body = None;
+        self.asked_more = None;
+    }
+
+    /// The newest page of a folder arrived again, from a refresh or after a
+    /// reconnect. A request for older mail may have been lost on the way, so
+    /// it can be made again.
+    pub fn first_page_arrived(&mut self) {
+        self.asked_more = None;
+    }
+
+    /// The request for older mail that is due: the selection is near the end
+    /// of what is loaded and the folder has more. Asked once for each number
+    /// of messages loaded.
+    pub fn take_more(&mut self, selection: &Selection, mail: &MailSnapshot) -> Option<Command> {
+        let folder = selection.folder?;
+        let page = mail.page.as_ref().filter(|page| page.folder == folder)?;
+        let have = page.envelopes.len();
+        let more = u64::from(page.total) > u64::from(page.offset) + u64::try_from(have).ok()?;
+        let near = selection.message_index + NEAR_END >= have;
+        if !(more && near) || self.asked_more == Some((folder, have)) {
+            return None;
+        }
+        self.asked_more = Some((folder, have));
+        Some(Command::LoadMore { folder, have: u32::try_from(have).ok()? })
     }
 
     /// Every command due now: the explicit ones, then whatever the selection

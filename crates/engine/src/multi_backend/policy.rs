@@ -32,6 +32,7 @@ pub(super) fn classify(event: &Event) -> Class {
         | Event::Quota { .. }
         | Event::SyncProgress { .. } => Class::Status,
         Event::EnvelopePage { .. }
+        | Event::OlderEnvelopes { .. }
         | Event::BodyReady { .. }
         | Event::FlagsChanged { .. }
         | Event::SearchResults { .. } => Class::Answer,
