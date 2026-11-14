@@ -5,6 +5,7 @@
 pub mod app_identity;
 pub mod app_view;
 pub mod borders;
+pub mod composer;
 pub mod format;
 pub mod icons;
 pub mod input;
