@@ -6,7 +6,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::capabilities::Capabilities;
-use crate::frame::Frame;
+use crate::frame::{Color, Frame};
 use crate::input_event::InputEvent;
 use crate::pointer_shape::PointerShape;
 
@@ -80,6 +80,19 @@ pub trait Presenter {
 
     /// Asks for a pointer shape; a host without shapes ignores it.
     fn set_pointer_shape(&mut self, shape: PointerShape);
+
+    /// Asks for a new text size in points and a row-height multiplier. A host
+    /// whose font is not its own to change (a terminal) ignores it. When the
+    /// change altered how many cells fit, returns the grid the host now has,
+    /// so the screen draws at that size; otherwise `None`.
+    fn set_text_size(&mut self, _points: u8, _line_spacing: f32) -> Option<(u16, u16)> {
+        None
+    }
+
+    /// Tells the host what the theme means by plain text and plain
+    /// background, for the cells that name no color and for the margin around
+    /// the grid; a host that takes its colors from elsewhere ignores it.
+    fn set_base_colors(&mut self, _text: Color, _background: Color) {}
 
     /// Asks the host to call `EventSink::on_redraw` soon.
     fn request_redraw(&mut self);

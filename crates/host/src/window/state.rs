@@ -4,13 +4,13 @@
 
 use std::sync::Arc;
 
-use surface::{Capabilities, Frame, HostError, PointerShape, Presenter, Waker};
+use surface::{Capabilities, Color, Frame, HostError, PointerShape, Presenter, Waker};
 use winit::event_loop::EventLoopProxy;
 use winit::window::{CursorIcon, Fullscreen, Window};
 
 use crate::clipboard::SystemClipboard;
 use crate::font::{CellMetrics, FontSet, GlyphCache};
-use crate::paint::{Canvas, Grid, PaintContext, paint_frame};
+use crate::paint::{Canvas, Grid, Ink, PaintContext, Palette, paint_frame};
 use crate::present::SoftwarePresenter;
 
 use super::geometry::grid_for;
@@ -220,6 +220,23 @@ impl Presenter for WindowState<'_> {
         }
     }
 
+    fn set_text_size(&mut self, points: u8, line_spacing: f32) -> Option<(u16, u16)> {
+        let before = self.grid;
+        // The size the Options screen asked for is the one Ctrl+0 goes back to.
+        self.options.points = points;
+        self.options.line_spacing = line_spacing;
+        self.points = points;
+        self.remeasure();
+        self.request_redraw();
+        (self.grid != before).then_some(self.grid)
+    }
+
+    fn set_base_colors(&mut self, text: Color, background: Color) {
+        let old = self.options.palette;
+        self.options.palette = Palette::new(old.resolve(text, Ink::Foreground), old.resolve(background, Ink::Background));
+        self.request_redraw();
+    }
+
     fn request_redraw(&mut self) {
         if let Some(window) = &self.window {
             window.request_redraw();
@@ -250,3 +267,6 @@ fn cursor_icon(shape: PointerShape) -> CursorIcon {
         PointerShape::RowResize => CursorIcon::RowResize,
     }
 }
+
+#[cfg(test)]
+include!("state.tests.rs");
