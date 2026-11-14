@@ -13,6 +13,7 @@ mod fonts;
 mod identity;
 mod launch_mode;
 mod link_opener;
+mod oauth_clients;
 mod options_flow;
 mod paths;
 mod picture;

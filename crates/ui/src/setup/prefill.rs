@@ -78,6 +78,7 @@ impl SetupForm {
         form.username_touched = true;
         form.name_touched = true;
         form.signin_touched = true;
+        form.client_touched = !prefill.client_id.is_empty();
         form.note_provider(&prefill);
         form
     }

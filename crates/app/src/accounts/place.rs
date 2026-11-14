@@ -58,6 +58,15 @@ impl Place {
         }
     }
 
+    /// The data folder this run keeps its own files in: the one holding the
+    /// accounts folder, or the folder of the `--account` file.
+    pub fn data_folder(&self) -> PathBuf {
+        match self {
+            Self::Root(root) => folder_of_file(root),
+            Self::File(file) => folder_of_file(file),
+        }
+    }
+
     /// The folder to show as the accounts folder.
     pub fn accounts_folder(&self) -> PathBuf {
         match self {

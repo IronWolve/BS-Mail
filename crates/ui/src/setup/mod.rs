@@ -15,9 +15,11 @@ pub mod link_panel;
 pub mod link_panel_input;
 pub mod prefill;
 pub mod providers;
+pub mod saved_client;
 
 pub use account_id::account_id_for;
 pub use action::SetupAction;
 pub use fields::{Security, SetupField, SignIn};
 pub use form::SetupForm;
 pub use prefill::AccountPrefill;
+pub use saved_client::SavedClient;

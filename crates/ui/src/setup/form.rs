@@ -11,6 +11,7 @@ use crate::composer::EditorBuffer;
 
 use super::fields::{Security, SetupField, SignIn};
 use super::providers::{Preset, preset_for};
+use super::saved_client::SavedClient;
 
 #[derive(Clone)]
 pub struct SetupForm {
@@ -51,12 +52,17 @@ pub struct SetupForm {
     /// The id of the account being edited; `None` for a new account, whose id
     /// is made from the address when the file text is made.
     pub(super) edit_id: Option<String>,
+    /// The client ids the program already holds, by provider.
+    pub(crate) saved_clients: Vec<SavedClient>,
     /// The provider files a copy of sent mail itself, so the program must not.
     pub(super) files_sent_itself: bool,
     pub(super) servers_touched: bool,
     pub(super) username_touched: bool,
     pub(super) name_touched: bool,
     pub(super) signin_touched: bool,
+    /// The user, or the account being edited, set the client id or secret, so
+    /// a saved one is not put over it.
+    pub(super) client_touched: bool,
 }
 
 impl Default for SetupForm {
@@ -93,11 +99,13 @@ impl SetupForm {
             copied: None,
             quit_armed: false,
             edit_id: None,
+            saved_clients: Vec::new(),
             files_sent_itself: false,
             servers_touched: false,
             username_touched: false,
             name_touched: false,
             signin_touched: false,
+            client_touched: false,
         }
     }
 
@@ -137,7 +145,7 @@ impl SetupForm {
     pub fn is_empty(&self) -> bool {
         self.email.is_empty()
             && self.password.is_empty()
-            && self.client_id.is_empty()
+            && (self.client_id.is_empty() || !self.client_touched)
             && !self.name_touched
             && !self.servers_touched
     }
@@ -184,12 +192,31 @@ impl SetupForm {
         let preset = preset_for(email);
         self.provider_note = preset.as_ref().map_or("", |preset| preset.note);
         self.oauth_provider = preset.as_ref().and_then(|preset| preset.oauth);
+        self.fill_saved_client();
         if !self.signin_touched {
             let browser = preset.as_ref().is_some_and(|preset| preset.browser_first);
             self.signin = if browser { SignIn::Browser } else { SignIn::Password };
         }
         if let (Some(preset), false) = (preset, self.servers_touched) {
             self.fill_servers(&preset);
+        }
+    }
+
+    /// Puts the client id the program holds for this provider into the form,
+    /// unless the user has typed their own; a provider with none leaves the
+    /// rows empty for the user to fill once.
+    fn fill_saved_client(&mut self) {
+        if self.client_touched {
+            return;
+        }
+        let saved = self
+            .oauth_provider
+            .and_then(|provider| self.saved_clients.iter().find(|client| client.provider == provider))
+            .cloned();
+        self.client_id.set_text(saved.as_ref().map_or("", |client| client.client_id.as_str()));
+        self.client_secret.set_text(saved.as_ref().map_or("", |client| client.client_secret.as_str()));
+        if saved.is_some() && self.signin == SignIn::Browser {
+            self.info = Some("Signing in uses the client id this program already has for this provider.".to_string());
         }
     }
 
@@ -216,6 +243,7 @@ impl SetupForm {
             SetupField::Username => self.username_touched = true,
             SetupField::Name => self.name_touched = true,
             SetupField::SignIn => self.signin_touched = true,
+            SetupField::ClientId | SetupField::ClientSecret => self.client_touched = true,
             _ => {}
         }
     }

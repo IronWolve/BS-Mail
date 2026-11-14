@@ -5,6 +5,8 @@ use engine::MembersHandle;
 use model::AccountId;
 use ui::AccountSummary;
 
+use crate::oauth_clients::ClientStore;
+
 use super::place::Place;
 use super::summary::summaries_in_order;
 
@@ -26,6 +28,11 @@ impl Live {
     pub fn summaries(&self) -> Vec<AccountSummary> {
         let scan = self.place.scan();
         summaries_in_order(&scan.found, &self.members.ids())
+    }
+
+    /// The client ids this run's data folder holds for all accounts.
+    pub fn clients(&self) -> ClientStore {
+        ClientStore::in_folder(&self.place.data_folder())
     }
 
     /// The ids the running accounts hold, as text.

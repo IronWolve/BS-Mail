@@ -22,7 +22,9 @@ impl AppView {
     /// Shows the account form instead of the mail, with `note` under the
     /// title when there is something to say about where it will be saved.
     pub fn open_setup(&mut self) {
-        self.setup = Some(SetupForm::new());
+        let mut form = SetupForm::new();
+        form.saved_clients = self.saved_clients.clone();
+        self.setup = Some(form);
         self.setup_request = None;
         self.setup_online = false;
         self.setup_actions.clear();
@@ -31,10 +33,19 @@ impl AppView {
     /// Shows the account form filled with an existing account's details, for
     /// the user to change.
     pub fn open_setup_with(&mut self, prefill: AccountPrefill) {
-        self.setup = Some(SetupForm::from_prefill(prefill));
+        let mut form = SetupForm::from_prefill(prefill);
+        form.saved_clients = self.saved_clients.clone();
+        self.setup = Some(form);
         self.setup_request = None;
         self.setup_online = false;
         self.setup_actions.clear();
+    }
+
+    /// The client ids the program holds for providers, so that a form for a
+    /// second account with the same provider is filled in and asks for
+    /// nothing. Replaces the earlier list; an open form keeps what it has.
+    pub fn set_saved_clients(&mut self, clients: Vec<crate::setup::SavedClient>) {
+        self.saved_clients = clients;
     }
 
     /// Whether the account form is open.

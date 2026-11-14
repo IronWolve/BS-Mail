@@ -23,4 +23,4 @@ pub mod widgets;
 pub use app_identity::AppIdentity;
 pub use app_view::AppView;
 pub use options::{AccountSummary, OptionsAction, OptionsPaths};
-pub use setup::AccountPrefill;
+pub use setup::{AccountPrefill, SavedClient};

@@ -59,10 +59,11 @@ pub(super) fn empty(view: AppView, base: Base, place: Place, source: PathBuf) ->
     real(view, base, Vec::new(), place, (source, "saves to"))
 }
 
-fn real(view: AppView, base: Base, members: Vec<Member>, place: Place, source: (PathBuf, &'static str)) -> Scene {
+fn real(mut view: AppView, base: Base, members: Vec<Member>, place: Place, source: (PathBuf, &'static str)) -> Scene {
     let count = members.len();
     let multi = MultiBackend::new(members);
     let live = Live::new(place, multi.members());
+    view.set_saved_clients(live.clients().load());
     Scene {
         view,
         messages: 0,

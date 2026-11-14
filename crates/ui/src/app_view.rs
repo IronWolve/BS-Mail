@@ -89,6 +89,9 @@ pub struct AppView {
     pub(crate) setup_online: bool,
     /// What the form asked the program to do, not yet taken.
     pub(crate) setup_actions: Vec<crate::setup::SetupAction>,
+    /// The client ids the program holds, which the form fills in for a
+    /// provider it knows.
+    pub(crate) saved_clients: Vec<crate::setup::SavedClient>,
     /// The Options screen, while it is open.
     pub(crate) options: Option<OptionsState>,
     /// What the program told the Options screen, and what it asked for.
@@ -126,6 +129,7 @@ impl AppView {
             setup_request: None,
             setup_online: false,
             setup_actions: Vec::new(),
+            saved_clients: Vec::new(),
             options: None,
             options_host: OptionsHost::default(),
         }

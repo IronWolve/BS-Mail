@@ -11,6 +11,7 @@ mod attempt;
 mod browser;
 mod finish;
 mod flow;
+mod remember;
 mod starter;
 mod trial;
 

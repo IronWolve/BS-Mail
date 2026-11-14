@@ -22,6 +22,7 @@ impl SetupFlow {
             return view.setup_failed(&reason);
         }
         self.created = None;
+        self.remember_client(&plan, view);
         let id = AccountId(plan.id.clone());
         let member = Member::new(id.clone(), plan.config.name.clone(), plan.config.address.clone(), trial);
         if plan.edit {
