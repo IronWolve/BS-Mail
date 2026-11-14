@@ -59,6 +59,8 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
 # Stage 5: bundled root certificates, the same on every platform (engine).
 webpki-roots = "1"
+# Stage 9: the SHA-256 for the sign-in link's PKCE challenge; already in the tree through the TLS crate (engine).
+ring = { version = "0.17.14", default-features = false }
 # Stage 5: MIME parsing and charset decoding; 1.x needs a newer compiler than the pinned one (engine).
 mail-parser = "0.11"
 # Stage 5: HTML bodies to wrapped text with numbered link references (engine).

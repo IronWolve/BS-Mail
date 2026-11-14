@@ -2,14 +2,14 @@
 //! account's SMTP server. This file only declares and re-exports the
 //! modules.
 
-mod base64;
+pub(crate) mod base64;
 mod check;
 mod date;
 mod flowed;
 mod header_block;
 mod limits;
 mod message;
-mod random;
+pub(crate) mod random;
 mod reply_ids;
 mod smtp;
 mod transfer;

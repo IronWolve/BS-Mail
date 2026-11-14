@@ -4,6 +4,8 @@ use std::io;
 
 use async_imap::error::Error as ImapError;
 
+use crate::text_clean::single_line;
+
 /// A failure to get from nothing to a signed-in session.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConnectError {
@@ -16,8 +18,15 @@ pub enum ConnectError {
     TlsFailed(String),
     /// STARTTLS was asked for and the server does not do it.
     StartTlsMissing,
-    /// The server refused the user name or password.
+    /// The server refused the user name or password. Holds the server's own
+    /// words, or nothing.
     AuthFailed(String),
+    /// The access token could not be had just now (no network to the sign-in
+    /// service, or it is down). Worth retrying later.
+    SignInTrouble(String),
+    /// An OAuth2 sign-in was refused by the server, or the saved sign-in is
+    /// gone or ended. Holds the words behind it. Retrying cannot help.
+    OAuthRefused(String),
     /// The server greeted with something that is not a usable IMAP session
     /// (a goodbye, a pre-authenticated session, garbage).
     Greeting(String),
@@ -29,13 +38,13 @@ impl ConnectError {
     /// Retrying the same settings cannot succeed, so the worker stops until
     /// the user asks again.
     pub fn is_permanent(&self) -> bool {
-        !matches!(self, Self::Unreachable(_) | Self::Greeting(_))
+        !matches!(self, Self::Unreachable(_) | Self::Greeting(_) | Self::SignInTrouble(_))
     }
 
     /// The operation name the footer shows with the reason.
     pub fn operation(&self) -> &'static str {
         match self {
-            Self::AuthFailed(_) => "login",
+            Self::AuthFailed(_) | Self::OAuthRefused(_) | Self::SignInTrouble(_) => "login",
             _ => "connect",
         }
     }
@@ -44,6 +53,7 @@ impl ConnectError {
     pub fn reason(&self) -> String {
         match self {
             Self::Unreachable(text) => format!("host unreachable: {text}"),
+            Self::SignInTrouble(words) => format!("could not renew the sign-in just now, will try again ({words})"),
             Self::CertificateNotTrusted(text) => {
                 format!("certificate not trusted: {text}")
             }
@@ -51,15 +61,60 @@ impl ConnectError {
             Self::StartTlsMissing => "the server does not offer STARTTLS, so the password \
                  was not sent; use implicit TLS or fix the server"
                 .to_owned(),
-            Self::AuthFailed(text) => {
-                format!("wrong user name or password ({text})")
-            }
+            Self::AuthFailed(words) if words.is_empty() => "wrong user name or password".to_owned(),
+            Self::AuthFailed(words) => format!("wrong user name or password (the server said: {words})"),
+            Self::OAuthRefused(words) => format!(
+                "the sign-in was refused or has ended; run the program with --setup to sign in again ({words})"
+            ),
             Self::Greeting(text) => format!("the server did not accept the connection: {text}"),
             Self::NotLoopback(text) => {
                 format!("refusing a plain or unverified connection to a non-local address: {text}")
             }
         }
     }
+}
+
+/// The server's own words in an error from the IMAP library, which wraps
+/// them as `code: <code>, info: Some("<words>")`: only the words, with
+/// control characters removed. Text that is not in that form is taken as the
+/// words themselves.
+pub fn server_words(text: &str) -> String {
+    const OPEN: &str = "info: Some(\"";
+    let words = match text.split_once(OPEN) {
+        Some((_, rest)) => unquote(rest.strip_suffix("\")").unwrap_or(rest)),
+        None if text.contains("info: None") => String::new(),
+        None => text.to_owned(),
+    };
+    let one_line = single_line(&words);
+    one_line.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(SERVER_WORDS_MAX).collect()
+}
+
+/// The most characters of a server's own words that are kept.
+const SERVER_WORDS_MAX: usize = 200;
+
+/// Undoes the escapes of Rust's debug form of a string: `\"` and `\\` are
+/// the characters themselves, line breaks and tabs become blanks, and a
+/// `\u{..}` escape is the character, or nothing when it is a control code.
+fn unquote(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('n' | 'r' | 't') | None => out.push(' '),
+            Some('u') => {
+                let hex: String = chars.by_ref().skip_while(|c| *c == '{').take_while(|c| *c != '}').collect();
+                if let Some(decoded) = u32::from_str_radix(&hex, 16).ok().and_then(char::from_u32) {
+                    out.push(decoded);
+                }
+            }
+            Some(other) => out.push(other),
+        }
+    }
+    out
 }
 
 /// A failure of one operation on a signed-in session.

@@ -13,6 +13,7 @@ use super::link::{Link, Progress};
 use super::timeouts::SmtpTimeouts;
 use crate::account_config::Security;
 use crate::account_smtp::SmtpSettings;
+use crate::oauth::TokenSource;
 use crate::send::check::Refusal;
 use crate::send::message::Prepared;
 
@@ -39,8 +40,10 @@ impl Accepted {
 
 /// Sends `prepared` through the account's server. The answer comes as soon
 /// as the server has accepted the message; the goodbye is left to the caller.
+/// `tokens` gives the access token when the account signs in with one.
 pub async fn submit(
     settings: &SmtpSettings,
+    tokens: Option<&TokenSource>,
     limits: SmtpTimeouts,
     prepared: &Prepared,
 ) -> Result<Accepted, SmtpError> {
@@ -48,7 +51,7 @@ pub async fn submit(
         return Err(SmtpError::NoHost);
     };
     let progress = Progress::default();
-    let whole = converse(settings, host, limits, prepared, progress.clone());
+    let whole = converse(settings, tokens, host, limits, prepared, progress.clone());
     match tokio::time::timeout(limits.total, whole).await {
         Ok(result) => result,
         Err(_) if progress.message_begun() => Err(SmtpError::MayHaveBeenSent),
@@ -58,6 +61,7 @@ pub async fn submit(
 
 async fn converse(
     settings: &SmtpSettings,
+    tokens: Option<&TokenSource>,
     host: &str,
     limits: SmtpTimeouts,
     prepared: &Prepared,
@@ -71,7 +75,7 @@ async fn converse(
         link = link.start_tls(settings, host, &caps).await?;
         caps = link.hello().await?;
     }
-    match transact(&mut link, settings, &caps, prepared).await {
+    match transact(&mut link, settings, tokens, &caps, prepared).await {
         Ok(bytes) => Ok(Accepted { bytes, link }),
         Err(SmtpError::MayHaveBeenSent) => Err(SmtpError::MayHaveBeenSent),
         Err(error) => {
@@ -85,10 +89,11 @@ async fn converse(
 async fn transact(
     link: &mut Link,
     settings: &SmtpSettings,
+    tokens: Option<&TokenSource>,
     caps: &ServerCaps,
     prepared: &Prepared,
 ) -> Result<Vec<u8>, SmtpError> {
-    link.sign_in(settings, caps).await?;
+    link.sign_in(settings, caps, tokens).await?;
     let rendered = prepared.render(caps.eight_bit).map_err(SmtpError::Refused)?;
     if !is_wire_safe(&rendered.bytes) {
         return Err(SmtpError::Refused(Refusal::new(

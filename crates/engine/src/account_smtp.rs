@@ -5,10 +5,24 @@
 //! The same loopback-only rules as for the mailbox connection apply:
 //! `smtp_security = "none"` (no TLS at all) and `smtp_trust = "any"` (accept
 //! any certificate) are allowed for loopback hosts only.
+//!
+//! An OAuth2 account signs in to the submission server with the same token
+//! source as the mailbox (SASL XOAUTH2), unless the file sets `smtp_password`
+//! itself: then that password is used as for any account.
 
 use model::Secret;
 
 use crate::account_config::{ConfigError, Security, Trust, is_loopback_host};
+
+/// How the submission server is signed in to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SmtpAuth {
+    /// AUTH PLAIN or LOGIN with `username` and `password`.
+    Password,
+    /// AUTH XOAUTH2 with `username` and an access token from the account's
+    /// token source.
+    OAuth2,
+}
 
 /// How to submit mail for one account, checked and ready to use.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,8 +35,12 @@ pub struct SmtpSettings {
     pub security: Security,
     /// The mailbox user name unless set.
     pub username: String,
-    /// The mailbox password unless set. Never shown in debug output.
+    /// The mailbox password unless set; empty when `auth` is `OAuth2`. Never
+    /// shown in debug output.
     pub password: Secret,
+    /// A password sign-in, or a token sign-in for an OAuth2 account that sets
+    /// no `smtp_password`.
+    pub auth: SmtpAuth,
     pub trust: Trust,
     /// Append what was sent to the Sent folder. On unless set.
     pub save_sent: bool,
@@ -43,7 +61,13 @@ pub(crate) struct RawSmtp {
 impl SmtpSettings {
     /// Fills in the defaults; the mailbox sign-in stands in for the missing
     /// sending one.
-    pub(crate) fn resolve(raw: RawSmtp, mailbox_user: &str, mailbox_password: &Secret) -> Self {
+    pub(crate) fn resolve(
+        raw: RawSmtp,
+        mailbox_user: &str,
+        mailbox_password: &Secret,
+        mailbox_oauth: bool,
+    ) -> Self {
+        let auth = if mailbox_oauth && raw.password.is_none() { SmtpAuth::OAuth2 } else { SmtpAuth::Password };
         let security = raw.security.unwrap_or(Security::Starttls);
         let default_port = match security {
             Security::Starttls => 587,
@@ -58,6 +82,7 @@ impl SmtpSettings {
             password: raw
                 .password
                 .map_or_else(|| mailbox_password.clone(), Secret::new),
+            auth,
             trust: raw.trust.unwrap_or_default(),
             save_sent: raw.save_sent.unwrap_or(true),
         }
@@ -74,7 +99,7 @@ impl SmtpSettings {
         if self.username.is_empty() {
             return invalid("`smtp_username` is empty");
         }
-        if self.password.expose().is_empty() {
+        if self.auth == SmtpAuth::Password && self.password.expose().is_empty() {
             return invalid("`smtp_password` is empty");
         }
         if self.username.contains('\0') || self.password.expose().contains('\0') {

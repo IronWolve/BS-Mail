@@ -3,18 +3,22 @@
 //! rest of the module map.
 
 pub mod account_config;
+mod account_oauth;
 mod account_smtp;
 mod imap_session;
 mod mime_render;
 pub mod mock;
 pub mod mock_backend;
+mod oauth;
 pub mod real_backend;
 mod search;
 mod send;
 mod session_state;
 mod text_clean;
 
-pub use account_config::{AccountConfig, ConfigError, Security, SmtpSettings, Trust};
+pub use account_config::{AccountConfig, ConfigError, Security, SmtpAuth, SmtpSettings, Trust};
+pub use account_oauth::{AuthKind, OAuthSettings};
 pub use mock::{Fixture, FixtureError};
 pub use mock_backend::MockBackend;
+pub use oauth::{BrowserSignIn, HttpLimits, SignInLimits, SignInPoll, TokenError, TokenSource};
 pub use real_backend::RealBackend;

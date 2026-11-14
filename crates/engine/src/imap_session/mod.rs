@@ -38,6 +38,8 @@ mod write_select;
 pub use capabilities::ServerCaps;
 pub use envelope_map::build_envelope;
 pub use error::{ConnectError, SessionError, classify_tls};
+#[cfg(test)]
+pub use error::server_words;
 pub use fetch_envelopes::fetched_row;
 pub use folder_tree::build_tree;
 pub use mutf7::decode as decode_mailbox_name;

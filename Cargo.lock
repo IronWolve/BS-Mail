@@ -577,6 +577,7 @@ dependencies = [
  "html2text",
  "mail-parser",
  "model",
+ "ring",
  "rustls",
  "serde",
  "tokio",

@@ -31,6 +31,13 @@
 //! save_sent = true           # true | false                (default true)
 //! ```
 //!
+//! Signing in with OAuth2 instead of a password (`auth = "oauth2"`, no
+//! `password` needed) is described in `account_oauth.rs`: the keys
+//! `oauth_provider`, `oauth_client_id`, `oauth_client_secret`,
+//! `oauth_auth_url`, `oauth_token_url`, `oauth_scopes` and
+//! `oauth_redirect_host`. The tokens are kept in `oauth/<id>.token` beside
+//! the account file.
+//!
 //! `security = "none"` (no TLS at all) and `trust = "any"` (accept any
 //! certificate, for a local bridge with a self-signed one) are allowed for
 //! loopback hosts only, and so are `smtp_security = "none"` and
@@ -54,8 +61,9 @@ use std::path::Path;
 use model::Secret;
 use serde::Deserialize;
 
-pub use crate::account_smtp::SmtpSettings;
+use crate::account_oauth::{AuthKind, OAuthSettings, RawOAuth, token_file_in};
 use crate::account_smtp::RawSmtp;
+pub use crate::account_smtp::{SmtpAuth, SmtpSettings};
 
 /// How the connection is protected.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
@@ -97,6 +105,7 @@ pub struct AccountConfig {
     pub imap_port: u16,
     pub security: Security,
     pub username: String,
+    /// Empty for an OAuth2 account. Never shown in debug output.
     pub password: Secret,
     pub trust: Trust,
     /// When true, nothing the program does can change the mailbox on the
@@ -107,6 +116,8 @@ pub struct AccountConfig {
     /// Seconds between automatic checks for new mail; 0 means never. A
     /// non-zero value is at least `MIN_POLL_SECONDS`.
     pub poll_seconds: u32,
+    /// How an OAuth2 account signs in; `None` for a password account.
+    pub oauth: Option<OAuthSettings>,
 }
 
 /// Why an account file was refused.
@@ -130,8 +141,8 @@ impl fmt::Display for ConfigError {
             Self::Invalid(text) => write!(f, "the account file is not allowed: {text}"),
             Self::Permissions { path, mode } => write!(
                 f,
-                "the account file {path} holds a password and is readable by other users \
-                 (mode {mode:o}); run: chmod 600 {path}"
+                "the account file {path} holds a password or client secret and is readable by \
+                 other users (mode {mode:o}); run: chmod 600 {path}"
             ),
         }
     }
@@ -149,7 +160,16 @@ struct RawAccount {
     #[serde(default)]
     security: Security,
     username: String,
-    password: String,
+    password: Option<String>,
+    #[serde(default)]
+    auth: AuthKind,
+    oauth_provider: Option<String>,
+    oauth_client_id: Option<String>,
+    oauth_client_secret: Option<String>,
+    oauth_auth_url: Option<String>,
+    oauth_token_url: Option<String>,
+    oauth_scopes: Option<Vec<String>>,
+    oauth_redirect_host: Option<String>,
     #[serde(default)]
     trust: Trust,
     #[serde(default = "read_only_by_default")]
@@ -179,22 +199,65 @@ fn read_only_by_default() -> bool {
     true
 }
 
+/// The OAuth2 settings of an account that asks for them; `None` for a
+/// password account.
+fn resolve_oauth(raw: &mut RawAccount) -> Result<Option<OAuthSettings>, ConfigError> {
+    if raw.auth != AuthKind::Oauth2 {
+        return Ok(None);
+    }
+    let asked = RawOAuth {
+        provider: raw.oauth_provider.take(),
+        client_id: raw.oauth_client_id.take(),
+        client_secret: raw.oauth_client_secret.take(),
+        auth_url: raw.oauth_auth_url.take(),
+        token_url: raw.oauth_token_url.take(),
+        scopes: raw.oauth_scopes.take(),
+        redirect_host: raw.oauth_redirect_host.take(),
+    };
+    OAuthSettings::resolve(asked, raw.imap_host.trim()).map(Some)
+}
+
+/// The mailbox password: whatever the file says for a password account
+/// (which must say something), nothing for an OAuth2 account.
+fn mailbox_password(given: Option<String>, oauth: bool) -> Result<String, ConfigError> {
+    if oauth {
+        return Ok(String::new());
+    }
+    given.ok_or_else(|| {
+        ConfigError::Parse("missing field `password` (it is only optional when auth = \"oauth2\")".to_owned())
+    })
+}
+
 impl AccountConfig {
-    /// Reads and checks the account file at `path`.
+    /// Reads and checks the account file at `path`. An OAuth2 account keeps
+    /// its tokens in `oauth/<id>.token` in the same folder.
     pub fn from_file(path: &Path) -> Result<Self, ConfigError> {
         check_private(path)?;
         let text = std::fs::read_to_string(path).map_err(|e| ConfigError::Read(e.to_string()))?;
-        Self::from_toml_str(&text)
+        let folder = path.parent().unwrap_or_else(|| Path::new(""));
+        Self::from_toml_str(&text).map(|config| config.with_state_dir(folder))
+    }
+
+    /// Where an OAuth2 account keeps its tokens: `<dir>/oauth/<id>.token`.
+    /// For text parsed in memory, which has no folder of its own. A password
+    /// account is returned as it is.
+    pub fn with_state_dir(mut self, dir: &Path) -> Self {
+        let file = token_file_in(dir, &self.id);
+        if let Some(oauth) = self.oauth.as_mut() {
+            oauth.token_file = file;
+        }
+        self
     }
 
     /// Parses and checks account file text.
     pub fn from_toml_str(text: &str) -> Result<Self, ConfigError> {
-        let raw: RawAccount = toml::from_str(text).map_err(|e| ConfigError::Parse(e.to_string()))?;
+        let mut raw: RawAccount = toml::from_str(text).map_err(|e| ConfigError::Parse(e.to_string()))?;
         let default_port = match raw.security {
             Security::Implicit => 993,
             Security::Starttls | Security::None => 143,
         };
-        let password = Secret::new(raw.password);
+        let oauth = resolve_oauth(&mut raw)?;
+        let password = Secret::new(mailbox_password(raw.password.take(), oauth.is_some())?);
         let smtp = SmtpSettings::resolve(
             RawSmtp {
                 host: raw.smtp_host,
@@ -207,6 +270,7 @@ impl AccountConfig {
             },
             &raw.username,
             &password,
+            oauth.is_some(),
         );
         let config = Self {
             name: raw.name.unwrap_or_else(|| raw.address.clone()),
@@ -221,6 +285,7 @@ impl AccountConfig {
             read_only: raw.read_only,
             smtp,
             poll_seconds: resolve_poll_seconds(raw.poll_seconds),
+            oauth,
         };
         config.validate()?;
         Ok(config)
@@ -245,7 +310,7 @@ impl AccountConfig {
         if self.username.is_empty() {
             return invalid("`username` is empty".to_owned());
         }
-        if self.password.expose().is_empty() {
+        if self.oauth.is_none() && self.password.expose().is_empty() {
             return invalid("`password` is empty".to_owned());
         }
         self.check_loopback_only()?;

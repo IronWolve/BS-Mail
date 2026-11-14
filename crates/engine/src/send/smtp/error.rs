@@ -93,6 +93,13 @@ pub enum SmtpError {
     Declined(Said),
     SignInRefused(Said),
     SignInUnsupported(Vec<String>),
+    /// The server refused the access token (or its error text was answered
+    /// and it then said no).
+    OAuthRefused(Said),
+    /// The saved sign-in is gone or has ended: sign in again.
+    SignInEnded(String),
+    /// No access token just now (the provider could not be reached).
+    TokenUnavailable(String),
     SenderRefused(String, Said),
     RecipientRefused(String, Said),
     /// The server's size limit, when it said one.
@@ -133,18 +140,11 @@ impl SmtpError {
             Self::Declined(said) => format!(
                 "the mail server did not accept the connection ({said}); nothing was sent"
             ),
-            Self::SignInRefused(said) if said.is_temporary() => format!(
-                "the mail server could not check the user name and password just now ({said}); \
-                 nothing was sent"
-            ),
-            Self::SignInRefused(said) => format!(
-                "the mail server refused the user name or password ({said}); nothing was sent"
-            ),
-            Self::SignInUnsupported(offered) => format!(
-                "the mail server offers no sign-in method this program supports (it offers: {}); \
-                 nothing was sent",
-                offered.join(", ")
-            ),
+            Self::SignInRefused(_)
+            | Self::SignInUnsupported(_)
+            | Self::OAuthRefused(_)
+            | Self::SignInEnded(_)
+            | Self::TokenUnavailable(_) => self.sign_in_reason(),
             Self::SenderRefused(address, said) => format!(
                 "the mail server refused the sender address {address} ({said}); nothing was sent"
             ),
@@ -162,6 +162,41 @@ impl SmtpError {
             ),
             Self::Refused(refusal) => refusal.reason().to_owned(),
             Self::MayHaveBeenSent => MAY_HAVE_BEEN_SENT.to_owned(),
+        }
+    }
+}
+
+impl SmtpError {
+    /// The sentence for a failure of the sign-in itself.
+    fn sign_in_reason(&self) -> String {
+        match self {
+            Self::SignInRefused(said) if said.is_temporary() => format!(
+                "the mail server could not check the user name and password just now ({said}); \
+                 nothing was sent"
+            ),
+            Self::SignInRefused(said) => format!(
+                "the mail server refused the user name or password ({said}); nothing was sent"
+            ),
+            Self::SignInUnsupported(offered) => format!(
+                "the mail server offers no sign-in method this program supports (it offers: {}); \
+                 nothing was sent",
+                offered.join(", ")
+            ),
+            Self::OAuthRefused(said) if said.is_temporary() => format!(
+                "the mail server could not check the sign-in just now ({said}); nothing was sent"
+            ),
+            Self::OAuthRefused(said) => format!(
+                "the mail server refused the sign-in ({said}); run the program with --setup to \
+                 sign in again; nothing was sent"
+            ),
+            Self::SignInEnded(words) => format!(
+                "the sign-in was refused or has ended; run the program with --setup to sign in \
+                 again ({words}); nothing was sent"
+            ),
+            Self::TokenUnavailable(words) => format!(
+                "could not get a sign-in token just now ({words}); nothing was sent"
+            ),
+            _ => String::new(),
         }
     }
 }

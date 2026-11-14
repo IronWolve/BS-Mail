@@ -20,8 +20,9 @@ use super::sink::EventSink;
 use super::stop::Stop;
 use super::unsupported::SEND_READ_ONLY_REASON;
 use super::worker::Worker;
-use crate::account_smtp::SmtpSettings;
+use crate::account_smtp::{SmtpAuth, SmtpSettings};
 use crate::imap_session::{ImapSession, SessionError};
+use crate::oauth::{HttpLimits, TokenSource};
 use crate::send::{
     Checked, Prepared, ReplyIds, Sender, SmtpError, SmtpTimeouts, check, now_unix, submit,
 };
@@ -29,6 +30,9 @@ use crate::send::{
 /// What a send task needs, all of it owned.
 struct SendJob {
     settings: SmtpSettings,
+    /// Gives the access token when the submission server is signed in to
+    /// with one.
+    tokens: Option<TokenSource>,
     limits: SmtpTimeouts,
     sink: EventSink,
     stop: Stop,
@@ -104,8 +108,13 @@ impl Worker {
                 return;
             }
         };
+        let tokens = match self.config.smtp.auth {
+            SmtpAuth::OAuth2 => TokenSource::with_limits(&self.config, HttpLimits::within(self.timing.smtp.connect)),
+            SmtpAuth::Password => None,
+        };
         let job = SendJob {
             settings: self.config.smtp.clone(),
+            tokens,
             limits: self.timing.smtp,
             sink: self.sink.clone(),
             stop: self.stop.clone(),
@@ -128,7 +137,7 @@ async fn watched(job: SendJob, prepared: Prepared) {
 }
 
 async fn deliver(job: SendJob, prepared: Prepared) {
-    let sent = job.stop.guard(submit(&job.settings, job.limits, &prepared)).await;
+    let sent = job.stop.guard(submit(&job.settings, job.tokens.as_ref(), job.limits, &prepared)).await;
     match sent {
         None => {}
         Some(Ok(mut accepted)) => {
