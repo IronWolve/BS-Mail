@@ -8,7 +8,7 @@ use surface::{Capabilities, Frame, Rect};
 use crate::app_identity::AppIdentity;
 use crate::format::display_width;
 use crate::icons::{IconId, IconSet};
-use crate::input::CommandQueue;
+use crate::input::{CommandQueue, Drag};
 use crate::input::viewport::{folders_first, list_first};
 use crate::layout::{
     FolderSpacing, GridSize, Layout, LayoutOptions, LayoutPrefs, ListRegion, MIN_COLS, MIN_ROWS,
@@ -32,7 +32,7 @@ pub struct AppView {
     pub(crate) icons: IconSet,
     capabilities: Capabilities,
     pub(crate) now: MailDate,
-    prefs: LayoutPrefs,
+    pub(crate) prefs: LayoutPrefs,
     pub(crate) mail: MailSnapshot,
     pub(crate) selection: Selection,
     pub(crate) scroll: ScrollState,
@@ -45,6 +45,8 @@ pub struct AppView {
     /// The message this view already marked read by itself, so it is not
     /// marked again right after the user marks it unread.
     pub(crate) auto_marked: Option<MessageId>,
+    /// The bar being dragged, while a button is held on it.
+    pub(crate) drag: Option<Drag>,
 }
 
 impl AppView {
@@ -65,6 +67,7 @@ impl AppView {
             queue: CommandQueue::default(),
             read_timer: None,
             auto_marked: None,
+            drag: None,
         }
     }
 

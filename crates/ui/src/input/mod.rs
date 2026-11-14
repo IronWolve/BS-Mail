@@ -6,10 +6,13 @@ pub mod action;
 pub mod changes;
 pub mod command_queue;
 pub mod dispatch;
+pub mod drag;
+pub mod dragging;
 pub mod hit;
 pub mod movement;
 pub mod viewport;
 
 pub use action::{Action, action_for};
 pub use command_queue::CommandQueue;
+pub use drag::Drag;
 pub use hit::{Hit, HitView, hit_at};

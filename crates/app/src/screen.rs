@@ -85,6 +85,10 @@ impl EventSink for Screen {
             }
             InputEvent::CloseRequested => return Flow::Quit,
             InputEvent::Key(key) if closes(key) => return Flow::Quit,
+            InputEvent::PointerMoved { pos, .. } => {
+                let shape = self.view.pointer_shape(pos.col, pos.row, (self.cols, self.rows));
+                host.set_pointer_shape(shape);
+            }
             _ => {}
         }
         if self.view.handle_input(&event, (self.cols, self.rows)) {

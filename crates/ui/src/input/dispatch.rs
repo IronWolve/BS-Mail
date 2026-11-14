@@ -32,7 +32,18 @@ impl AppView {
                 state: ButtonState::Pressed,
                 pos,
                 ..
-            } => self.click(pos.col, pos.row, grid),
+            } => {
+                if self.begin_drag(pos.col, pos.row, grid) {
+                    return true;
+                }
+                self.click(pos.col, pos.row, grid)
+            }
+            InputEvent::Button {
+                button: PointerButton::Left,
+                state: ButtonState::Released,
+                ..
+            } => self.end_drag(),
+            InputEvent::PointerMoved { pos, .. } => self.drag_to(*pos, grid),
             InputEvent::Wheel { pos, rows, .. } => self.wheel(pos.col, pos.row, *rows, grid),
             _ => false,
         }
