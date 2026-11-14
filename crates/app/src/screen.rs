@@ -14,7 +14,7 @@ use ui::AppView;
 
 use crate::accounts::Live;
 use crate::clock::system_now;
-use crate::options_flow::{self, Opened};
+use crate::options_flow::{self, Opened, Settings, is_setting};
 use crate::pump::pump;
 use crate::setup_flow::SetupFlow;
 use crate::state_file::{self, State};
@@ -50,6 +50,8 @@ pub struct Screen {
     /// The accounts of this run, which the Options screen and the form can
     /// change; `None` for mock mail.
     live: Option<Live>,
+    /// What answers the Options screen's requests about settings.
+    settings: Settings,
 }
 
 impl Screen {
@@ -75,7 +77,15 @@ impl Screen {
             title: String::new(),
             setup: None,
             live: None,
+            settings: Settings::default(),
         }
+    }
+
+    /// Lets the Options screen change and reload the settings `settings`
+    /// describes.
+    pub fn with_settings(mut self, settings: Settings) -> Self {
+        self.settings = settings;
+        self
     }
 
     /// Lets the Options screen and the account form add, change and remove
@@ -147,10 +157,10 @@ impl Screen {
     /// What the Options screen and the account form asked for is answered
     /// first; when that changed which accounts run, mail is moved again so
     /// the new state is on screen before the next frame.
-    fn exchange(&mut self) -> bool {
+    fn exchange(&mut self, host: &mut dyn Presenter) -> bool {
         let mut changed = false;
         for _ in 0..ROUNDS {
-            let asked = self.account_steps();
+            let asked = self.account_steps(host);
             let mail = pump(&mut self.view, self.backend.as_mut()) > 0;
             changed |= asked | mail;
             if !asked {
@@ -161,17 +171,32 @@ impl Screen {
     }
 
     /// The Options screen's requests, then the form's.
-    fn account_steps(&mut self) -> bool {
+    fn account_steps(&mut self, host: &mut dyn Presenter) -> bool {
         let actions = self.view.take_options_actions();
         let mut changed = !actions.is_empty();
         if changed {
-            self.answer_options(actions);
+            self.answer_options(actions, host);
         }
         changed |= self.setup_step();
         changed
     }
 
-    fn answer_options(&mut self, actions: Vec<ui::OptionsAction>) {
+    /// The requests about settings go to the settings, with the host at hand
+    /// to show a new text size; the rest are the accounts'.
+    fn answer_options(&mut self, actions: Vec<ui::OptionsAction>, host: &mut dyn Presenter) {
+        let (about_settings, about_accounts): (Vec<_>, Vec<_>) = actions.into_iter().partition(is_setting);
+        if !about_settings.is_empty()
+            && let Some((cols, rows)) = self.settings.answer(&mut self.view, host, about_settings)
+        {
+            self.cols = cols;
+            self.rows = rows;
+        }
+        if !about_accounts.is_empty() {
+            self.answer_accounts(about_accounts);
+        }
+    }
+
+    fn answer_accounts(&mut self, actions: Vec<ui::OptionsAction>) {
         let edit = match options_flow::answer(&mut self.view, &mut self.backend, self.live.as_ref(), actions) {
             Opened::Nothing => return,
             Opened::New => None,
@@ -227,7 +252,7 @@ impl EventSink for Screen {
             host.set_clipboard(&text);
         }
         if used {
-            self.exchange();
+            self.exchange(host);
             host.request_redraw();
         }
         if matches!(event, InputEvent::Button { state: surface::ButtonState::Released, .. }) {
@@ -242,7 +267,7 @@ impl EventSink for Screen {
         }
         let elapsed = u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX);
         self.view.tick(elapsed);
-        if self.exchange() {
+        if self.exchange(host) {
             host.request_redraw();
         }
         Flow::Continue

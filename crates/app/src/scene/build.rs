@@ -13,6 +13,7 @@ use crate::cli::Options;
 use crate::config_io::{self, CONFIG_NAME};
 use crate::errors::AppError;
 use crate::identity::identity;
+use crate::options_flow::Settings;
 use crate::paths::{accounts_dir, data_dir};
 use crate::source::{Source, choose, needs_scan};
 
@@ -37,12 +38,15 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
     let icons = options.icons.unwrap_or_else(|| icon_kind(loaded.config.appearance.icons));
     let mut view = AppView::new(identity(), loaded.theme, loaded.config, IconSet::new(icons));
     // What is wrong with an account comes before what is wrong with a setting.
+    let note_is_about_settings = scanned.problems.is_empty() && !loaded.problems.is_empty();
     let problems: Vec<String> = scanned.problems.iter().cloned().chain(loaded.problems).collect();
     view.set_config_problem(problems.first().cloned());
     view.set_capabilities(capabilities);
     view.set_options_paths(options_paths(data.as_deref(), &source));
     let mut scene = scene_for(&source, view, base, &scanned)?;
     scene.font = font;
+    scene.settings = Settings::start(options, data.as_deref(), font, note_is_about_settings);
+    scene.view.set_theme_names(scene.settings.theme_names().to_vec());
     if let Some(live) = &scene.live {
         scene.view.set_accounts(live.summaries());
     }
@@ -80,7 +84,7 @@ fn options_paths(data: Option<&Path>, source: &Source) -> OptionsPaths {
 
 /// The icon set a setting asks for. `auto` is the Nerd set: the window
 /// carries its own font, and a terminal's first-run check is not built yet.
-fn icon_kind(mode: model::config::IconMode) -> ui::icons::IconKind {
+pub(crate) fn icon_kind(mode: model::config::IconMode) -> ui::icons::IconKind {
     use model::config::IconMode;
     use ui::icons::IconKind;
     match mode {
@@ -91,12 +95,18 @@ fn icon_kind(mode: model::config::IconMode) -> ui::icons::IconKind {
 }
 
 /// The theme's plain text and plain background, which is what a cell means
-/// when it names no color of its own.
-fn base_colors(theme: &Theme) -> Base {
+/// when it names no color of its own. A theme with no background is black.
+pub(crate) fn plain_colors(theme: &Theme) -> (model::theme_schema::Rgb, model::theme_schema::Rgb) {
     let base = theme.role(roles::BASE);
     let background = base.bg.or_else(|| theme.background());
+    (base.fg, background.unwrap_or(model::theme_schema::Rgb { r: 0, g: 0, b: 0 }))
+}
+
+/// The same two colors, as the window's pixels.
+fn base_colors(theme: &Theme) -> Base {
+    let (text, background) = plain_colors(theme);
     let pixels = |color: model::theme_schema::Rgb| host::Rgb::new(color.r, color.g, color.b);
-    (pixels(base.fg), background.map_or(host::Rgb::new(0, 0, 0), pixels))
+    (pixels(text), pixels(background))
 }
 
 #[cfg(test)]

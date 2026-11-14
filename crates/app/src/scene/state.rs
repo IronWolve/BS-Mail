@@ -8,6 +8,7 @@ use model::{MailBackend, MailDate};
 use ui::AppView;
 
 use crate::accounts::Live;
+use crate::options_flow::Settings;
 use crate::pump::pump;
 
 /// How often a one-shot draw checks whether real mail has arrived.
@@ -40,6 +41,8 @@ pub struct Scene {
     /// Text size in points and row height, from the command line or the
     /// settings.
     pub font: (u8, f32),
+    /// What answers the Options screen's requests about settings.
+    pub settings: Settings,
 }
 
 impl Scene {

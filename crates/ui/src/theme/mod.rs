@@ -9,7 +9,7 @@ pub mod resolve;
 pub mod resolved_style;
 pub mod roles;
 
-pub use builtin::{DEFAULT_THEME_NAME, builtin_theme_text, default_theme, default_theme_text};
+pub use builtin::{DEFAULT_THEME_NAME, builtin_theme_names, builtin_theme_text, default_theme, default_theme_text};
 pub use gradient::{color_at, spread};
 pub use loader::{ThemeError, load_theme_file, merge_inherited, parse_theme_file, validate};
 pub use resolve::Theme;

@@ -24,37 +24,43 @@ pub struct Loaded {
     pub theme: Theme,
     /// One line each, for the footer.
     pub problems: Vec<String>,
+    /// Set when `config.toml` is there but could not be read or understood:
+    /// what was wrong, without what became of the settings. The config is
+    /// then the defaults, which a caller that has settings in force already
+    /// should not take.
+    pub file_problem: Option<String>,
 }
 
 /// Reads the settings in `dir`, or the defaults when there is no folder.
 pub fn load(dir: Option<&Path>) -> Result<Loaded, AppError> {
     let mut problems = Vec::new();
-    let mut config = dir.map_or_else(Config::default, |dir| read_config(dir, &mut problems));
+    let read = dir.map_or_else(|| Ok(Config::default()), read_config);
+    let (mut config, file_problem) = match read {
+        Ok(config) => (config, None),
+        Err(reason) => {
+            problems.push(format!("{reason}; using the defaults"));
+            (Config::default(), Some(reason))
+        }
+    };
     clamp(&mut config, &mut problems);
     let theme = pick_theme(&config.appearance.theme, dir, &mut problems)?;
-    Ok(Loaded { config, theme, problems })
+    Ok(Loaded { config, theme, problems, file_problem })
 }
 
-fn read_config(dir: &Path, problems: &mut Vec<String>) -> Config {
+/// The file's settings, or what was wrong with it. No file is no problem.
+fn read_config(dir: &Path) -> Result<Config, String> {
     let path = dir.join(CONFIG_NAME);
     let text = match fs::read_to_string(&path) {
         Ok(text) => text,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Config::default(),
-        Err(error) => {
-            problems.push(format!("{CONFIG_NAME} could not be read: {error}"));
-            return Config::default();
-        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Config::default()),
+        Err(error) => return Err(format!("{CONFIG_NAME} could not be read: {error}")),
     };
-    match toml::from_str::<Config>(&text) {
-        Ok(config) => config,
-        Err(error) => {
-            // The message says what; the span says where. The rest of the
-            // error quotes the file, which does not belong in a footer.
-            let where_ = error.span().map_or(String::new(), |span| format!(" (line {})", line_of(&text, span.start)));
-            problems.push(format!("{CONFIG_NAME}{where_}: {}; using the defaults", error.message().trim()));
-            Config::default()
-        }
-    }
+    toml::from_str::<Config>(&text).map_err(|error| {
+        // The message says what; the span says where. The rest of the
+        // error quotes the file, which does not belong in a footer.
+        let where_ = error.span().map_or(String::new(), |span| format!(" (line {})", line_of(&text, span.start)));
+        format!("{CONFIG_NAME}{where_}: {}", error.message().trim())
+    })
 }
 
 fn line_of(text: &str, offset: usize) -> usize {
@@ -81,26 +87,41 @@ fn clamp(config: &mut Config, problems: &mut Vec<String>) {
     }
 }
 
-/// The named theme: the built-in one, or `themes/<name>.toml` in the data
-/// folder. Another theme it inherits from is found the same way.
+/// The theme at start: the one the settings name, or the built-in one with a
+/// problem to show when that cannot be had.
 fn pick_theme(name: &str, dir: Option<&Path>, problems: &mut Vec<String>) -> Result<Theme, AppError> {
     let default = || default_theme().map_err(|error| AppError::Theme(error.to_string()));
     if name == DEFAULT_THEME_NAME || name.is_empty() {
         return default();
     }
-    let Some(text) = find_theme_text(name, dir) else {
-        problems.push(format!("theme {name} was not found in {THEMES_DIR}/, using {DEFAULT_THEME_NAME}"));
-        return default();
-    };
-    let found = |wanted: &str| find_theme_text(wanted, dir);
-    match load_theme_file(&text, &found).and_then(|file| Theme::from_file(&file)) {
+    match theme_named(name, dir) {
         Ok(theme) => Ok(theme),
-        Err(error) => {
-            let first = error.to_string().lines().next().unwrap_or_default().to_string();
-            problems.push(format!("theme {name}: {first}; using {DEFAULT_THEME_NAME}"));
+        Err(reason) => {
+            problems.push(format!("{reason}; using {DEFAULT_THEME_NAME}"));
             default()
         }
     }
+}
+
+/// The theme called `name`: the built-in one, or `themes/<name>.toml` in the
+/// data folder; another theme it inherits from is found the same way. A theme
+/// that is not there or does not load gives one line saying why, starting
+/// with `theme <name>`.
+///
+/// The theme goes by the name it was asked for, which is what the settings
+/// file keeps, whatever name its own file gives it or inherits.
+pub fn theme_named(name: &str, dir: Option<&Path>) -> Result<Theme, String> {
+    let Some(text) = find_theme_text(name, dir) else {
+        return Err(format!("theme {name} was not found in {THEMES_DIR}/"));
+    };
+    let found = |wanted: &str| find_theme_text(wanted, dir);
+    let failed = |error: &dyn std::fmt::Display| {
+        let first = error.to_string().lines().next().unwrap_or_default().to_string();
+        format!("theme {name}: {first}")
+    };
+    let mut file = load_theme_file(&text, &found).map_err(|error| failed(&error))?;
+    file.name = name.to_string();
+    Theme::from_file(&file).map_err(|error| failed(&error))
 }
 
 /// A theme's text by name. A name that could point outside the themes folder
@@ -115,7 +136,8 @@ fn find_theme_text(name: &str, dir: Option<&Path>) -> Option<String> {
     fs::read_to_string(dir?.join(THEMES_DIR).join(format!("{name}.toml"))).ok()
 }
 
-fn is_plain_name(name: &str) -> bool {
+/// Whether a theme name is only letters, digits, `-` and `_`.
+pub(crate) fn is_plain_name(name: &str) -> bool {
     !name.is_empty()
         && name
             .chars()

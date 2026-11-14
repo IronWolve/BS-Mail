@@ -31,6 +31,8 @@ strip = true
 serde = { version = "1", features = ["derive"] }
 # Stage 1: parsing the embedded default theme and, later, config files.
 toml = "0.9" # verify: version not checked against the registry
+# Options screen: changing one setting in config.toml and leaving the rest of the file as it is (app).
+toml_edit = { version = "0.25.19", default-features = false, features = ["parse", "display"] }
 # Stage 1: cell buffer, rect, style and color types behind surface/src/frame.rs.
 ratatui-core = { version = "0.1", default-features = false } # verify: split out of the 0.30 widget crate
 # Stage 1: the window and its input events (host).

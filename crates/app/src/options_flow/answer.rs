@@ -8,9 +8,6 @@ use crate::accounts::{Live, MOCK_RUN};
 use super::edit::{add_account, edit_account};
 use super::remove::remove_account;
 
-/// Said for a setting the program does not save yet.
-pub const NOT_BUILT: &str = "Saving this setting is not built yet.";
-
 /// Which account form, if any, the answers opened. The caller makes the flow
 /// that answers it, and needs to know whether the form changes an account.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,7 +20,8 @@ pub enum Opened {
     Editing(String),
 }
 
-/// Answers `actions` in order.
+/// Answers the accounts' requests in `actions` in order. Requests about
+/// settings are `Settings::answer`'s and are passed over here.
 pub fn answer(
     view: &mut AppView,
     backend: &mut Box<dyn MailBackend>,
@@ -48,7 +46,7 @@ pub fn answer(
             | OptionsAction::SetIcons(_)
             | OptionsAction::SetFontSize(_)
             | OptionsAction::SetLineSpacing(_)
-            | OptionsAction::ReloadSettings => view.options_problem(NOT_BUILT),
+            | OptionsAction::ReloadSettings => {}
         }
     }
     opened

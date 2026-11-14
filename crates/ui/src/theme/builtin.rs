@@ -13,6 +13,11 @@ pub fn default_theme_text() -> &'static str {
     DEFAULT_THEME_TEXT
 }
 
+/// The names of the built-in themes, the default first.
+pub fn builtin_theme_names() -> &'static [&'static str] {
+    &[DEFAULT_THEME_NAME]
+}
+
 /// The text of a built-in theme by name; `None` for any other name.
 pub fn builtin_theme_text(name: &str) -> Option<&'static str> {
     (name == DEFAULT_THEME_NAME).then_some(DEFAULT_THEME_TEXT)

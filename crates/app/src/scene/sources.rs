@@ -8,6 +8,7 @@ use ui::AppView;
 
 use crate::accounts::{Live, Place, Scan, members_of, reason_of};
 use crate::errors::AppError;
+use crate::options_flow::Settings;
 
 use super::state::Scene;
 
@@ -31,6 +32,7 @@ pub(super) fn mock(mut view: AppView, base: Base, path: &Path) -> Result<Scene, 
         accounts: None,
         live: None,
         base,
+        settings: Settings::default(),
     })
 }
 
@@ -73,6 +75,7 @@ fn real(view: AppView, base: Base, members: Vec<Member>, place: Place, source: (
         accounts: Some(count),
         live: Some(live),
         base,
+        settings: Settings::default(),
     }
 }
 
