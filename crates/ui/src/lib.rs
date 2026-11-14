@@ -10,6 +10,7 @@ pub mod format;
 pub mod icons;
 pub mod input;
 pub mod layout;
+pub mod move_picker;
 pub mod theme;
 pub mod view_state;
 pub mod widgets;

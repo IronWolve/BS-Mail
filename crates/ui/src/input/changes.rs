@@ -94,7 +94,7 @@ impl AppView {
 
     /// The nearest message that is not in `going`: the first one after the
     /// selected one, else the first before it.
-    fn neighbor_outside(&self, going: &[MessageId]) -> Option<MessageId> {
+    pub(crate) fn neighbor_outside(&self, going: &[MessageId]) -> Option<MessageId> {
         let folder = self.selection.folder?;
         let page = self.mail.page.as_ref().filter(|page| page.folder == folder)?;
         let at = self.selection.message_index;

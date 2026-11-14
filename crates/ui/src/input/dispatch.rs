@@ -23,6 +23,9 @@ impl AppView {
         if self.composer.is_some() {
             return self.composer_input(event, grid);
         }
+        if self.picker.is_some() {
+            return self.picker_input(event);
+        }
         if self.overlays.is_open() {
             return self.input_over_overlay(event);
         }
@@ -111,6 +114,7 @@ impl AppView {
             Action::Delete => self.delete_selected(),
             Action::Sync => self.refresh(),
             Action::Help => self.overlays.open = Some(OverlayKind::Help),
+            Action::Move => self.start_move(),
             Action::Compose => self.start_compose(ComposeKind::New),
             Action::Reply => self.start_compose(ComposeKind::Reply),
             Action::ReplyAll => self.start_compose(ComposeKind::ReplyAll),
@@ -162,6 +166,7 @@ impl AppView {
             "reply_all" => self.act(Action::ReplyAll, grid),
             "forward" => self.act(Action::Forward, grid),
             "delete" => self.act(Action::Delete, grid),
+            "move" => self.act(Action::Move, grid),
             "sync" => self.act(Action::Sync, grid),
             "help" => self.act(Action::Help, grid),
             "quit" => self.quit_requested = true,

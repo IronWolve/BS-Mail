@@ -12,6 +12,7 @@ pub mod dragging;
 pub mod hit;
 pub mod marks;
 pub mod movement;
+pub mod picker;
 pub mod tree;
 pub mod viewport;
 

@@ -24,6 +24,7 @@ pub const HELP_ROWS: &[(&str, &str)] = &[
     ("u", "mark read or unread"),
     ("*", "star or unstar"),
     ("d", "delete"),
+    ("m", "move to another folder"),
     ("s", "sync now"),
     ("c  F2", "write a new message"),
     ("r  R  f", "reply, reply to everyone, forward"),
@@ -108,7 +109,7 @@ fn draw_frame(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect) {
     put_text(frame, clip, hint_at, bottom, CLOSE_HINT, ctx.fg(roles::FOOTER_TEXT));
 }
 
-fn overlaps(a: Rect, b: Rect) -> bool {
+pub(crate) fn overlaps(a: Rect, b: Rect) -> bool {
     a.x < b.right() && b.x < a.right() && a.y < b.bottom() && b.y < a.bottom()
 }
 

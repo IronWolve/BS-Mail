@@ -11,6 +11,8 @@ use crate::app_identity::AppIdentity;
 use crate::format::display_width;
 use crate::icons::{IconId, IconSet};
 use crate::composer::ComposeForm;
+use crate::move_picker::MovePicker;
+use crate::move_picker::draw::draw_picker;
 use crate::composer::draw::draw_composer;
 use crate::input::{CommandQueue, Drag};
 use crate::input::viewport::{folders_first, list_first};
@@ -59,6 +61,8 @@ pub struct AppView {
     pub(crate) quit_requested: bool,
     /// Messages marked with Space, which the change keys then act on together.
     pub(crate) marked: BTreeSet<MessageId>,
+    /// The folder picker, while one is open to move messages.
+    pub(crate) picker: Option<MovePicker>,
 }
 
 impl AppView {
@@ -83,6 +87,7 @@ impl AppView {
             composer: None,
             quit_requested: false,
             marked: BTreeSet::new(),
+            picker: None,
         }
     }
 
@@ -210,6 +215,9 @@ impl AppView {
         self.mark_focus(&mut frame, &layout);
         if let Some(form) = &self.composer {
             draw_composer(&mut frame, &ctx, layout.main, form);
+        }
+        if let Some(picker) = &self.picker {
+            draw_picker(&mut frame, &ctx, area, picker, &self.mail.folders);
         }
         if self.overlays.open == Some(OverlayKind::Help) {
             draw_help(&mut frame, &ctx, area);
