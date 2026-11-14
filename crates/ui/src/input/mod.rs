@@ -14,6 +14,7 @@ pub mod marks;
 pub mod movement;
 pub mod picker;
 pub mod search;
+pub mod setup;
 pub mod tree;
 pub mod viewport;
 

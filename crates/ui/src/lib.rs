@@ -12,8 +12,10 @@ pub mod input;
 pub mod layout;
 pub mod move_picker;
 pub mod search;
+pub mod setup;
 pub mod theme;
 pub mod view_facts;
+pub mod view_sidebar;
 pub mod view_state;
 pub mod widgets;
 

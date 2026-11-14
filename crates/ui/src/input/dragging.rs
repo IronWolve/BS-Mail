@@ -41,6 +41,9 @@ impl AppView {
     /// the one for the bar being dragged for as long as the drag lasts, even
     /// when the pointer has run ahead of it.
     pub fn pointer_shape(&self, col: u16, row: u16, grid: (u16, u16)) -> PointerShape {
+        if self.setup.is_some() {
+            return PointerShape::Arrow;
+        }
         if let Some(drag) = self.drag {
             return drag.shape();
         }

@@ -114,7 +114,7 @@ fn draw_field(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, field: Field
 
 /// How many graphemes of a one-line field are scrolled off the left so the
 /// cursor stays in view.
-fn horizontal_skip(buffer: &EditorBuffer, room: usize) -> usize {
+pub(crate) fn horizontal_skip(buffer: &EditorBuffer, room: usize) -> usize {
     let line = &buffer.lines()[0];
     let col = buffer.cursor().col;
     let mut skip = 0;
@@ -154,7 +154,7 @@ fn draw_notice(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, form: &Comp
 }
 
 /// One grapheme at `x`, in reverse when selected. Returns the next cell.
-fn put_cell(frame: &mut Frame, clip: Rect, x: u16, y: u16, grapheme: &str, style: surface::Style, selected: bool) -> u16 {
+pub(crate) fn put_cell(frame: &mut Frame, clip: Rect, x: u16, y: u16, grapheme: &str, style: surface::Style, selected: bool) -> u16 {
     let style = if selected { style.add_modifier(Modifier::REVERSED) } else { style };
     let next = put_text(frame, clip, x, y, grapheme, style);
     if grapheme.chars().all(char::is_whitespace) && selected {

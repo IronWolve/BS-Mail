@@ -9,31 +9,33 @@ use surface::{Capabilities, Frame, Rect};
 
 use crate::app_identity::AppIdentity;
 use crate::format::display_width;
-use crate::icons::{IconId, IconSet};
+use crate::icons::IconSet;
 use crate::composer::ComposeForm;
 use crate::composer::EditorBuffer;
 use crate::move_picker::MovePicker;
 use crate::search::ActiveSearch;
+use crate::setup::SetupForm;
+use crate::setup::draw::draw_setup;
 use crate::search::draw::draw_search_bar;
 use crate::move_picker::draw::draw_picker;
 use crate::composer::draw::draw_composer;
 use crate::input::{CommandQueue, Drag};
-use crate::input::viewport::{folders_first, list_first};
+use crate::input::viewport::list_first;
 use crate::layout::{
     FolderSpacing, GridSize, Layout, LayoutOptions, LayoutPrefs, ListRegion, MIN_COLS, MIN_ROWS,
-    ReaderRegion, SectionKind, SidebarContent, SidebarLayout, compute_layout,
+    ReaderRegion, SectionKind, SidebarContent, compute_layout,
 };
 use crate::theme::{Theme, roles};
 use crate::view_state::{
     Focus, ListPage, MailSnapshot, OverlayKind, Overlays, ScrollState, Selection,
 };
 use crate::widgets::{
-    BodyView, DrawContext, FolderTreeView, FooterData, HighlightRules, ListRowsView,
-    ReaderTitleData, StatusLine, StripData, content_rows, draw_account_list,
-    draw_account_strip, draw_banner, draw_chrome_lines, draw_folder_tree, draw_footer,
+    BodyView, DrawContext, FooterData, HighlightRules, ListRowsView,
+    ReaderTitleData, StatusLine, StripData, content_rows,
+    draw_account_strip, draw_banner, draw_chrome_lines, draw_footer,
     draw_help, draw_key_bar, mark_focused, draw_list_header, draw_list_rows, draw_list_title, draw_reader_body,
-    draw_reader_headers, draw_reader_title, draw_section_title, draw_status_panel, fill_cells,
-    put_text, row_offsets, visible_rows,
+    draw_reader_headers, draw_reader_title, fill_cells,
+    put_text, visible_rows,
 };
 
 pub struct AppView {
@@ -75,6 +77,12 @@ pub struct AppView {
     /// What was wrong with the user's settings, shown in the footer for as
     /// long as nothing more urgent is.
     pub(crate) config_problem: Option<String>,
+    /// The account form, while the program has no account yet.
+    pub(crate) setup: Option<SetupForm>,
+    /// The account file text the user asked to try, until the program takes it.
+    pub(crate) setup_request: Option<String>,
+    /// The account that was tried has signed in; the program saves it next.
+    pub(crate) setup_online: bool,
 }
 
 impl AppView {
@@ -104,6 +112,9 @@ impl AppView {
             search: None,
             next_request: 0,
             config_problem: None,
+            setup: None,
+            setup_request: None,
+            setup_online: false,
         }
     }
 
@@ -135,6 +146,7 @@ impl AppView {
 
     /// Stores what one backend event carries for the regions.
     pub fn apply_event(&mut self, event: Event) {
+        self.note_setup_event(&event);
         self.note_send_outcome(&event);
         self.note_search_event(&event);
         self.mail.apply(event, &mut self.selection);
@@ -196,6 +208,10 @@ impl AppView {
         let mut frame = Frame::new(Rect::new(0, 0, cols, rows));
         let ctx = DrawContext::new(&self.theme, &self.icons, &self.config, self.now);
         let area = frame.area();
+        if let Some(form) = &self.setup {
+            draw_setup(&mut frame, &ctx, area, form);
+            return frame;
+        }
         fill_cells(&mut frame, area, ctx.full(roles::BASE));
         let layout = self.layout(cols, rows);
         if layout.too_small {
@@ -274,31 +290,6 @@ impl AppView {
         }
     }
 
-    fn draw_sidebar(&self, frame: &mut Frame, ctx: &DrawContext<'_>, sidebar: &SidebarLayout) {
-        for section in &sidebar.sections {
-            let (icon, title) = match section.kind {
-                SectionKind::Folders => (IconId::FolderOpen, "Folders"),
-                SectionKind::Accounts => (IconId::At, "Accounts"),
-                SectionKind::Status => (IconId::Chart, "Status"),
-            };
-            draw_section_title(frame, ctx, section.title, icon, title);
-            match section.kind {
-                SectionKind::Folders => self.draw_folders(frame, ctx, section.body, sidebar.spacing),
-                SectionKind::Accounts => draw_account_list(
-                    frame,
-                    ctx,
-                    section.body,
-                    &self.mail.accounts,
-                    self.selection.account.as_ref(),
-                ),
-                SectionKind::Status => {
-                    let lines = StatusLine::list_from_names(&self.config.sidebar.status_lines);
-                    draw_status_panel(frame, ctx, section.body, &self.mail.status, &lines);
-                }
-            }
-        }
-    }
-
     /// The envelope of the selected message, from the loaded page.
     fn selected_envelope(&self) -> Option<&model::Envelope> {
         self.mail.page.as_ref()?.envelopes.get(self.selection.message_index)
@@ -349,26 +340,6 @@ impl AppView {
             };
             draw_reader_body(frame, ctx, reader.body, &view);
         }
-    }
-
-    fn draw_folders(
-        &self,
-        frame: &mut Frame,
-        ctx: &DrawContext<'_>,
-        body: Rect,
-        spacing: FolderSpacing,
-    ) {
-        let rows = visible_rows(&self.mail.folders);
-        let offsets = row_offsets(&rows, spacing);
-        let selected = self.selection.folder;
-        let first = folders_first(&rows, &offsets, selected, self.scroll.folders, body.height);
-        let view = FolderTreeView {
-            rows: &rows,
-            selected,
-            spacing,
-            first,
-        };
-        draw_folder_tree(frame, ctx, body, &view);
     }
 }
 
