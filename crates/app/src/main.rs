@@ -2,6 +2,7 @@
 //! asks for, and reports what went wrong when it cannot.
 
 mod account_writer;
+mod browser_login;
 mod cli;
 mod clock;
 mod config_io;
@@ -9,6 +10,7 @@ mod errors;
 mod fonts;
 mod identity;
 mod launch_mode;
+mod link_opener;
 mod null_backend;
 mod paths;
 mod picture;
