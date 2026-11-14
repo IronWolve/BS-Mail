@@ -4,7 +4,7 @@
 use std::collections::BTreeSet;
 
 use model::config::Config;
-use model::{ConnectionState, Event, MailDate, MessageId};
+use model::{Event, MailDate, MessageId};
 use surface::{Capabilities, Frame, Rect};
 
 use crate::app_identity::AppIdentity;
@@ -26,7 +26,7 @@ use crate::view_state::{
 };
 use crate::widgets::{
     BodyView, DrawContext, FolderTreeView, FooterData, HighlightRules, ListRowsView,
-    MailboxSummary, ReaderTitleData, StatusLine, StripData, content_rows, draw_account_list,
+    ReaderTitleData, StatusLine, StripData, content_rows, draw_account_list,
     draw_account_strip, draw_banner, draw_chrome_lines, draw_folder_tree, draw_footer,
     draw_help, draw_key_bar, mark_focused, draw_list_header, draw_list_rows, draw_list_title, draw_reader_body,
     draw_reader_headers, draw_reader_title, draw_section_title, draw_status_panel, fill_cells,
@@ -95,22 +95,6 @@ impl AppView {
     /// and for clock times.
     pub fn set_now(&mut self, now: MailDate) {
         self.now = now;
-    }
-
-    /// The window's title: the name, then the open folder and its unread
-    /// count when the options ask for them.
-    pub fn window_title(&self) -> String {
-        let name = self.identity.name.clone();
-        if !self.config.window.title_shows_folder {
-            return name;
-        }
-        let Some(folder) = self.selection.folder.and_then(|id| self.mail.folder(id)) else {
-            return name;
-        };
-        match folder.unread {
-            0 => format!("{name} \u{2014} {}", folder.name),
-            unread => format!("{name} \u{2014} {} ({unread})", folder.name),
-        }
     }
 
     /// What the host showing these frames can do. A window is assumed until
@@ -239,23 +223,6 @@ impl AppView {
         if let Some(title) = title {
             mark_focused(frame, title);
         }
-    }
-
-    fn mailbox_summary(&self) -> Option<MailboxSummary> {
-        let folder = self.mail.folder(self.selection.folder?)?;
-        Some(MailboxSummary {
-            name: folder.name.clone(),
-            unread: folder.unread,
-            total: folder.total,
-        })
-    }
-
-    fn connection(&self) -> ConnectionState {
-        self.selected_account().map_or(ConnectionState::Offline, |account| account.state)
-    }
-
-    pub(crate) fn selected_account(&self) -> Option<&model::Account> {
-        self.selection.account.as_ref().and_then(|id| self.mail.account(id))
     }
 
     fn draw_bands(&self, frame: &mut Frame, ctx: &DrawContext<'_>, layout: &Layout) {
