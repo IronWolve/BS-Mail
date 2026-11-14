@@ -15,6 +15,7 @@ pub mod real_backend;
 mod search;
 mod send;
 mod session_state;
+mod sign_in_advice;
 mod text_clean;
 
 pub use account_config::{AccountConfig, ConfigError, Security, SmtpAuth, SmtpSettings, Trust};

@@ -14,6 +14,7 @@ use super::token_file::{self, FileError, TokenRecord};
 use crate::account_config::AccountConfig;
 use crate::account_oauth::OAuthSettings;
 use crate::send::now_unix;
+use crate::sign_in_advice::sign_in_first;
 
 /// An access token with fewer seconds than this left is refreshed first.
 pub const REFRESH_BELOW_SECONDS: i64 = 60;
@@ -85,7 +86,7 @@ fn renewed_record(old: &TokenRecord, fresh: Tokens) -> TokenRecord {
 
 fn read_failure(error: FileError) -> TokenError {
     match error {
-        FileError::Missing => TokenError::Permanent("not signed in yet, run the program with --setup".to_owned()),
+        FileError::Missing => TokenError::Permanent(format!("not signed in yet, {}", sign_in_first())),
         FileError::Failed(text) => TokenError::Permanent(text),
     }
 }

@@ -8,6 +8,7 @@ use std::fmt;
 use super::reply::Reply;
 use super::wire::WireError;
 use crate::send::check::Refusal;
+use crate::sign_in_advice::sign_in_again;
 
 /// The only reason given when the message may or may not have gone out.
 pub const MAY_HAVE_BEEN_SENT: &str = "the connection dropped while sending, so the message \
@@ -186,12 +187,12 @@ impl SmtpError {
                 "the mail server could not check the sign-in just now ({said}); nothing was sent"
             ),
             Self::OAuthRefused(said) => format!(
-                "the mail server refused the sign-in ({said}); run the program with --setup to \
-                 sign in again; nothing was sent"
+                "the mail server refused the sign-in ({said}); {}; nothing was sent",
+                sign_in_again()
             ),
             Self::SignInEnded(words) => format!(
-                "the sign-in was refused or has ended; run the program with --setup to sign in \
-                 again ({words}); nothing was sent"
+                "the sign-in was refused or has ended; {} ({words}); nothing was sent",
+                sign_in_again()
             ),
             Self::TokenUnavailable(words) => format!(
                 "could not get a sign-in token just now ({words}); nothing was sent"

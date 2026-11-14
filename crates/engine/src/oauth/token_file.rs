@@ -10,6 +10,7 @@ use model::Secret;
 use serde::{Deserialize, Serialize};
 
 use crate::send::random;
+use crate::sign_in_advice::sign_in_again;
 
 /// The tokens of one account.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,12 +48,13 @@ pub fn read(path: &Path) -> Result<TokenRecord, FileError> {
     let text = std::fs::read_to_string(path)
         .map_err(|error| FileError::Failed(format!("cannot read the token file {}: {error}", path.display())))?;
     let parsed: OnDisk = toml::from_str(&text).map_err(|_| {
-        FileError::Failed(format!("the token file {} is not valid; run the program with --setup to sign in again", path.display()))
+        FileError::Failed(format!("the token file {} is not valid; {}", path.display(), sign_in_again()))
     })?;
     if parsed.access_token.is_empty() || parsed.refresh_token.is_empty() {
         return Err(FileError::Failed(format!(
-            "the token file {} has an empty token; run the program with --setup to sign in again",
-            path.display()
+            "the token file {} has an empty token; {}",
+            path.display(),
+            sign_in_again()
         )));
     }
     Ok(TokenRecord {

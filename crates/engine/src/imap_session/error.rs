@@ -4,6 +4,7 @@ use std::io;
 
 use async_imap::error::Error as ImapError;
 
+use crate::sign_in_advice::sign_in_again;
 use crate::text_clean::single_line;
 
 /// A failure to get from nothing to a signed-in session.
@@ -64,7 +65,8 @@ impl ConnectError {
             Self::AuthFailed(words) if words.is_empty() => "wrong user name or password".to_owned(),
             Self::AuthFailed(words) => format!("wrong user name or password (the server said: {words})"),
             Self::OAuthRefused(words) => format!(
-                "the sign-in was refused or has ended; run the program with --setup to sign in again ({words})"
+                "the sign-in was refused or has ended; {} ({words})",
+                sign_in_again()
             ),
             Self::Greeting(text) => format!("the server did not accept the connection: {text}"),
             Self::NotLoopback(text) => {
