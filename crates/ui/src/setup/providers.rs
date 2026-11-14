@@ -66,7 +66,7 @@ fn known(domain: &str) -> Option<Preset> {
         "protonmail.com" | "proton.me" | "pm.me" | "protonmail.ch" => local_bridge(),
         _ => {
             let entry = find(domain)?;
-            hosts(entry.imap, entry.smtp, 587, Security::Starttls, entry.note)
+            hosts(entry.imap, entry.smtp, entry.smtp_port, entry.smtp_security, entry.note)
         }
     })
 }

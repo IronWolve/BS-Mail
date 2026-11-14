@@ -1,7 +1,10 @@
-//! Providers whose whole preset is two server names and a line for the user:
-//! encrypted from the start for incoming mail (993), encrypted after hello for
-//! outgoing (587). Data only; the server names come from each provider's own
-//! help pages, and the notes say "this provider".
+//! Providers whose whole preset is two server names, the outgoing port and a
+//! line for the user: incoming mail is encrypted from the start (993). Data
+//! only; the server names come from each provider's own help pages or, where
+//! those could not be read, from several guides that agree, and the notes say
+//! "this provider".
+
+use super::fields::Security;
 
 /// An app password is the way in.
 const APP_PASSWORD: &str = "This provider needs an app password, made in your account's security settings.";
@@ -12,20 +15,31 @@ const SWITCH_ON: &str =
 const SEPARATE_PASSWORD: &str = "This provider needs a separate email password for mail programs, made in its customer center.";
 const IF_REFUSED: &str = "If this provider refuses your password, make an app password in your account's security settings.";
 const GUESS_CHECK: &str = "If this does not connect, use the server names in your provider's mail settings.";
+const EXTERNAL_PASSWORD: &str = "This provider needs a password for external programs, made in its security settings.";
+const AUTH_CODE: &str =
+    "This provider needs IMAP and SMTP switched on in its settings, and an authorization code in place of your password.";
 
 /// One provider: the domains of its addresses and its two servers.
 pub(super) struct Simple {
     pub domains: &'static [&'static str],
     pub imap: &'static str,
     pub smtp: &'static str,
+    pub smtp_port: u16,
+    pub smtp_security: Security,
     pub note: &'static str,
 }
 
+/// Outgoing mail on 587, encrypted after hello.
 const fn simple(domains: &'static [&'static str], imap: &'static str, smtp: &'static str, note: &'static str) -> Simple {
-    Simple { domains, imap, smtp, note }
+    Simple { domains, imap, smtp, smtp_port: 587, smtp_security: Security::Starttls, note }
 }
 
-static TABLE: [Simple; 14] = [
+/// Outgoing mail on 465, encrypted from the start.
+const fn implicit(domains: &'static [&'static str], imap: &'static str, smtp: &'static str, note: &'static str) -> Simple {
+    Simple { domains, imap, smtp, smtp_port: 465, smtp_security: Security::Implicit, note }
+}
+
+static TABLE: [Simple; 24] = [
     simple(
         &["yahoo.com", "ymail.com", "rocketmail.com", "yahoo.co.uk", "yahoo.ca", "yahoo.de", "yahoo.fr", "yahoo.es", "yahoo.it", "yahoo.com.au"],
         "imap.mail.yahoo.com",
@@ -47,6 +61,16 @@ static TABLE: [Simple; 14] = [
     // cannot see; these are the addresses the provider itself hands out.
     simple(&["ionos.com", "ionos.de", "ionos.co.uk", "ionos.es", "ionos.fr"], "imap.ionos.com", "smtp.ionos.com", GUESS_CHECK),
     simple(&["1and1.com", "1und1.de", "online.de"], "imap.ionos.com", "smtp.ionos.com", GUESS_CHECK),
+    implicit(&["att.net"], "imap.mail.att.net", "smtp.mail.att.net", APP_PASSWORD),
+    simple(&["cox.net"], "imap.cox.net", "smtp.cox.net", IF_REFUSED),
+    simple(&["optimum.net"], "mail.optimum.net", "mail.optimum.net", GUESS_CHECK),
+    implicit(&["virginmedia.com", "blueyonder.co.uk", "ntlworld.com"], "imap.virginmedia.com", "smtp.virginmedia.com", APP_PASSWORD),
+    simple(&["free.fr"], "imap.free.fr", "smtp.free.fr", ""),
+    implicit(&["sfr.fr"], "imap.sfr.fr", "smtp.sfr.fr", GUESS_CHECK),
+    simple(&["laposte.net"], "imap.laposte.net", "smtp.laposte.net", GUESS_CHECK),
+    implicit(&["mail.ru", "inbox.ru", "list.ru", "bk.ru"], "imap.mail.ru", "smtp.mail.ru", EXTERNAL_PASSWORD),
+    implicit(&["qq.com", "foxmail.com"], "imap.qq.com", "smtp.qq.com", AUTH_CODE),
+    implicit(&["163.com"], "imap.163.com", "smtp.163.com", AUTH_CODE),
 ];
 
 /// The provider whose addresses end in `domain`.
