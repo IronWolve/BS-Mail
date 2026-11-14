@@ -65,7 +65,7 @@ pub fn help_text() -> String {
          terminal when started from one):\n  \
          --window           open a window and draw there\n  \
          --tty              run in this terminal (with --print: draw once and exit)\n  \
-         --print            draw once into the terminal and exit\n  \
+         --print            draw once into the terminal or a pipe and exit (never a window)\n  \
          --color-depth <d>  truecolor, 256, 16 or none (default: from the environment)\n  \
          --render-once <f>  draw once into a picture file and exit\n  \
          --smoke            open a window, draw one frame and stop\n\

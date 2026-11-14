@@ -144,6 +144,11 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
             other => return Err(format!("unknown option {other}; see --help")),
         }
     }
+    // Drawing once is for a terminal or a pipe: it must never end up opening
+    // a window because the output happens not to be a console.
+    if options.print && options.mode == Mode::Auto {
+        options.mode = Mode::Terminal;
+    }
     Ok(options)
 }
 
