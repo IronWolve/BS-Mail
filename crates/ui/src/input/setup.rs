@@ -14,9 +14,14 @@ use crate::app_view::AppView;
 use crate::setup::{AccountPrefill, SetupForm};
 use crate::setup::input::{Outcome, click, handle_key, handle_text};
 use crate::setup::layout::{area_of, layout};
+use crate::setup::fields::SetupField;
 use crate::setup::link_panel::PanelChoice;
+use crate::setup::providers::registration_page;
 use crate::setup::link_panel_input;
 use crate::setup::SetupAction;
+
+/// What the form says while the provider's registration page opens.
+const REGISTER_FIRST: &str = "Register on the page that just opened, paste the client id above, then connect.";
 
 impl AppView {
     /// Shows the account form instead of the mail, with `note` under the
@@ -206,11 +211,22 @@ impl AppView {
     }
 
     /// Checks what was typed and hands the account text over, or says what
-    /// is wrong with it.
+    /// is wrong with it. A browser sign-in with no client id yet is not an
+    /// error: the provider's registration page opens, and the cursor waits on
+    /// the client id.
     fn submit_setup(&mut self) {
         let Some(form) = self.setup.as_mut() else {
             return;
         };
+        if form.needs_client_id()
+            && let Some(page) = form.oauth_provider.and_then(registration_page)
+        {
+            form.focus = SetupField::ClientId;
+            form.notice = None;
+            form.info = Some(REGISTER_FIRST.to_string());
+            self.setup_actions.push(SetupAction::OpenLink(page.to_string()));
+            return;
+        }
         match form.to_account_toml() {
             Err(problem) => form.notice = Some(problem),
             Ok(text) => {

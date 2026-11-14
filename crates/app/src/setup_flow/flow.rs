@@ -23,6 +23,9 @@ pub struct SetupFlow {
     pub(super) created: Option<String>,
     pub(super) logins: Box<dyn BrowserLoginStarter>,
     pub(super) opener: Box<dyn LinkOpener>,
+    /// The page opened is the provider's registration page, not a sign-in
+    /// link, so a failure to open it has its own words.
+    pub(super) registering: bool,
     pub(super) backends: Box<dyn BackendStarter>,
 }
 
@@ -42,7 +45,7 @@ impl SetupFlow {
         opener: Box<dyn LinkOpener>,
         backends: Box<dyn BackendStarter>,
     ) -> Self {
-        Self { live, edit, attempt: None, created: None, logins, opener, backends }
+        Self { live, edit, attempt: None, created: None, logins, opener, registering: false, backends }
     }
 
     /// Takes whatever the form has to say and answers it. Returns whether

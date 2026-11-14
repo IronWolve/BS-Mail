@@ -84,6 +84,16 @@ fn known(domain: &str) -> Option<Preset> {
     })
 }
 
+/// The page where a program is registered with a provider, which is where a
+/// client id comes from. Data only: the form opens it for the user.
+pub fn registration_page(provider: &str) -> Option<&'static str> {
+    match provider {
+        "microsoft" => Some("https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"),
+        "google" => Some("https://console.cloud.google.com/apis/credentials"),
+        _ => None,
+    }
+}
+
 /// A provider that takes an app password and also offers a sign-in through
 /// the browser, which needs a client id the owner registers.
 fn with_browser_sign_in() -> Preset {

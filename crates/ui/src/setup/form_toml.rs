@@ -26,6 +26,12 @@ impl SetupForm {
         }
     }
 
+    /// A sign-in through the browser for a provider the program knows, with no
+    /// client id typed or saved yet: the one thing the user must get first.
+    pub fn needs_client_id(&self) -> bool {
+        self.signin == SignIn::Browser && self.oauth_provider.is_some() && self.client_id.text().trim().is_empty()
+    }
+
     /// The account file this form makes, or what is wrong with it.
     pub fn to_account_toml(&self) -> Result<String, String> {
         let email = self.email.text().trim().to_string();
