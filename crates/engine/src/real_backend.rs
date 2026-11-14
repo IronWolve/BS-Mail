@@ -1,24 +1,38 @@
-//! The real mail backend: reads a mailbox over IMAP and changes nothing on
-//! the server.
+//! The real mail backend: reads a mailbox over IMAP and, only when the
+//! account says so (`read_only = false`), changes mail on the server: flags,
+//! moves and deletes. A read-only account never sends anything that could
+//! change the server.
 //!
 //! It owns one worker thread running a single-threaded async runtime.
 //! Commands travel to the worker over a channel; events come back over
 //! another, and `poll_events` drains it without blocking. `handle` returns at
 //! once: a command that needs the server is answered through `poll_events`
-//! later, and one that is not available yet is answered on the spot.
+//! later, and one that is not available (or a change asked for while the
+//! connection is down) is answered on the spot.
+//!
+//! A change is sent to the server and its events are produced only after the
+//! server confirmed it. A refusal or a lost connection becomes a failure
+//! notice and nothing is changed locally; nothing is queued for later.
 
 mod backoff;
+mod change_flags;
+mod change_relocate;
+mod change_rules;
+mod changes;
 mod handlers;
 mod host_info;
 mod lifecycle;
 mod offline;
 mod online;
+mod resolve;
 mod sink;
 mod stop;
 mod timing;
 mod unsupported;
 mod worker;
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
 use std::thread::JoinHandle;
 
@@ -29,7 +43,9 @@ use tokio::sync::watch;
 use self::lifecycle::connection;
 use self::sink::EventSink;
 use self::stop::Stop;
-use self::unsupported::{READ_ONLY_REASON, unavailable_operation};
+use self::unsupported::{
+    OFFLINE_CHANGE_REASON, change_operation, unavailable_operation, unavailable_reason,
+};
 use self::worker::Worker;
 use crate::account_config::AccountConfig;
 
@@ -38,9 +54,14 @@ pub use self::timing::Timing;
 #[cfg(not(feature = "test-support"))]
 use self::timing::Timing;
 
-/// A backend that serves one account from a real IMAP server, read-only.
+/// A backend that serves one account from a real IMAP server. It is
+/// read-only unless the account file allows changes.
 pub struct RealBackend {
     account: AccountId,
+    /// Whether the account may change mail on the server.
+    writes: bool,
+    /// True while the worker's connection is up.
+    online: Arc<AtomicBool>,
     commands: Option<UnboundedSender<Command>>,
     events: Receiver<Event>,
     stop: watch::Sender<bool>,
@@ -67,6 +88,8 @@ impl RealBackend {
         let (command_sender, command_receiver) = unbounded_channel();
         let (stop_sender, stop) = Stop::pair();
         let sink = EventSink::new(event_sender, account.clone());
+        let online = sink.online_flag();
+        let writes = !config.read_only;
         let failed_sink = sink.clone();
         let spawned = std::thread::Builder::new()
             .name("mail-worker".to_owned())
@@ -80,6 +103,8 @@ impl RealBackend {
         };
         Self {
             account,
+            writes,
+            online,
             commands: worker.is_some().then_some(command_sender),
             events,
             stop: stop_sender,
@@ -125,8 +150,13 @@ fn run_worker(worker: Worker, mut commands: tokio::sync::mpsc::UnboundedReceiver
 
 impl MailBackend for RealBackend {
     fn handle(&mut self, command: Command) -> Vec<Event> {
-        if let Some(operation) = unavailable_operation(&command) {
-            return self.unavailable(operation, READ_ONLY_REASON);
+        if let Some(operation) = unavailable_operation(&command, self.writes) {
+            return self.unavailable(operation, unavailable_reason(self.writes));
+        }
+        if let Some(operation) = change_operation(&command)
+            && !self.online.load(Ordering::Acquire)
+        {
+            return self.unavailable(operation, OFFLINE_CHANGE_REASON);
         }
         let sent = self
             .commands

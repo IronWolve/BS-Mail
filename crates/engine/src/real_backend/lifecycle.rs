@@ -8,7 +8,8 @@ use super::sink::EventSink;
 use crate::account_config::AccountConfig;
 
 /// The first events of a run, sent before any connection is tried so the
-/// screen can show the account as connecting: state, host and account list.
+/// screen can show the account as connecting: state, host, account list and
+/// whether changes are allowed.
 pub fn announce(config: &AccountConfig, sink: &EventSink) {
     let (host_name, system) = host_info();
     sink.send(connection(sink, ConnectionState::Connecting));
@@ -20,6 +21,15 @@ pub fn announce(config: &AccountConfig, sink: &EventSink) {
         state: ConnectionState::Connecting,
         selected: true,
     }]));
+    sink.send(changes_allowed(config, sink));
+}
+
+/// Whether this account lets the program change mail on the server.
+pub fn changes_allowed(config: &AccountConfig, sink: &EventSink) -> Event {
+    Event::ChangesAllowed {
+        account: sink.account().clone(),
+        allowed: !config.read_only,
+    }
 }
 
 pub fn connection(sink: &EventSink, state: ConnectionState) -> Event {

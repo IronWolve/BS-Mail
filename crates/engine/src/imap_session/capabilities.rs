@@ -18,6 +18,12 @@ pub struct ServerCaps {
     pub quota: bool,
     /// The server can push changes while idle (RFC 2177).
     pub idle: bool,
+    /// Commands can name exact UIDs to expunge (RFC 4315). Without it the
+    /// only expunge removes every deleted message in the mailbox, which this
+    /// client never sends.
+    pub uidplus: bool,
+    /// Messages can be moved in one step (RFC 6851).
+    pub move_ext: bool,
 }
 
 impl ServerCaps {
@@ -30,6 +36,8 @@ impl ServerCaps {
                 "LIST-EXTENDED" => caps.list_extended = true,
                 "QUOTA" => caps.quota = true,
                 "IDLE" => caps.idle = true,
+                "UIDPLUS" => caps.uidplus = true,
+                "MOVE" => caps.move_ext = true,
                 _ => {}
             }
         }

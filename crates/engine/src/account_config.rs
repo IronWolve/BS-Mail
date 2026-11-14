@@ -17,11 +17,17 @@
 //! username = "alex"
 //! password = "app-password"
 //! trust = "verify"           # verify | any                (default verify)
+//! read_only = true           # true | false                (default true)
 //! ```
 //!
 //! `security = "none"` (no TLS at all) and `trust = "any"` (accept any
 //! certificate, for a local bridge with a self-signed one) are allowed for
 //! loopback hosts only.
+//!
+//! `read_only = true` (the default) keeps the account strictly read-only:
+//! mailboxes are opened for reading, nothing is ever sent that could change
+//! the server, and flag changes, moves and deletes are refused. Only
+//! `read_only = false` lets the program mark mail, move it and delete it.
 
 use std::fmt;
 use std::net::IpAddr;
@@ -66,6 +72,9 @@ pub struct AccountConfig {
     pub username: String,
     pub password: Secret,
     pub trust: Trust,
+    /// When true, nothing the program does can change the mailbox on the
+    /// server. This is the default; changes must be switched on by the owner.
+    pub read_only: bool,
 }
 
 /// Why an account file was refused.
@@ -111,6 +120,13 @@ struct RawAccount {
     password: String,
     #[serde(default)]
     trust: Trust,
+    #[serde(default = "read_only_by_default")]
+    read_only: bool,
+}
+
+/// Accounts are read-only unless the file says otherwise.
+fn read_only_by_default() -> bool {
+    true
 }
 
 impl AccountConfig {
@@ -138,6 +154,7 @@ impl AccountConfig {
             username: raw.username,
             password: Secret::new(raw.password),
             trust: raw.trust,
+            read_only: raw.read_only,
         };
         config.validate()?;
         Ok(config)

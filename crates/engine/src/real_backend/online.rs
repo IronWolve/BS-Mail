@@ -108,6 +108,9 @@ impl Worker {
                 let synced = self.sync_now(session, &account).await;
                 self.settle("sync", synced)
             }
+            change @ (Command::SetFlags { .. } | Command::Move { .. } | Command::Delete { .. }) => {
+                self.change(session, change).await
+            }
             other => {
                 self.answer_offline(other);
                 Ok(())

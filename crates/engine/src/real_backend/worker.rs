@@ -7,7 +7,7 @@ use model::{AccountId, Command, ConnectionState, FolderId, MessageId};
 use tokio::sync::mpsc::UnboundedReceiver;
 
 use super::backoff::Backoff;
-use super::lifecycle::{announce, connection};
+use super::lifecycle::{announce, changes_allowed, connection};
 use super::online::Served;
 use super::sink::EventSink;
 use super::stop::Stop;
@@ -64,6 +64,7 @@ impl Worker {
         loop {
             if !std::mem::take(&mut first) {
                 self.sink.send(connection(&self.sink, ConnectionState::Connecting));
+                self.sink.send(changes_allowed(&self.config, &self.sink));
             }
             let attempt = ImapSession::connect(&self.config, self.timing.timeouts);
             let Some(outcome) = self.stop.guard(attempt).await else {

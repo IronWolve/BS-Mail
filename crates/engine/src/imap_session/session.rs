@@ -8,6 +8,7 @@ use super::capabilities::ServerCaps;
 use super::connect;
 use super::error::{ConnectError, SessionError};
 use super::login;
+use super::select::OpenMailbox;
 use super::stream::MailStream;
 use super::timeouts::{Timeouts, bounded};
 use crate::account_config::AccountConfig;
@@ -15,14 +16,22 @@ use crate::account_config::AccountConfig;
 /// How long a goodbye may take before the connection is dropped anyway.
 const GOODBYE_WAIT: Duration = Duration::from_millis(500);
 
-/// One signed-in connection. It only ever reads: mailboxes are opened with
+/// One signed-in connection. Reads are always safe: mailboxes are opened with
 /// EXAMINE and bodies fetched with PEEK, so the server cannot see a change.
+/// Changes are possible only when the account allows them, and then only
+/// through the few operations in `write_exchange.rs`, `store_flags.rs` and
+/// `move_copy.rs`, each on an explicit list of UIDs in a mailbox opened for
+/// the purpose.
 pub struct ImapSession {
     pub(super) inner: Session<MailStream>,
     pub(super) caps: ServerCaps,
     pub(super) limits: Timeouts,
-    /// The mailbox opened with EXAMINE, as the server names it.
-    pub(super) examined: Option<String>,
+    /// Whether the account may change the server. Fixed when connecting; a
+    /// read-only session refuses every changing operation before it sends
+    /// anything.
+    pub(super) writes: bool,
+    /// The mailbox open now, as the server names it, and how it was opened.
+    pub(super) open: Option<OpenMailbox>,
 }
 
 impl ImapSession {
@@ -37,13 +46,19 @@ impl ImapSession {
             inner,
             caps: ServerCaps::default(),
             limits,
-            examined: None,
+            writes: !config.read_only,
+            open: None,
         };
         session
             .load_capabilities()
             .await
             .map_err(|e| ConnectError::Unreachable(e.text().to_owned()))?;
         Ok(session)
+    }
+
+    /// What the server said it can do.
+    pub fn caps(&self) -> &ServerCaps {
+        &self.caps
     }
 
     /// Keeps the connection alive and notices a dead one.

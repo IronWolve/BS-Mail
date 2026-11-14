@@ -52,7 +52,8 @@ impl ImapSession {
         Ok(names.iter().map(raw_from_name).collect())
     }
 
-    async fn status_counts(&mut self, path: &str) -> Result<(u32, u32), SessionError> {
+    /// Unread and total counts of one mailbox, from STATUS.
+    pub async fn status_counts(&mut self, path: &str) -> Result<(u32, u32), SessionError> {
         let limit = self.limits.command;
         let result = bounded(limit, self.inner.status(path, "(MESSAGES UNSEEN)")).await;
         let found = self.settle(result)?;

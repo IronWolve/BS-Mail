@@ -8,7 +8,19 @@
 
 use std::collections::HashMap;
 
-use model::{Folder, FolderId, MessageId, Uid};
+use model::{Folder, FolderId, FolderRole, MessageId, Uid};
+
+/// How a folder's UIDVALIDITY compares with the one its message ids were
+/// issued under.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Validity {
+    /// The same: the ids still mean what they meant.
+    Same,
+    /// Different: every UID the folder had is void.
+    Changed,
+    /// One side is missing, so nothing can be confirmed.
+    Unknown,
+}
 
 #[derive(Debug, Default)]
 pub struct SessionState {
@@ -43,12 +55,38 @@ impl SessionState {
         self.folders = folders;
     }
 
+    /// The folder with this id in the current listing.
+    pub fn folder(&self, id: FolderId) -> Option<&Folder> {
+        self.folders.iter().find(|folder| folder.id == id)
+    }
+
     /// The server's name for a folder in the current listing.
     pub fn folder_path(&self, id: FolderId) -> Option<&str> {
+        self.folder(id).map(|folder| folder.path.as_str())
+    }
+
+    /// The current listing.
+    pub fn folders(&self) -> &[Folder] {
+        &self.folders
+    }
+
+    /// The folder that holds deleted mail, when the account has one.
+    pub fn trash_folder(&self) -> Option<&Folder> {
         self.folders
             .iter()
-            .find(|folder| folder.id == id)
-            .map(|folder| folder.path.as_str())
+            .find(|folder| folder.role == FolderRole::Trash)
+    }
+
+    /// Stores new counts for a folder in the listing. True when they differ
+    /// from the ones held.
+    pub fn set_counts(&mut self, id: FolderId, unread: u32, total: u32) -> bool {
+        let Some(folder) = self.folders.iter_mut().find(|folder| folder.id == id) else {
+            return false;
+        };
+        let moved = folder.unread != unread || folder.total != total;
+        folder.unread = unread;
+        folder.total = total;
+        moved
     }
 
     /// The id for a message; the same folder and UID always get the same id.
@@ -66,6 +104,32 @@ impl SessionState {
     /// Where a message lives on the server.
     pub fn message_key(&self, id: MessageId) -> Option<(FolderId, Uid)> {
         self.keys.get(&id).copied()
+    }
+
+    /// Stops a message id from resolving, for a message that left its folder.
+    pub fn forget_message(&mut self, id: MessageId) {
+        if let Some(key) = self.keys.remove(&id) {
+            self.messages.remove(&key);
+        }
+    }
+
+    /// Checks the UIDVALIDITY a server reports for a folder just opened for a
+    /// change against the one its ids were issued under. Anything but `Same`
+    /// voids the folder's ids, so no later command can act on them.
+    pub fn check_validity(&mut self, folder: FolderId, seen: Option<u32>) -> Validity {
+        let known = self.validity.get(&folder).copied();
+        match (known, seen) {
+            (Some(before), Some(now)) if before == now => Validity::Same,
+            (Some(_), Some(now)) => {
+                self.validity.insert(folder, now);
+                self.forget_messages(folder);
+                Validity::Changed
+            }
+            _ => {
+                self.forget_messages(folder);
+                Validity::Unknown
+            }
+        }
     }
 
     /// Records the folder's UIDVALIDITY. When it differs from the one seen

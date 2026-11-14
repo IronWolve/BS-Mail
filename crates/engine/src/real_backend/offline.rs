@@ -2,7 +2,9 @@
 
 use model::Command;
 
-use super::unsupported::{READ_ONLY_REASON, unavailable_operation};
+use super::unsupported::{
+    OFFLINE_CHANGE_REASON, change_operation, unavailable_operation, unavailable_reason,
+};
 use super::worker::Worker;
 
 /// Why a reading command could not run.
@@ -10,10 +12,17 @@ const OFFLINE_REASON: &str = "not connected to the server";
 
 impl Worker {
     /// Replies with a failure notice. A folder or body that was asked for is
-    /// remembered and served again as soon as the connection is back.
+    /// remembered and served again as soon as the connection is back. A
+    /// change is never remembered: it is refused, not queued, so nothing is
+    /// sent to the server later that the person has forgotten about.
     pub(super) fn answer_offline(&mut self, command: Command) {
-        if let Some(operation) = unavailable_operation(&command) {
-            self.sink.send(self.sink.failure(operation, READ_ONLY_REASON));
+        let writes = !self.config.read_only;
+        if let Some(operation) = unavailable_operation(&command, writes) {
+            self.sink.send(self.sink.failure(operation, unavailable_reason(writes)));
+            return;
+        }
+        if let Some(operation) = change_operation(&command) {
+            self.sink.send(self.sink.failure(operation, OFFLINE_CHANGE_REASON));
             return;
         }
         let (operation, remembered) = match command {
