@@ -72,6 +72,7 @@ pub fn help_text() -> String {
          \n\
          Options:\n  \
          --account <file>   real mail from this account file (default: {ACCOUNT_NAME} beside the program)\n  \
+         --setup            show the account form, even where an account is installed\n  \
          --data-dir <dir>   where sizes and other settings are remembered (default: data\n  \
                             beside the program)\n  \
          --mock <file>      draw mock data instead (default: {FIXTURE_NAME} beside the program)\n  \
@@ -114,7 +115,7 @@ pub fn print_stats(stats: &Stats) {
         paint.green,
         format!("{} x {} cells", stats.cols, stats.rows),
     );
-    if !stats.real {
+    if !stats.real && !stats.setup {
         line("messages", paint.green, stats.messages.to_string());
     }
     match &stats.shown {
@@ -147,7 +148,11 @@ pub fn print_stats(stats: &Stats) {
         }
     }
     line("drawn in", paint.green, format!("{} ms", stats.millis));
-    let label = if stats.real { "account" } else { "mock data" };
+    let label = match (stats.setup, stats.real) {
+        (true, _) => "saves to",
+        (false, true) => "account",
+        (false, false) => "mock data",
+    };
     line(label, paint.dim, stats.source.display().to_string());
 }
 

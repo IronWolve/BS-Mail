@@ -49,6 +49,8 @@ pub struct Options {
     pub mock: Option<PathBuf>,
     /// A mail account file: the program reads that account's real mail.
     pub account: Option<PathBuf>,
+    /// Show the account form, even where an account or a mock is installed.
+    pub setup: bool,
     /// Where the program keeps what it remembers between runs; beside the
     /// program when not given.
     pub data_dir: Option<PathBuf>,
@@ -77,6 +79,7 @@ impl Default for Options {
             mode: Mode::Auto,
             mock: None,
             account: None,
+            setup: false,
             data_dir: None,
             size: SizeChoice::Reference,
             icons: None,
@@ -126,6 +129,7 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
                 options.line_spacing = Some(parse_spacing(&value(&mut rest, &argument)?)?);
             }
             "--mock" => options.mock = Some(PathBuf::from(value(&mut rest, &argument)?)),
+            "--setup" => options.setup = true,
             "--account" => options.account = Some(PathBuf::from(value(&mut rest, &argument)?)),
             "--data-dir" => options.data_dir = Some(PathBuf::from(value(&mut rest, &argument)?)),
             "--size" => options.size = parse_size(&value(&mut rest, &argument)?)?,

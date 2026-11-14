@@ -1,6 +1,7 @@
 //! Program entry: reads the arguments, shows the screen the way this run
 //! asks for, and reports what went wrong when it cannot.
 
+mod account_writer;
 mod cli;
 mod clock;
 mod config_io;
@@ -8,6 +9,7 @@ mod errors;
 mod fonts;
 mod identity;
 mod launch_mode;
+mod null_backend;
 mod paths;
 mod picture;
 mod pump;
@@ -15,6 +17,7 @@ mod report;
 mod run;
 mod scene;
 mod screen;
+mod setup_flow;
 mod source;
 mod state_file;
 mod stats;

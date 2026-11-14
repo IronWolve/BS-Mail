@@ -37,7 +37,8 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         scene.view.set_prefs(state.layout.clone());
     }
     let effects = scene.view.render(cols, rows).effects.len();
-    let mut screen = Screen::new(scene.view, scene.backend, (cols, rows), scene.fixed_now);
+    let mut screen = Screen::new(scene.view, scene.backend, (cols, rows), scene.fixed_now)
+        .with_setup(scene.setup.clone());
     if let Some(dir) = data_dir {
         screen = screen.remember_in(dir);
     }
@@ -54,6 +55,7 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         effects,
         source: scene.source,
         real: scene.real,
+        setup: scene.setup.is_some(),
         millis: started.elapsed().as_millis(),
         shown: Shown::Window {
             frames: screen.frames(),

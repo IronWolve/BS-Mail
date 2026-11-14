@@ -11,6 +11,8 @@ pub struct Stats {
     pub source: PathBuf,
     /// Real mail from an account, not the mock.
     pub real: bool,
+    /// The account form was showing, to save the file at `source`.
+    pub setup: bool,
     pub millis: u128,
     pub shown: Shown,
 }

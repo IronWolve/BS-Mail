@@ -4,6 +4,12 @@
 
 use std::path::PathBuf;
 
+/// Where the account file goes when the program makes one: beside the
+/// program, where `installed_account` looks for it.
+pub fn account_target() -> Option<PathBuf> {
+    Some(program_dir()?.join(ACCOUNT_NAME))
+}
+
 /// The mock fixture installed beside the program.
 pub const FIXTURE_NAME: &str = "mock.toml";
 

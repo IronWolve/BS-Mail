@@ -20,6 +20,7 @@ use crate::config_io;
 use crate::paths::data_dir;
 use crate::errors::AppError;
 use crate::identity::identity;
+use crate::null_backend::NullBackend;
 use crate::pump::pump;
 use crate::source::{Source, choose_for_run};
 
@@ -37,6 +38,8 @@ pub struct Scene {
     pub source: PathBuf,
     /// Real mail from an account, not the mock.
     pub real: bool,
+    /// The account form is showing and will save the account file here.
+    pub setup: Option<PathBuf>,
     /// What the theme means by plain text on the plain background.
     pub base: (host::Rgb, host::Rgb),
     /// A clock that stands still, so a picture of mock data never changes
@@ -102,6 +105,7 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
     let mut scene = match source {
         Source::Mock(_) => mock_scene(view, base, &path),
         Source::Account(_) => account_scene(view, base, &path),
+        Source::Setup(_) => Ok(setup_scene(view, base, &path)),
     }?;
     scene.font = font;
     Ok(scene)
@@ -135,6 +139,7 @@ fn mock_scene(
         backend: Box::new(backend),
         source: path.to_path_buf(),
         real: false,
+        setup: None,
         base,
     })
 }
@@ -154,8 +159,26 @@ fn account_scene(
         backend: Box::new(RealBackend::start(config)),
         source: path.to_path_buf(),
         real: true,
+        setup: None,
         base,
     })
+}
+
+/// No account yet: the form, and a backend with nothing to say until the
+/// user has one.
+fn setup_scene(mut view: AppView, base: (host::Rgb, host::Rgb), path: &Path) -> Scene {
+    view.open_setup();
+    Scene {
+        view,
+        messages: 0,
+        fixed_now: None,
+        font: (12, 1.0),
+        backend: Box::new(NullBackend),
+        source: path.to_path_buf(),
+        real: false,
+        setup: Some(path.to_path_buf()),
+        base,
+    }
 }
 
 /// The theme's plain text and plain background, which is what a cell means

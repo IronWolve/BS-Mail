@@ -43,6 +43,7 @@ pub fn render(options: &Options, path: &Path) -> Result<Stats, AppError> {
         effects: frame.effects.len(),
         source: scene.source,
         real: scene.real,
+        setup: scene.setup.is_some(),
         millis: started.elapsed().as_millis(),
         shown: Shown::Picture {
             path: PathBuf::from(path),

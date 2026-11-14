@@ -14,6 +14,7 @@ use ui::AppView;
 
 use crate::clock::system_now;
 use crate::pump::pump;
+use crate::setup_flow::SetupFlow;
 use crate::state_file::{self, State};
 use crate::ticker::Ticker;
 
@@ -39,6 +40,8 @@ pub struct Screen {
     track_grid: bool,
     /// The title last given to the window, so it is set only when it changes.
     title: String,
+    /// What answers the account form, while there is one.
+    setup: Option<SetupFlow>,
 }
 
 impl Screen {
@@ -62,7 +65,15 @@ impl Screen {
             remember: None,
             track_grid: true,
             title: String::new(),
+            setup: None,
         }
+    }
+
+    /// Lets the account form try the account the user types and save it at
+    /// `target`.
+    pub fn with_setup(mut self, target: Option<PathBuf>) -> Self {
+        self.setup = target.map(SetupFlow::new);
+        self
     }
 
     /// Remembers the sizes of the bars and the window in `dir`.
@@ -124,8 +135,23 @@ impl Screen {
     }
 
     /// Moves mail both ways until quiet; returns whether the view changed.
+    /// While the account form is open, what it asked for is answered first
+    /// and what the account says is read after.
     fn exchange(&mut self) -> bool {
-        pump(&mut self.view, self.backend.as_mut()) > 0
+        let mut changed = self.setup_step();
+        changed |= pump(&mut self.view, self.backend.as_mut()) > 0;
+        changed | self.setup_step()
+    }
+
+    fn setup_step(&mut self) -> bool {
+        let Some(flow) = self.setup.as_mut() else {
+            return false;
+        };
+        let changed = flow.step(&mut self.view, &mut self.backend);
+        if !self.view.is_setting_up() {
+            self.setup = None;
+        }
+        changed
     }
 }
 
@@ -139,8 +165,8 @@ impl EventSink for Screen {
                 return Flow::Continue;
             }
             InputEvent::CloseRequested => return Flow::Quit,
-            // While a message is being written every letter is for the message.
-            InputEvent::Key(key) if closes(key) && !self.view.is_composing() => return Flow::Quit,
+            // While text is being typed every letter is for the text.
+            InputEvent::Key(key) if closes(key) && !self.view.takes_text() => return Flow::Quit,
             InputEvent::PointerMoved { pos, .. } => {
                 let shape = self.view.pointer_shape(pos.col, pos.row, (self.cols, self.rows));
                 host.set_pointer_shape(shape);

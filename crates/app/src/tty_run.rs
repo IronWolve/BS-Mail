@@ -26,7 +26,7 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
     }
     let (cols, rows) = terminal_size().unwrap_or((REF_COLS, REF_ROWS));
     let grid = (cols.max(MIN_COLS), rows.max(MIN_ROWS));
-    let mut screen = Screen::new(scene.view, scene.backend, grid, scene.fixed_now);
+    let mut screen = Screen::new(scene.view, scene.backend, grid, scene.fixed_now).with_setup(scene.setup.clone());
     if let (Some(dir), Some(state)) = (data_dir, remembered) {
         screen = screen.remember_layout_in(dir, state);
     }
@@ -41,6 +41,7 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         effects: 0,
         source: scene.source,
         real: scene.real,
+        setup: scene.setup.is_some(),
         millis: started.elapsed().as_millis(),
         shown: Shown::Tty {
             frames: screen.frames(),
