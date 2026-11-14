@@ -8,6 +8,7 @@ mod cli;
 mod clock;
 mod config_edit;
 mod config_io;
+mod data_lock;
 mod errors;
 mod fonts;
 mod identity;

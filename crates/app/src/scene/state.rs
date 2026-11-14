@@ -8,6 +8,7 @@ use model::{MailBackend, MailDate};
 use ui::AppView;
 
 use crate::accounts::Live;
+use crate::data_lock::DataLock;
 use crate::options_flow::Settings;
 use crate::pump::pump;
 
@@ -43,6 +44,9 @@ pub struct Scene {
     pub font: (u8, f32),
     /// What answers the Options screen's requests about settings.
     pub settings: Settings,
+    /// The hold on the data folder, kept until the run ends; `None` for mock
+    /// mail and where no lock can be had.
+    pub lock: Option<DataLock>,
 }
 
 impl Scene {

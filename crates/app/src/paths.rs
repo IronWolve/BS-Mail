@@ -13,6 +13,9 @@ pub const ACCOUNTS_DIR_NAME: &str = "accounts";
 /// The account file inside an account's own folder.
 pub const ACCOUNT_FILE: &str = "account.toml";
 
+/// The file inside the data folder that one running copy holds a lock on.
+pub const LOCK_FILE: &str = "lock";
+
 /// The folder the running executable sits in.
 pub fn program_dir() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
@@ -21,8 +24,8 @@ pub fn program_dir() -> Option<PathBuf> {
 }
 
 /// Where the program keeps what it remembers: the folder asked for, else a
-/// `data` folder beside the program. Nothing is created until something is
-/// saved.
+/// `data` folder beside the program. A run that uses it makes it and its lock
+/// file; nothing else is created until something is saved.
 pub fn data_dir(asked: Option<&PathBuf>) -> Option<PathBuf> {
     match asked {
         Some(path) => Some(path.clone()),

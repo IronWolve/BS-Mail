@@ -33,6 +33,7 @@ pub(super) fn mock(mut view: AppView, base: Base, path: &Path) -> Result<Scene, 
         live: None,
         base,
         settings: Settings::default(),
+        lock: None,
     })
 }
 
@@ -77,6 +78,7 @@ fn real(mut view: AppView, base: Base, members: Vec<Member>, place: Place, sourc
         live: Some(live),
         base,
         settings: Settings::default(),
+        lock: None,
     }
 }
 

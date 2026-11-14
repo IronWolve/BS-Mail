@@ -5,6 +5,7 @@
 
 use std::path::PathBuf;
 
+use crate::accounts::Place;
 use crate::cli::Options;
 use crate::errors::AppError;
 
@@ -30,6 +31,18 @@ impl Source {
     /// account.
     pub fn starts_empty(&self) -> bool {
         matches!(self, Self::Empty(_) | Self::Setup(_))
+    }
+
+    /// The data folder this run keeps its accounts in, which one copy at a
+    /// time may use. `None` for mock mail, which keeps nothing, and for
+    /// `--account`, the scripted way of running: it names one file, which may
+    /// sit in a folder shared with other files and other runs, so it is not a
+    /// data folder of its own.
+    pub fn data_folder(&self) -> Option<PathBuf> {
+        match self {
+            Self::Mock(_) | Self::Account(_) | Self::Setup(_) => None,
+            Self::Accounts(root) | Self::Empty(root) => Some(Place::Root(root.clone()).data_folder()),
+        }
     }
 }
 

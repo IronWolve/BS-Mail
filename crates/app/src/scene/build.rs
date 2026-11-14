@@ -11,6 +11,7 @@ use ui::{AppView, OptionsPaths};
 use crate::accounts::{Place, Scan, scan};
 use crate::cli::Options;
 use crate::config_io::{self, CONFIG_NAME};
+use crate::data_lock::{self, DataLock};
 use crate::errors::AppError;
 use crate::identity::identity;
 use crate::options_flow::Settings;
@@ -29,6 +30,9 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
         _ => Scan::default(),
     };
     let source = choose(options, root, scanned.found.len())?;
+    // Listing the accounts above only reads; from here on the run may start
+    // sign-ins and write, so only one copy at a time gets to.
+    let lock = hold_data_folder(&source)?;
     let loaded = config_io::load(data.as_deref())?;
     let base = base_colors(&loaded.theme);
     let font = (
@@ -44,6 +48,7 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
     view.set_capabilities(capabilities);
     view.set_options_paths(options_paths(data.as_deref(), &source));
     let mut scene = scene_for(&source, view, base, &scanned)?;
+    scene.lock = lock;
     scene.font = font;
     scene.settings = Settings::start(options, data.as_deref(), font, note_is_about_settings);
     scene.view.set_theme_names(scene.settings.theme_names().to_vec());
@@ -54,6 +59,15 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
         scene.view.open_setup();
     }
     Ok(scene)
+}
+
+/// The lock on the folder this run keeps its accounts in; a second copy is
+/// turned away with the name of the first.
+fn hold_data_folder(source: &Source) -> Result<Option<DataLock>, AppError> {
+    let Some(folder) = source.data_folder() else {
+        return Ok(None);
+    };
+    data_lock::take(&folder).map_err(|busy| AppError::Locked(folder, busy.holder))
 }
 
 fn scene_for(source: &Source, view: AppView, base: Base, scanned: &Scan) -> Result<Scene, AppError> {

@@ -9,6 +9,9 @@ pub enum AppError {
     NoSource,
     Fixture(PathBuf, String),
     Account(PathBuf, String),
+    /// Another copy of the program is using this data folder; the text says
+    /// who, when it could be told.
+    Locked(PathBuf, String),
     Theme(String),
     Fonts(String),
     Output(io::Error),
@@ -26,6 +29,15 @@ impl fmt::Display for AppError {
             ),
             Self::Account(path, reason) => {
                 write!(f, "the account file {} cannot be used: {reason}", path.display())
+            }
+            Self::Locked(folder, holder) => {
+                let who = if holder.is_empty() { String::new() } else { format!(" ({holder})") };
+                write!(
+                    f,
+                    "another copy is already using the data folder{who}; close it first, \
+                     or start this one with --data-dir <another folder> (this folder: {})",
+                    folder.display()
+                )
             }
             Self::Fixture(path, reason) => {
                 write!(f, "the mock file {} did not load: {reason}", path.display())
