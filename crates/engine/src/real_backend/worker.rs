@@ -9,6 +9,7 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use super::backoff::Backoff;
 use super::lifecycle::{announce, changes_allowed, connection};
 use super::online::Served;
+use super::save_sent::SentCopies;
 use super::sink::EventSink;
 use super::stop::Stop;
 use super::timing::Timing;
@@ -33,6 +34,8 @@ pub(super) struct Worker {
     pub state: SessionState,
     pub wanted: Wanted,
     pub last_sync: Option<i64>,
+    /// Sent messages whose copies are waiting to be saved in the Sent folder.
+    pub(super) copies: SentCopies,
 }
 
 /// How a pause between connection attempts ended.
@@ -52,6 +55,7 @@ impl Worker {
             state: SessionState::new(),
             wanted: Wanted::default(),
             last_sync: None,
+            copies: SentCopies::new(),
         }
     }
 
@@ -131,6 +135,11 @@ impl Worker {
                     Some(Command::SyncNow { .. }) => return Pause::Retry,
                     Some(other) => self.answer_offline(other),
                 },
+                copy = self.copies.recv() => {
+                    if copy.is_some() {
+                        self.sent_copy_offline();
+                    }
+                }
             }
         }
     }

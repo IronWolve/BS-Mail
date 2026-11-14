@@ -215,7 +215,7 @@ impl Worker {
 
     /// Reads the counts of these folders from the server. True when any
     /// differs from what was held.
-    async fn recount(
+    pub(super) async fn recount(
         &mut self,
         session: &mut ImapSession,
         folders: &[FolderId],

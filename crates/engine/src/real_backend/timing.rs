@@ -4,6 +4,7 @@
 use std::time::Duration;
 
 use crate::imap_session::Timeouts;
+use crate::send::SmtpTimeouts;
 
 /// How long the worker waits between reconnect attempts, how often it checks
 /// that the connection is alive, and how long it waits on the server.
@@ -13,6 +14,7 @@ pub struct Timing {
     pub(super) backoff_max: Duration,
     pub(super) keepalive: Duration,
     pub(super) timeouts: Timeouts,
+    pub(super) smtp: SmtpTimeouts,
 }
 
 impl Timing {
@@ -23,6 +25,7 @@ impl Timing {
             backoff_max: Duration::from_secs(300),
             keepalive: Duration::from_secs(60),
             timeouts: Timeouts::production(),
+            smtp: SmtpTimeouts::production(),
         }
     }
 
@@ -31,6 +34,15 @@ impl Timing {
     pub const fn with_backoff(mut self, start: Duration, max: Duration) -> Self {
         self.backoff_start = start;
         self.backoff_max = max;
+        self
+    }
+
+    /// The limits of a send: reaching the server and each secure handshake,
+    /// one answer, and the whole send. Tests use short ones to see a slow
+    /// server given up on.
+    #[cfg(feature = "test-support")]
+    pub const fn with_send_limits(mut self, connect: Duration, reply: Duration, total: Duration) -> Self {
+        self.smtp = SmtpTimeouts { connect, reply, finish: reply, total };
         self
     }
 
@@ -44,6 +56,12 @@ impl Timing {
             timeouts: Timeouts {
                 connect: Duration::from_secs(5),
                 command: Duration::from_secs(10),
+            },
+            smtp: SmtpTimeouts {
+                connect: Duration::from_secs(5),
+                reply: Duration::from_secs(10),
+                finish: Duration::from_secs(10),
+                total: Duration::from_secs(30),
             },
         }
     }

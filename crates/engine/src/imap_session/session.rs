@@ -21,7 +21,8 @@ const GOODBYE_WAIT: Duration = Duration::from_millis(500);
 /// Changes are possible only when the account allows them, and then only
 /// through the few operations in `write_exchange.rs`, `store_flags.rs` and
 /// `move_copy.rs`, each on an explicit list of UIDs in a mailbox opened for
-/// the purpose.
+/// the purpose. The one exception adds mail instead: the saved copy of a sent
+/// message, appended to the Sent folder by `write_exchange.rs`.
 pub struct ImapSession {
     pub(super) inner: Session<MailStream>,
     pub(super) caps: ServerCaps,

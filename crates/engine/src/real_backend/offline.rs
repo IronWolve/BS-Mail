@@ -18,7 +18,14 @@ impl Worker {
     pub(super) fn answer_offline(&mut self, command: Command) {
         let writes = !self.config.read_only;
         if let Some(operation) = unavailable_operation(&command, writes) {
-            self.sink.send(self.sink.failure(operation, unavailable_reason(writes)));
+            self.sink.send(self.sink.failure(operation, unavailable_reason(&command, writes)));
+            return;
+        }
+        if let Command::Send { message } = command {
+            // Sending has its own connection: a mailbox that is down does
+            // not stop it. The reply headers cannot be looked up, so a
+            // reply goes out without them.
+            self.send_offline(message);
             return;
         }
         if let Some(operation) = change_operation(&command) {

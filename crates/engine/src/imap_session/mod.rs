@@ -1,7 +1,8 @@
 //! The IMAP side of the real backend: one signed-in session, the few
 //! operations that can change a mailbox when the account allows it, and the
 //! pure helpers that turn server data into model types. This file only
-//! declares and re-exports the modules.
+//! declares and re-exports the modules. The TLS settings and the stream type
+//! are shared with the sending side, so both judge certificates the same way.
 
 mod body_structure;
 mod capabilities;
@@ -10,6 +11,7 @@ mod envelope_map;
 mod error;
 mod fetch_body;
 mod fetch_envelopes;
+mod fetch_headers;
 mod flag_map;
 mod folder_list;
 mod folder_roles;
@@ -33,13 +35,15 @@ mod write_select;
 
 pub use capabilities::ServerCaps;
 pub use envelope_map::build_envelope;
-pub use error::{ConnectError, SessionError};
+pub use error::{ConnectError, SessionError, classify_tls};
 pub use fetch_envelopes::fetched_row;
 pub use folder_tree::build_tree;
 pub use session::ImapSession;
+pub use stream::MailStream;
 pub use timeouts::Timeouts;
+pub use tls_config::client_config;
 pub use uid_set::{MAX_PER_COMMAND, UidSet};
-pub use write_command::{StoreFlag, StoreMode};
+pub use write_command::{SentFolder, StoreFlag, StoreMode};
 
 #[cfg(test)]
 include!("test_server.tests.rs");

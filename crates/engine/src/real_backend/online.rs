@@ -61,6 +61,16 @@ impl Worker {
                         Some(Ok(())) => {}
                     }
                 }
+                copy = self.copies.recv() => {
+                    let Some(copy) = copy else {
+                        continue;
+                    };
+                    match stop.guard(self.save_sent(session, copy)).await {
+                        None => return Served::Stopped,
+                        Some(Err(_)) => return Served::Lost,
+                        Some(Ok(())) => {}
+                    }
+                }
                 _ = keepalive.tick() => {
                     match stop.guard(session.ping()).await {
                         None => return Served::Stopped,
@@ -111,6 +121,7 @@ impl Worker {
             change @ (Command::SetFlags { .. } | Command::Move { .. } | Command::Delete { .. }) => {
                 self.change(session, change).await
             }
+            Command::Send { message } => self.send_online(session, message).await,
             other => {
                 self.answer_offline(other);
                 Ok(())

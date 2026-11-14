@@ -18,16 +18,27 @@
 //! password = "app-password"
 //! trust = "verify"           # verify | any                (default verify)
 //! read_only = true           # true | false                (default true)
+//!
+//! # Sending (all optional; without `smtp_host` a send is refused):
+//! smtp_host = "smtp.example.org"
+//! smtp_port = 587            # 587 for starttls, 465 for implicit, 25 for none
+//! smtp_security = "starttls" # starttls | implicit | none  (default starttls)
+//! smtp_username = "alex"     # default: the mailbox `username`
+//! smtp_password = "app-password" # default: the mailbox `password`
+//! smtp_trust = "verify"      # verify | any                (default verify)
+//! save_sent = true           # true | false                (default true)
 //! ```
 //!
 //! `security = "none"` (no TLS at all) and `trust = "any"` (accept any
 //! certificate, for a local bridge with a self-signed one) are allowed for
-//! loopback hosts only.
+//! loopback hosts only, and so are `smtp_security = "none"` and
+//! `smtp_trust = "any"`.
 //!
 //! `read_only = true` (the default) keeps the account strictly read-only:
 //! mailboxes are opened for reading, nothing is ever sent that could change
-//! the server, and flag changes, moves and deletes are refused. Only
-//! `read_only = false` lets the program mark mail, move it and delete it.
+//! the server, and flag changes, moves, deletes and sending mail are
+//! refused. Only `read_only = false` lets the program mark mail, move it,
+//! delete it, send mail and save a copy of what it sent.
 
 use std::fmt;
 use std::net::IpAddr;
@@ -35,6 +46,9 @@ use std::path::Path;
 
 use model::Secret;
 use serde::Deserialize;
+
+pub use crate::account_smtp::SmtpSettings;
+use crate::account_smtp::RawSmtp;
 
 /// How the connection is protected.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
@@ -75,6 +89,8 @@ pub struct AccountConfig {
     /// When true, nothing the program does can change the mailbox on the
     /// server. This is the default; changes must be switched on by the owner.
     pub read_only: bool,
+    /// How to submit mail; see `SmtpSettings`.
+    pub smtp: SmtpSettings,
 }
 
 /// Why an account file was refused.
@@ -122,6 +138,13 @@ struct RawAccount {
     trust: Trust,
     #[serde(default = "read_only_by_default")]
     read_only: bool,
+    smtp_host: Option<String>,
+    smtp_port: Option<u16>,
+    smtp_security: Option<Security>,
+    smtp_username: Option<String>,
+    smtp_password: Option<String>,
+    smtp_trust: Option<Trust>,
+    save_sent: Option<bool>,
 }
 
 /// Accounts are read-only unless the file says otherwise.
@@ -144,6 +167,20 @@ impl AccountConfig {
             Security::Implicit => 993,
             Security::Starttls | Security::None => 143,
         };
+        let password = Secret::new(raw.password);
+        let smtp = SmtpSettings::resolve(
+            RawSmtp {
+                host: raw.smtp_host,
+                port: raw.smtp_port,
+                security: raw.smtp_security,
+                username: raw.smtp_username,
+                password: raw.smtp_password,
+                trust: raw.smtp_trust,
+                save_sent: raw.save_sent,
+            },
+            &raw.username,
+            &password,
+        );
         let config = Self {
             name: raw.name.unwrap_or_else(|| raw.address.clone()),
             id: raw.id,
@@ -152,9 +189,10 @@ impl AccountConfig {
             imap_port: raw.imap_port.unwrap_or(default_port),
             security: raw.security,
             username: raw.username,
-            password: Secret::new(raw.password),
+            password,
             trust: raw.trust,
             read_only: raw.read_only,
+            smtp,
         };
         config.validate()?;
         Ok(config)
@@ -182,7 +220,8 @@ impl AccountConfig {
         if self.password.expose().is_empty() {
             return invalid("`password` is empty".to_owned());
         }
-        self.check_loopback_only()
+        self.check_loopback_only()?;
+        self.smtp.validate()
     }
 
     fn check_loopback_only(&self) -> Result<(), ConfigError> {

@@ -1,7 +1,8 @@
 //! The real mail backend: reads a mailbox over IMAP and, only when the
 //! account says so (`read_only = false`), changes mail on the server: flags,
-//! moves and deletes. A read-only account never sends anything that could
-//! change the server.
+//! moves and deletes. It also sends mail through the account's SMTP server
+//! and then saves a copy in the Sent folder. A read-only account never sends
+//! anything that could change the server and never sends mail.
 //!
 //! It owns one worker thread running a single-threaded async runtime.
 //! Commands travel to the worker over a channel; events come back over
@@ -13,6 +14,11 @@
 //! A change is sent to the server and its events are produced only after the
 //! server confirmed it. A refusal or a lost connection becomes a failure
 //! notice and nothing is changed locally; nothing is queued for later.
+//!
+//! A send runs on a task of its own with its own connection, so a slow mail
+//! server never holds up reading, and a mailbox connection that is down does
+//! not stop it. It is never retried and never replayed after a reconnect.
+//! Exactly one of `MessageSent` and a failure notice named `send` answers it.
 
 mod backoff;
 mod change_flags;
@@ -25,6 +31,9 @@ mod lifecycle;
 mod offline;
 mod online;
 mod resolve;
+mod reply_lookup;
+mod save_sent;
+mod sending;
 mod sink;
 mod stop;
 mod timing;
@@ -151,8 +160,11 @@ fn run_worker(worker: Worker, mut commands: tokio::sync::mpsc::UnboundedReceiver
 impl MailBackend for RealBackend {
     fn handle(&mut self, command: Command) -> Vec<Event> {
         if let Some(operation) = unavailable_operation(&command, self.writes) {
-            return self.unavailable(operation, unavailable_reason(self.writes));
+            return self.unavailable(operation, unavailable_reason(&command, self.writes));
         }
+        // A send that cannot be handed over must still be answered as a send,
+        // or the composer would never get its message back.
+        let failed_as = if matches!(command, Command::Send { .. }) { "send" } else { "command" };
         if let Some(operation) = change_operation(&command)
             && !self.online.load(Ordering::Acquire)
         {
@@ -165,7 +177,7 @@ impl MailBackend for RealBackend {
         if sent {
             Vec::new()
         } else {
-            self.unavailable("command", "the mail worker is not running")
+            self.unavailable(failed_as, "the mail worker is not running")
         }
     }
 
