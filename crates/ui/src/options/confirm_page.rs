@@ -8,9 +8,8 @@ use super::summary::AccountSummary;
 /// What a removal leaves alone, said plainly.
 pub fn warning(address: &str) -> String {
     format!(
-        "Remove {address}? Its folder and its saved sign-in are deleted from this computer. \
-         Mail on the server is not touched. Earlier copies of the account file, named \
-         account.toml.bak\u{2026}, are not touched."
+        "Remove {address}? Everything in its folder is deleted from this computer: its settings, \
+         its saved sign-in and earlier copies of its settings. Mail on the server is not touched."
     )
 }
 
