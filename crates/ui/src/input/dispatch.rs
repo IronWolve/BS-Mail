@@ -7,6 +7,7 @@ use model::Command;
 use surface::{ButtonState, InputEvent, PointerButton};
 
 use super::action::{Action, action_for};
+use super::compose::ComposeKind;
 use super::hit::{Hit, HitView, hit_at};
 use super::movement::{WHEEL_ROWS, step};
 use super::viewport::{folders_first, list_first};
@@ -19,6 +20,9 @@ impl AppView {
     /// Reacts to one input event on a `cols` x `rows` grid. Returns whether
     /// anything on screen may have changed, so the host knows to redraw.
     pub fn handle_input(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
+        if self.composer.is_some() {
+            return self.composer_input(event, grid);
+        }
         if self.overlays.is_open() {
             return self.input_over_overlay(event);
         }
@@ -104,6 +108,10 @@ impl AppView {
             Action::Delete => self.delete_selected(),
             Action::Sync => self.refresh(),
             Action::Help => self.overlays.open = Some(OverlayKind::Help),
+            Action::Compose => self.start_compose(ComposeKind::New),
+            Action::Reply => self.start_compose(ComposeKind::Reply),
+            Action::ReplyAll => self.start_compose(ComposeKind::ReplyAll),
+            Action::Forward => self.start_compose(ComposeKind::Forward),
             movement => {
                 let layout = self.layout(grid.0, grid.1);
                 match self.focus {

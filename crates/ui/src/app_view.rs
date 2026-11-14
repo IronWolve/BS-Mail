@@ -8,6 +8,8 @@ use surface::{Capabilities, Frame, Rect};
 use crate::app_identity::AppIdentity;
 use crate::format::display_width;
 use crate::icons::{IconId, IconSet};
+use crate::composer::ComposeForm;
+use crate::composer::draw::draw_composer;
 use crate::input::{CommandQueue, Drag};
 use crate::input::viewport::{folders_first, list_first};
 use crate::layout::{
@@ -49,6 +51,8 @@ pub struct AppView {
     pub(crate) auto_marked: Option<MessageId>,
     /// The bar being dragged, while a button is held on it.
     pub(crate) drag: Option<Drag>,
+    /// The message being written, when the composer is open.
+    pub(crate) composer: Option<ComposeForm>,
 }
 
 impl AppView {
@@ -70,6 +74,7 @@ impl AppView {
             read_timer: None,
             auto_marked: None,
             drag: None,
+            composer: None,
         }
     }
 
@@ -117,7 +122,13 @@ impl AppView {
 
     /// Stores what one backend event carries for the regions.
     pub fn apply_event(&mut self, event: Event) {
+        self.note_send_outcome(&event);
         self.mail.apply(event, &mut self.selection);
+    }
+
+    /// Whether the composer is open, so the program leaves the letters to it.
+    pub fn is_composing(&self) -> bool {
+        self.composer.is_some()
     }
 
     pub fn selection(&self) -> &Selection {
@@ -178,6 +189,9 @@ impl AppView {
             self.draw_reader(&mut frame, &ctx, reader);
         }
         self.mark_focus(&mut frame, &layout);
+        if let Some(form) = &self.composer {
+            draw_composer(&mut frame, &ctx, layout.main, form);
+        }
         if self.overlays.open == Some(OverlayKind::Help) {
             draw_help(&mut frame, &ctx, area);
         }
@@ -213,7 +227,7 @@ impl AppView {
         self.selected_account().map_or(ConnectionState::Offline, |account| account.state)
     }
 
-    fn selected_account(&self) -> Option<&model::Account> {
+    pub(crate) fn selected_account(&self) -> Option<&model::Account> {
         self.selection.account.as_ref().and_then(|id| self.mail.account(id))
     }
 

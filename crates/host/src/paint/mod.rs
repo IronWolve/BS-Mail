@@ -3,6 +3,7 @@
 pub mod block_elements;
 pub mod box_drawing;
 pub mod canvas;
+pub mod caret;
 pub mod cell_painter;
 pub mod colors;
 pub mod context;
@@ -32,4 +33,7 @@ pub fn paint_frame(canvas: &mut Canvas, context: &mut PaintContext<'_>, frame: &
     let changes = effects::cell_changes(frame);
     cell_painter::paint_symbols(canvas, context, frame, &changes);
     effects::paint_over(canvas, context, frame);
+    if let Some(request) = &frame.cursor {
+        caret::draw_caret(canvas, context, request);
+    }
 }

@@ -289,8 +289,8 @@ impl FromStr for MockBackend {
 }
 
 impl MailBackend for MockBackend {
-    /// Answers at once. A command the mock has nothing to say about (`Send`,
-    /// `Unlock`) gets no events.
+    /// Answers at once. A command the mock has nothing to say about
+    /// (`Unlock`) gets no events; a send is accepted.
     fn handle(&mut self, command: Command) -> Vec<Event> {
         match command {
             Command::OpenFolder { folder } => self.open_folder(folder),
@@ -304,7 +304,10 @@ impl MailBackend for MockBackend {
                 query,
             } => self.search(request, &account, &query),
             Command::SyncNow { account } => self.sync_now(&account),
-            Command::Send { .. } | Command::Unlock { .. } => Vec::new(),
+            Command::Send { message } => vec![Event::MessageSent {
+                account: message.account,
+            }],
+            Command::Unlock { .. } => Vec::new(),
         }
     }
 

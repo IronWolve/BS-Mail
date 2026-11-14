@@ -63,6 +63,10 @@ pub enum Event {
         account: AccountId,
         allowed: bool,
     },
+    /// A message the user sent has been accepted by the server for delivery.
+    MessageSent {
+        account: AccountId,
+    },
     /// An operation failed; the footer shows `reason`.
     OpFailed {
         account: Option<AccountId>,

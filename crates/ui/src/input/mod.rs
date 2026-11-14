@@ -4,6 +4,7 @@
 
 pub mod action;
 pub mod changes;
+pub mod compose;
 pub mod command_queue;
 pub mod dispatch;
 pub mod drag;

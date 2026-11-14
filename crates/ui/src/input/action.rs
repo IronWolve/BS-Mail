@@ -29,6 +29,10 @@ pub enum Action {
     Delete,
     Sync,
     Help,
+    Compose,
+    Reply,
+    ReplyAll,
+    Forward,
 }
 
 /// The action for a key press, or `None` for a key the screen ignores.
@@ -47,6 +51,10 @@ pub fn action_for(key: &KeyEvent) -> Option<Action> {
         LogicalKey::Char('u') if !held.shift => Some(Action::ToggleRead),
         LogicalKey::Char('*') => Some(Action::ToggleStar),
         LogicalKey::Char('?') => Some(Action::Help),
+        LogicalKey::Char('c') if !held.shift => Some(Action::Compose),
+        LogicalKey::Char('r') if !held.shift => Some(Action::Reply),
+        LogicalKey::Char('R') => Some(Action::ReplyAll),
+        LogicalKey::Char('f') if !held.shift => Some(Action::Forward),
         LogicalKey::Char('d') if !held.shift => Some(Action::Delete),
         LogicalKey::Char('s') if !held.shift => Some(Action::Sync),
         LogicalKey::Char(_) => None,
@@ -66,6 +74,7 @@ fn named_action(named: NamedKey, shift: bool) -> Option<Action> {
         NamedKey::Enter => Action::Enter,
         NamedKey::Right => Action::Right,
         NamedKey::Left => Action::Left,
+        NamedKey::Function(2) => Action::Compose,
         NamedKey::Escape | NamedKey::Backspace => Action::Back,
         _ => return None,
     })
