@@ -3,12 +3,20 @@
 use mail_parser::{Message, MessagePart, MimeHeaders, PartType};
 
 use super::flowed::unflow;
-use super::html_to_text::html_to_text;
+use super::html_to_text::{html_to_text, too_nested};
+use super::limits::{MAX_HTML_BYTES, MAX_TEXT_BYTES, keep, megabytes};
+
+/// The text of a message and what was left out of it, for the notices.
+pub struct Picked {
+    pub text: String,
+    pub notes: Vec<String>,
+}
 
 /// The body text: the first non-empty `text/plain` part; failing that, the
 /// first non-empty `text/html` part converted to text. `None` when the
-/// message has neither.
-pub fn pick_body(message: &Message<'_>) -> Option<String> {
+/// message has neither. A very long text, or HTML too large or too deeply
+/// nested for the converter, is shortened or simplified, and says so.
+pub fn pick_body(message: &Message<'_>) -> Option<Picked> {
     for &id in &message.text_body {
         let Some(part) = message.parts.get(id as usize) else {
             continue;
@@ -17,7 +25,8 @@ pub fn pick_body(message: &Message<'_>) -> Option<String> {
             && is_plain(part)
             && !text.trim().is_empty()
         {
-            return Some(plain_text(part, text));
+            let mut notes = Vec::new();
+            return Some(Picked { text: cut_text(plain_text(part, text), &mut notes), notes });
         }
     }
     for &id in &message.html_body {
@@ -27,10 +36,35 @@ pub fn pick_body(message: &Message<'_>) -> Option<String> {
         if let PartType::Html(html) = &part.body
             && !html.trim().is_empty()
         {
-            return Some(html_to_text(html));
+            return Some(from_html(html));
         }
     }
     None
+}
+
+fn from_html(html: &str) -> Picked {
+    let mut notes = Vec::new();
+    let shown = &html[..keep(html, MAX_HTML_BYTES)];
+    if shown.len() < html.len() {
+        notes.push(format!(
+            "[This message is very large: only the first {} MB of its formatted text is shown.]",
+            megabytes(MAX_HTML_BYTES as u64)
+        ));
+    }
+    if too_nested(shown) {
+        notes.push("[This message is formatted in a way that is too complicated to lay out, so it is shown in a simpler form.]".to_owned());
+    }
+    Picked { text: cut_text(html_to_text(shown), &mut notes), notes }
+}
+
+/// Keeps at most `MAX_TEXT_BYTES` of `text`, noting when it cut.
+fn cut_text(mut text: String, notes: &mut Vec<String>) -> String {
+    let at = keep(&text, MAX_TEXT_BYTES);
+    if at < text.len() {
+        text.truncate(at);
+        notes.push(format!("[This text is very long: only the first {} MB is shown.]", megabytes(MAX_TEXT_BYTES as u64)));
+    }
+    text
 }
 
 /// A part with no type header is plain text by the standard's default.

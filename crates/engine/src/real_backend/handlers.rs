@@ -7,7 +7,7 @@ use model::{AccountId, Envelope, Event, Folder, FolderId, MessageId, SyncState};
 use super::lifecycle::{now_unix, progress, quota_event};
 use super::worker::Worker;
 use crate::imap_session::{ImapSession, SessionError, build_envelope, build_tree, fetched_row};
-use crate::mime_render::render_body;
+use crate::mime_render::render_message;
 
 /// How many messages one page of a folder holds.
 const PAGE_SIZE: u32 = 50;
@@ -161,7 +161,7 @@ impl Worker {
         };
         Ok(vec![Event::BodyReady {
             message,
-            body: render_body(&raw),
+            body: render_message(raw.bytes, raw.total),
         }])
     }
 
