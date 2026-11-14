@@ -16,6 +16,7 @@ use model::{Event, OutgoingMessage};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::save_sent::SentCopy;
+use super::sent_queue::SentQueue;
 use super::sink::EventSink;
 use super::stop::Stop;
 use super::unsupported::SEND_READ_ONLY_REASON;
@@ -37,6 +38,8 @@ struct SendJob {
     sink: EventSink,
     stop: Stop,
     copies: UnboundedSender<SentCopy>,
+    /// Where the copy is kept on disk until the mailbox has it.
+    queue: SentQueue,
 }
 
 /// The failure notice for a send, named as the screen expects.
@@ -119,6 +122,7 @@ impl Worker {
             sink: self.sink.clone(),
             stop: self.stop.clone(),
             copies: self.copies.sender(),
+            queue: self.queue.clone(),
         };
         tokio::spawn(watched(job, prepared));
     }
@@ -143,7 +147,9 @@ async fn deliver(job: SendJob, prepared: Prepared) {
         Some(Ok(mut accepted)) => {
             job.sink.send(Event::MessageSent { account: job.sink.account().clone() });
             if job.settings.save_sent {
-                let _ = job.copies.send(SentCopy { bytes: accepted.take_bytes() });
+                let bytes = accepted.take_bytes();
+                let file = job.queue.store(&bytes);
+                let _ = job.copies.send(SentCopy { bytes, file });
             }
             job.stop.guard(accepted.say_goodbye()).await;
         }

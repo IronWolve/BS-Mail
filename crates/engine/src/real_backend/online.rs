@@ -106,7 +106,7 @@ impl Worker {
             let body = self.fetch_body(session, message).await;
             self.settle("fetch body", body)?;
         }
-        Ok(())
+        self.save_unsaved(session).await
     }
 
     /// Runs one command that needs the server.

@@ -56,7 +56,7 @@
 
 use std::fmt;
 use std::net::IpAddr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use model::Secret;
 use serde::Deserialize;
@@ -118,6 +118,10 @@ pub struct AccountConfig {
     pub poll_seconds: u32,
     /// How an OAuth2 account signs in; `None` for a password account.
     pub oauth: Option<OAuthSettings>,
+    /// The folder this account keeps what it must not lose in: its sign-in
+    /// tokens and the copies of sent mail not yet saved on the server. `None`
+    /// for text parsed in memory, which has no folder of its own.
+    pub state_dir: Option<PathBuf>,
 }
 
 /// Why an account file was refused.
@@ -238,10 +242,12 @@ impl AccountConfig {
         Self::from_toml_str(&text).map(|config| config.with_state_dir(folder))
     }
 
-    /// Where an OAuth2 account keeps its tokens: `<dir>/oauth/<id>.token`.
-    /// For text parsed in memory, which has no folder of its own. A password
-    /// account is returned as it is.
+    /// Gives the account its folder: an OAuth2 account keeps its tokens in
+    /// `<dir>/oauth/<id>.token`, and any account keeps the copies of sent mail
+    /// it has not yet saved in `<dir>/sent_copies`. For text parsed in
+    /// memory, which has no folder of its own.
     pub fn with_state_dir(mut self, dir: &Path) -> Self {
+        self.state_dir = Some(dir.to_path_buf());
         let file = token_file_in(dir, &self.id);
         if let Some(oauth) = self.oauth.as_mut() {
             oauth.token_file = file;
@@ -286,6 +292,7 @@ impl AccountConfig {
             smtp,
             poll_seconds: resolve_poll_seconds(raw.poll_seconds),
             oauth,
+            state_dir: None,
         };
         config.validate()?;
         Ok(config)

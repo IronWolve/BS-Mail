@@ -11,6 +11,7 @@ pub mod mock;
 pub mod mock_backend;
 pub mod multi_backend;
 mod oauth;
+mod private_fs;
 pub mod real_backend;
 mod search;
 mod send;

@@ -10,7 +10,8 @@ use super::backoff::Backoff;
 use super::lifecycle::{announce, changes_allowed, connection};
 use super::online::Served;
 use super::poll_state::PollState;
-use super::save_sent::SentCopies;
+use super::save_sent::{SentCopies, SentCopy};
+use super::sent_queue::SentQueue;
 use super::sink::EventSink;
 use super::stop::Stop;
 use super::timing::Timing;
@@ -42,6 +43,11 @@ pub(super) struct Worker {
     pub(super) search_shown: bool,
     /// Sent messages whose copies are waiting to be saved in the Sent folder.
     pub(super) copies: SentCopies,
+    /// Sent copies waiting for the mailbox: made while it was out of reach,
+    /// or left on disk by an earlier run.
+    pub(super) unsaved: Vec<SentCopy>,
+    /// Where those copies are kept on disk.
+    pub(super) queue: SentQueue,
 }
 
 /// How a pause between connection attempts ended.
@@ -52,6 +58,7 @@ enum Pause {
 
 impl Worker {
     pub(super) fn new(config: AccountConfig, timing: Timing, sink: EventSink, stop: Stop) -> Self {
+        let queue = SentQueue::for_account(&config);
         Self {
             account: sink.account().clone(),
             config,
@@ -64,12 +71,15 @@ impl Worker {
             poll: PollState::default(),
             search_shown: false,
             copies: SentCopies::new(),
+            unsaved: Vec::new(),
+            queue,
         }
     }
 
     /// Runs until stopped.
     pub(super) async fn run(mut self, commands: &mut UnboundedReceiver<Command>) {
         announce(&self.config, &self.sink);
+        self.unsaved = self.queue.waiting();
         let mut backoff = Backoff::new(self.timing.backoff_start, self.timing.backoff_max);
         let mut told_user = false;
         let mut first = true;
@@ -144,8 +154,8 @@ impl Worker {
                     Some(other) => self.answer_offline(other),
                 },
                 copy = self.copies.recv() => {
-                    if copy.is_some() {
-                        self.sent_copy_offline();
+                    if let Some(copy) = copy {
+                        self.sent_copy_offline(copy);
                     }
                 }
             }

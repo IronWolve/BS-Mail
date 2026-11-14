@@ -28,6 +28,8 @@
 //! server never holds up reading, and a mailbox connection that is down does
 //! not stop it. It is never retried and never replayed after a reconnect.
 //! Exactly one of `MessageSent` and a failure notice named `send` answers it.
+//! The copy for the Sent folder is another matter: it is kept on disk until
+//! the mailbox has it, however long that takes (see `save_sent`).
 
 mod backoff;
 mod change_flags;
@@ -44,6 +46,7 @@ mod poll_state;
 mod resolve;
 mod reply_lookup;
 mod save_sent;
+mod sent_queue;
 mod search;
 mod search_folders;
 mod sending;

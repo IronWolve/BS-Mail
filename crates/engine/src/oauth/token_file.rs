@@ -3,12 +3,12 @@
 //! with owner-only permissions and then renamed into place, so a reader never
 //! sees half a file; on Unix a file that others can read is refused.
 
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use model::Secret;
 use serde::{Deserialize, Serialize};
 
+use crate::private_fs::{make_folder, write_new};
 use crate::send::random;
 use crate::sign_in_advice::sign_in_again;
 
@@ -106,34 +106,6 @@ pub fn write(path: &Path, record: &TokenRecord) -> Result<(), FileError> {
         return Err(fail("writing the file", &error));
     }
     Ok(())
-}
-
-#[cfg(unix)]
-fn make_folder(dir: &Path) -> std::io::Result<()> {
-    use std::os::unix::fs::DirBuilderExt;
-    std::fs::DirBuilder::new().recursive(true).mode(0o700).create(dir)
-}
-
-#[cfg(not(unix))]
-fn make_folder(dir: &Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(dir)
-}
-
-#[cfg(unix)]
-fn open_new(path: &Path) -> std::io::Result<std::fs::File> {
-    use std::os::unix::fs::OpenOptionsExt;
-    std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(path)
-}
-
-#[cfg(not(unix))]
-fn open_new(path: &Path) -> std::io::Result<std::fs::File> {
-    std::fs::OpenOptions::new().write(true).create_new(true).open(path)
-}
-
-fn write_new(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let mut file = open_new(path)?;
-    file.write_all(bytes)?;
-    file.sync_all()
 }
 
 #[cfg(test)]
