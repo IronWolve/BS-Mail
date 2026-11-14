@@ -9,6 +9,7 @@ mod imap_session;
 mod mime_render;
 pub mod mock;
 pub mod mock_backend;
+pub mod multi_backend;
 mod oauth;
 pub mod real_backend;
 mod search;
@@ -20,5 +21,6 @@ pub use account_config::{AccountConfig, ConfigError, Security, SmtpAuth, SmtpSet
 pub use account_oauth::{AuthKind, OAuthSettings};
 pub use mock::{Fixture, FixtureError};
 pub use mock_backend::MockBackend;
+pub use multi_backend::{Member, MembersHandle, MultiBackend};
 pub use oauth::{BrowserSignIn, HttpLimits, SignInLimits, SignInPoll, TokenError, TokenSource};
 pub use real_backend::RealBackend;
