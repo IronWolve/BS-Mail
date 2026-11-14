@@ -20,6 +20,7 @@ pub const HELP_ROWS: &[(&str, &str)] = &[
     ("Right  Left", "open and close a folder; in the other panes, in and out"),
     ("click", "select a folder or message"),
     ("wheel", "scroll the pane under the pointer"),
+    ("Space (list)", "mark a message; u * d then act on all marked, Esc clears"),
     ("u", "mark read or unread"),
     ("*", "star or unstar"),
     ("d", "delete"),

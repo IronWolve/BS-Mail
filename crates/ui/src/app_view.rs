@@ -1,6 +1,8 @@
 //! The screen's state and its drawing: events from the backend go in, a
 //! frame comes out. No mouse and no key handling yet.
 
+use std::collections::BTreeSet;
+
 use model::config::Config;
 use model::{ConnectionState, Event, MailDate, MessageId};
 use surface::{Capabilities, Frame, Rect};
@@ -55,6 +57,8 @@ pub struct AppView {
     pub(crate) composer: Option<ComposeForm>,
     /// The user clicked Quit; the program closes it, the screen cannot.
     pub(crate) quit_requested: bool,
+    /// Messages marked with Space, which the change keys then act on together.
+    pub(crate) marked: BTreeSet<MessageId>,
 }
 
 impl AppView {
@@ -78,6 +82,7 @@ impl AppView {
             drag: None,
             composer: None,
             quit_requested: false,
+            marked: BTreeSet::new(),
         }
     }
 
@@ -127,6 +132,12 @@ impl AppView {
     pub fn apply_event(&mut self, event: Event) {
         self.note_send_outcome(&event);
         self.mail.apply(event, &mut self.selection);
+        self.prune_marks();
+    }
+
+    /// How many messages are marked.
+    pub fn marked_count(&self) -> usize {
+        self.marked.len()
     }
 
     /// Whether the user asked to quit from the screen, by the Quit button.
@@ -316,6 +327,7 @@ impl AppView {
             now: self.now,
         };
         draw_list_rows(frame, ctx, list.rows, &view);
+        self.show_marks(frame, list, view.first, &page.envelopes);
     }
 
     fn reader_title_data<'a>(&'a self, page: &'a ListPage) -> Option<ReaderTitleData<'a>> {

@@ -29,51 +29,81 @@ impl AppView {
         true
     }
 
-    pub(crate) fn toggle_read(&mut self) {
-        let Some((id, seen)) = self.current_envelope().map(|e| (e.id, e.flags.seen)) else {
-            return;
+    /// The envelopes of the messages a change acts on.
+    fn target_envelopes(&self) -> Vec<&Envelope> {
+        let ids = self.targets();
+        let folder = self.selection.folder;
+        let Some(page) = folder.and_then(|f| self.mail.page.as_ref().filter(|p| p.folder == f)) else {
+            return Vec::new();
         };
+        page.envelopes.iter().filter(|e| ids.contains(&e.id)).collect()
+    }
+
+    /// Read when any target is unread, otherwise unread: one key press makes
+    /// every target the same.
+    pub(crate) fn toggle_read(&mut self) {
+        let targets = self.target_envelopes();
+        if targets.is_empty() {
+            return;
+        }
+        let make_seen = targets.iter().any(|e| !e.flags.seen);
+        let ids: Vec<MessageId> = targets.iter().map(|e| e.id).collect();
         if !self.changes_allowed_or_note() {
             return;
         }
         // The user's own choice wins over the timer for this message.
-        self.auto_marked = Some(id);
+        self.auto_marked = self.current_selected_id();
         self.read_timer = None;
-        self.queue.push(set_flags(id, FlagChange { seen: Some(!seen), ..FlagChange::default() }));
+        self.queue.push(set_flags_for(ids, FlagChange { seen: Some(make_seen), ..FlagChange::default() }));
     }
 
+    /// Starred when any target is not, otherwise unstarred.
     pub(crate) fn toggle_star(&mut self) {
-        let Some((id, flagged)) = self.current_envelope().map(|e| (e.id, e.flags.flagged)) else {
+        let targets = self.target_envelopes();
+        if targets.is_empty() {
             return;
-        };
+        }
+        let make_flagged = targets.iter().any(|e| !e.flags.flagged);
+        let ids: Vec<MessageId> = targets.iter().map(|e| e.id).collect();
         if !self.changes_allowed_or_note() {
             return;
         }
-        self.queue.push(set_flags(id, FlagChange { flagged: Some(!flagged), ..FlagChange::default() }));
+        self.queue.push(set_flags_for(ids, FlagChange { flagged: Some(make_flagged), ..FlagChange::default() }));
     }
 
-    /// Deletes the selected message and moves the selection to its neighbor,
-    /// so the refreshed page keeps the user's place.
+    /// Deletes the marked messages, or the selected one, and moves the
+    /// selection to the nearest message that stays, so the refreshed page
+    /// keeps the user's place.
     pub(crate) fn delete_selected(&mut self) {
-        let Some(id) = self.current_envelope().map(|e| e.id) else {
+        let ids = self.targets();
+        if ids.is_empty() {
             return;
-        };
+        }
         if !self.changes_allowed_or_note() {
             return;
         }
-        let neighbor = self.neighbor_of_selected();
+        let neighbor = self.neighbor_outside(&ids);
         self.selection.message = neighbor;
-        self.queue.push(Command::Delete { messages: vec![id] });
+        self.clear_marks();
+        self.queue.push(Command::Delete { messages: ids });
     }
 
-    /// The message after the selected one, else the one before it.
-    fn neighbor_of_selected(&self) -> Option<MessageId> {
+    fn current_selected_id(&self) -> Option<MessageId> {
+        self.current_envelope().map(|e| e.id)
+    }
+
+    /// The nearest message that is not in `going`: the first one after the
+    /// selected one, else the first before it.
+    fn neighbor_outside(&self, going: &[MessageId]) -> Option<MessageId> {
         let folder = self.selection.folder?;
         let page = self.mail.page.as_ref().filter(|page| page.folder == folder)?;
         let at = self.selection.message_index;
+        let stays = |e: &&Envelope| !going.contains(&e.id);
         page.envelopes
-            .get(at + 1)
-            .or_else(|| at.checked_sub(1).and_then(|before| page.envelopes.get(before)))
+            .iter()
+            .skip(at + 1)
+            .find(stays)
+            .or_else(|| page.envelopes.iter().take(at).rev().find(stays))
             .map(|envelope| envelope.id)
     }
 
@@ -111,10 +141,11 @@ impl AppView {
 }
 
 fn set_flags(id: MessageId, change: FlagChange) -> Command {
-    Command::SetFlags {
-        messages: vec![id],
-        change,
-    }
+    set_flags_for(vec![id], change)
+}
+
+fn set_flags_for(messages: Vec<MessageId>, change: FlagChange) -> Command {
+    Command::SetFlags { messages, change }
 }
 
 #[cfg(test)]

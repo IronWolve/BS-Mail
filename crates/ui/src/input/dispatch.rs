@@ -93,6 +93,7 @@ impl AppView {
             Action::FocusNext => self.focus = self.focus.next(),
             Action::FocusPrevious => self.focus = self.focus.previous(),
             Action::Enter => self.focus = deeper(self.focus),
+            Action::Back if self.focus == Focus::List && !self.marked.is_empty() => self.clear_marks(),
             Action::Back => self.focus = shallower(self.focus),
             Action::Right if self.focus == Focus::Sidebar => self.open_folder_or_go_in(),
             Action::Right => self.focus = deeper(self.focus),
@@ -102,6 +103,8 @@ impl AppView {
                 self.act(Action::PageDown, grid);
             }
             Action::SpaceUp if self.focus == Focus::Reader => self.act(Action::PageUp, grid),
+            Action::SpaceDown if self.focus == Focus::List => self.mark_and_move(Action::Down, grid),
+            Action::SpaceUp if self.focus == Focus::List => self.mark_and_move(Action::Up, grid),
             Action::SpaceDown | Action::SpaceUp => {}
             Action::ToggleRead => self.toggle_read(),
             Action::ToggleStar => self.toggle_star(),
@@ -121,6 +124,14 @@ impl AppView {
                 }
             }
         }
+    }
+
+    /// Space in the list: marks the message and moves on, so a run of Space
+    /// marks a run of messages.
+    fn mark_and_move(&mut self, direction: Action, grid: (u16, u16)) {
+        self.toggle_mark();
+        let layout = self.layout(grid.0, grid.1);
+        self.move_message(direction, &layout);
     }
 
     fn click(&mut self, col: u16, row: u16, grid: (u16, u16)) -> bool {

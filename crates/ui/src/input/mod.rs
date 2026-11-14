@@ -10,6 +10,7 @@ pub mod dispatch;
 pub mod drag;
 pub mod dragging;
 pub mod hit;
+pub mod marks;
 pub mod movement;
 pub mod tree;
 pub mod viewport;
