@@ -37,8 +37,8 @@ pub fn draw(options: &Options) -> Result<Stats, AppError> {
         messages: scene.messages,
         effects: frame.effects.len(),
         source: scene.source,
-        real: scene.real,
-        setup: scene.setup.is_some(),
+        label: scene.label,
+        accounts: scene.accounts,
         millis: started.elapsed().as_millis(),
         shown: Shown::Terminal,
     })

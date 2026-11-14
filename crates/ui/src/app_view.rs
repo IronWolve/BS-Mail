@@ -159,7 +159,6 @@ impl AppView {
 
     /// Stores what one backend event carries for the regions.
     pub fn apply_event(&mut self, event: Event) {
-        self.note_setup_event(&event);
         self.note_send_outcome(&event);
         self.note_search_event(&event);
         self.mail.apply(event, &mut self.selection);

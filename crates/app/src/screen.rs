@@ -12,11 +12,16 @@ use model::{MailBackend, MailDate};
 use surface::{EventSink, Flow, InputEvent, KeyEvent, LogicalKey, Presenter};
 use ui::AppView;
 
+use crate::accounts::Live;
 use crate::clock::system_now;
+use crate::options_flow::{self, Opened};
 use crate::pump::pump;
 use crate::setup_flow::SetupFlow;
 use crate::state_file::{self, State};
 use crate::ticker::Ticker;
+
+/// How many times mail is moved again after the accounts changed, at most.
+const ROUNDS: usize = 3;
 
 pub struct Screen {
     view: AppView,
@@ -42,6 +47,9 @@ pub struct Screen {
     title: String,
     /// What answers the account form, while there is one.
     setup: Option<SetupFlow>,
+    /// The accounts of this run, which the Options screen and the form can
+    /// change; `None` for mock mail.
+    live: Option<Live>,
 }
 
 impl Screen {
@@ -66,13 +74,14 @@ impl Screen {
             track_grid: true,
             title: String::new(),
             setup: None,
+            live: None,
         }
     }
 
-    /// Lets the account form try the account the user types and save it at
-    /// `target`.
-    pub fn with_setup(mut self, target: Option<PathBuf>) -> Self {
-        self.setup = target.map(SetupFlow::new);
+    /// Lets the Options screen and the account form add, change and remove
+    /// the accounts `live` describes.
+    pub fn with_accounts(mut self, live: Option<Live>) -> Self {
+        self.live = live;
         self
     }
 
@@ -135,15 +144,52 @@ impl Screen {
     }
 
     /// Moves mail both ways until quiet; returns whether the view changed.
-    /// While the account form is open, what it asked for is answered first
-    /// and what the account says is read after.
+    /// What the Options screen and the account form asked for is answered
+    /// first; when that changed which accounts run, mail is moved again so
+    /// the new state is on screen before the next frame.
     fn exchange(&mut self) -> bool {
-        let mut changed = self.setup_step();
-        changed |= pump(&mut self.view, self.backend.as_mut()) > 0;
-        changed | self.setup_step()
+        let mut changed = false;
+        for _ in 0..ROUNDS {
+            let asked = self.account_steps();
+            let mail = pump(&mut self.view, self.backend.as_mut()) > 0;
+            changed |= asked | mail;
+            if !asked {
+                break;
+            }
+        }
+        changed
     }
 
+    /// The Options screen's requests, then the form's.
+    fn account_steps(&mut self) -> bool {
+        let actions = self.view.take_options_actions();
+        let mut changed = !actions.is_empty();
+        if changed {
+            self.answer_options(actions);
+        }
+        changed |= self.setup_step();
+        changed
+    }
+
+    fn answer_options(&mut self, actions: Vec<ui::OptionsAction>) {
+        let edit = match options_flow::answer(&mut self.view, &mut self.backend, self.live.as_ref(), actions) {
+            Opened::Nothing => return,
+            Opened::New => None,
+            Opened::Editing(id) => Some(id),
+        };
+        // A form opened over another one replaces it: the old attempt ends.
+        if let Some(mut old) = self.setup.take() {
+            old.abandon();
+        }
+        self.setup = self.live.clone().map(|live| SetupFlow::new(live, edit));
+    }
+
+    /// Answers the account form. The flow is made when the form opens, and
+    /// let go when it closes.
     fn setup_step(&mut self) -> bool {
+        if self.setup.is_none() && self.view.is_setting_up() {
+            self.setup = self.live.clone().map(|live| SetupFlow::new(live, None));
+        }
         let Some(flow) = self.setup.as_mut() else {
             return false;
         };

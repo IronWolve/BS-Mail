@@ -1,0 +1,131 @@
+//! What saving an account will do, worked out before anything is tried.
+//!
+//! The id is settled here, because the account's folder (and so the place its
+//! sign-in tokens go) is named by it: a new account whose id is taken by a
+//! different address gets `-2`, `-3`…, and an address that is already set up
+//! is refused, so nothing is tried or written for it.
+
+use std::path::PathBuf;
+
+use engine::AccountConfig;
+
+use super::id::{is_valid_id, unique_id};
+use super::place::Place;
+use super::reason::reason_of;
+
+/// Said when a new account's address is already an account.
+pub const ADDRESS_TAKEN: &str = "that address is already set up; pick Edit on it instead";
+
+/// Where an account will be saved and under which id.
+pub struct Plan {
+    pub id: String,
+    /// The account file's text with the final id in it. It can hold a
+    /// password, so `Plan` is never printed whole.
+    pub text: String,
+    pub config: AccountConfig,
+    /// The account file.
+    pub file: PathBuf,
+    /// The folder the account lives in, which is also where its tokens go.
+    pub folder: PathBuf,
+    /// An existing account is being changed.
+    pub edit: bool,
+    /// The folder is not there yet, so this attempt is the one that makes it.
+    pub new_folder: bool,
+    /// A new account under the root: its file must not be there already.
+    pub exclusive: bool,
+}
+
+impl std::fmt::Debug for Plan {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Plan").field("id", &self.id).field("file", &self.file).field("edit", &self.edit).finish_non_exhaustive()
+    }
+}
+
+/// Works out the save of `text` into `place`. `edit` is the id of the account
+/// being changed, `None` for a new one. `in_use` are the ids the running
+/// accounts hold, which a new id must not be.
+pub fn plan(place: &Place, edit: Option<&str>, in_use: &[String], text: &str) -> Result<Plan, String> {
+    let config = AccountConfig::from_toml_str(text).map_err(|error| reason_of(&error))?;
+    match (place, edit) {
+        (Place::Root(_), Some(id)) => edit_in_root(place, id, config, text),
+        (Place::Root(_), None) => add_to_root(place, in_use, config, text),
+        (_, edit) => in_file(place, edit, config, text),
+    }
+}
+
+/// `--account <file>`: exactly that file, whatever the id says.
+fn in_file(place: &Place, edit: Option<&str>, config: AccountConfig, text: &str) -> Result<Plan, String> {
+    if let Some(id) = edit
+        && id != config.id
+    {
+        return Err(id_changed(id));
+    }
+    let (Some(file), Some(folder)) = (place.file_of(&config.id), place.folder_of(&config.id)) else {
+        return Err("there is no place to save this account".to_string());
+    };
+    Ok(Plan {
+        id: config.id.clone(),
+        text: text.to_string(),
+        config,
+        file,
+        folder,
+        edit: edit.is_some(),
+        new_folder: false,
+        exclusive: false,
+    })
+}
+
+fn edit_in_root(place: &Place, id: &str, config: AccountConfig, text: &str) -> Result<Plan, String> {
+    if id != config.id {
+        return Err(id_changed(id));
+    }
+    let scan = place.scan();
+    if scan.has_address(&config.address, Some(id)) {
+        return Err(ADDRESS_TAKEN.to_string());
+    }
+    finish(place, id.to_string(), config, text, true)
+}
+
+fn add_to_root(place: &Place, in_use: &[String], config: AccountConfig, text: &str) -> Result<Plan, String> {
+    let scan = place.scan();
+    if scan.has_address(&config.address, None) {
+        return Err(ADDRESS_TAKEN.to_string());
+    }
+    let taken = |candidate: &str| {
+        in_use.iter().any(|id| id == candidate)
+            || place.file_of(candidate).is_none_or(|file| file.exists())
+    };
+    let id = unique_id(&config.id, taken).ok_or("too many accounts are named like that; change the address a little")?;
+    finish(place, id, config, text, false)
+}
+
+fn finish(place: &Place, id: String, config: AccountConfig, text: &str, edit: bool) -> Result<Plan, String> {
+    let (Some(file), Some(folder)) = (place.file_of(&id), place.folder_of(&id)) else {
+        return Err(format!("\"{id}\" cannot be the name of an account folder"));
+    };
+    let (config, text) = if config.id == id { (config, text.to_string()) } else { with_id(&id, text)? };
+    let new_folder = !folder.exists();
+    Ok(Plan { id, text, config, file, folder, edit, new_folder, exclusive: !edit })
+}
+
+/// The same text and account with a different id.
+fn with_id(id: &str, text: &str) -> Result<(AccountConfig, String), String> {
+    if !is_valid_id(id) {
+        return Err(format!("\"{id}\" cannot be the name of an account folder"));
+    }
+    let adjust = |text: &str| -> Option<String> {
+        let mut table: toml::Table = toml::from_str(text).ok()?;
+        table.insert("id".to_string(), id.to_string().into());
+        toml::to_string(&table).ok()
+    };
+    let fresh = adjust(text).ok_or("the account could not be given another id")?;
+    let config = AccountConfig::from_toml_str(&fresh).map_err(|error| reason_of(&error))?;
+    Ok((config, fresh))
+}
+
+fn id_changed(id: &str) -> String {
+    format!("the account being edited is \"{id}\" but the form says another id; close the form and try again")
+}
+
+#[cfg(test)]
+include!("plan.tests.rs");

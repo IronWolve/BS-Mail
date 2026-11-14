@@ -47,12 +47,16 @@ pub struct Options {
     pub action: Action,
     pub mode: Mode,
     pub mock: Option<PathBuf>,
-    /// A mail account file: the program reads that account's real mail.
+    /// A mail account file: the program runs exactly that account and keeps
+    /// its saved sign-in in the file's own folder. Without it the program
+    /// runs the accounts in the data folder.
     pub account: Option<PathBuf>,
-    /// Show the account form, even where an account or a mock is installed.
+    /// Show the account form over the accounts that are there. With an
+    /// account file the form saves exactly that file and no account runs.
     pub setup: bool,
-    /// Where the program keeps what it remembers between runs; beside the
-    /// program when not given.
+    /// Where the program keeps its accounts (one folder each, under
+    /// `accounts/`) and what it remembers between runs; beside the program
+    /// when not given.
     pub data_dir: Option<PathBuf>,
     pub size: SizeChoice,
     /// The icon set, when asked for; otherwise the setting's.

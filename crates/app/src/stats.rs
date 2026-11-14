@@ -7,12 +7,13 @@ pub struct Stats {
     pub rows: u16,
     pub messages: usize,
     pub effects: usize,
-    /// The account file or the mock file the mail came from.
+    /// The account file, the accounts folder or the mock file the mail came
+    /// from.
     pub source: PathBuf,
-    /// Real mail from an account, not the mock.
-    pub real: bool,
-    /// The account form was showing, to save the file at `source`.
-    pub setup: bool,
+    /// What to call `source`.
+    pub label: &'static str,
+    /// How many accounts the run started with; `None` for mock mail.
+    pub accounts: Option<usize>,
     pub millis: u128,
     pub shown: Shown,
 }

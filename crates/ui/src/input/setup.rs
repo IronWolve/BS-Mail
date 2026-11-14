@@ -211,7 +211,10 @@ impl AppView {
     }
 
     /// Reads what the account that was tried says: signed in, or why not.
-    pub(crate) fn note_setup_event(&mut self, event: &Event) {
+    /// The program feeds the form the events of the account it is trying,
+    /// and only those: what the accounts already running say is not about
+    /// the form, so `apply_event` does not pass it on.
+    pub fn note_setup_event(&mut self, event: &Event) {
         let Some(form) = self.setup.as_mut() else {
             return;
         };

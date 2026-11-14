@@ -6,7 +6,7 @@ use std::io::{IsTerminal, Write};
 
 use crate::cli::{REF_COLS, REF_ROWS};
 use crate::identity::{display_name, slug, version};
-use crate::paths::ACCOUNT_NAME;
+use crate::paths::{ACCOUNT_FILE, ACCOUNTS_DIR_NAME};
 use crate::stats::{Shown, Stats};
 
 struct Paint {
@@ -71,10 +71,9 @@ pub fn help_text() -> String {
          --smoke            open a window, draw one frame and stop\n\
          \n\
          Options:\n  \
-         --account <file>   real mail from this account file (default: {ACCOUNT_NAME} beside the program)\n  \
-         --setup            show the account form, even where an account is installed\n  \
-         --data-dir <dir>   where sizes and other settings are remembered (default: data\n  \
-                            beside the program)\n  \
+         --account <file>   run only the account in this file; its saved sign-in is kept in the\n                     file's own folder (default: every account in\n                     <data dir>/{ACCOUNTS_DIR_NAME}/<id>/{ACCOUNT_FILE})\n  \
+         --setup            show the account form over the accounts that are there (with\n                     --account <file>: the form saves exactly that file and no account runs\n                     until it has)\n  \
+         --data-dir <dir>   where accounts, settings and sizes are kept (default: data beside\n                     the program); each account has a folder of its own in it\n  \
          --mock <file>      draw the mock mail in this file instead of an account (for trying the look)\n  \
          --size <COLSxROWS> grid to draw (default: {REF_COLS}x{REF_ROWS}, the reference size)\n  \
          --fit              use the size of this terminal instead\n  \
@@ -115,8 +114,9 @@ pub fn print_stats(stats: &Stats) {
         paint.green,
         format!("{} x {} cells", stats.cols, stats.rows),
     );
-    if !stats.real && !stats.setup {
-        line("messages", paint.green, stats.messages.to_string());
+    match stats.accounts {
+        Some(count) => line("accounts", paint.green, count.to_string()),
+        None => line("messages", paint.green, stats.messages.to_string()),
     }
     match &stats.shown {
         Shown::Tty { frames, depth } => {
@@ -148,12 +148,7 @@ pub fn print_stats(stats: &Stats) {
         }
     }
     line("drawn in", paint.green, format!("{} ms", stats.millis));
-    let label = match (stats.setup, stats.real) {
-        (true, _) => "saves to",
-        (false, true) => "account",
-        (false, false) => "mock data",
-    };
-    line(label, paint.dim, stats.source.display().to_string());
+    line(stats.label, paint.dim, stats.source.display().to_string());
 }
 
 /// A byte count in the largest unit that keeps it short.
@@ -168,3 +163,6 @@ fn bytes(count: u64) -> String {
     }
     format!("{:.1} MB", value / (STEP * STEP))
 }
+
+#[cfg(test)]
+include!("report.tests.rs");

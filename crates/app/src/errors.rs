@@ -4,8 +4,6 @@ use std::fmt;
 use std::io;
 use std::path::PathBuf;
 
-use crate::paths::ACCOUNT_NAME;
-
 #[derive(Debug)]
 pub enum AppError {
     NoSource,
@@ -23,8 +21,8 @@ impl fmt::Display for AppError {
         match self {
             Self::NoSource => write!(
                 f,
-                "no account to show: put {ACCOUNT_NAME} beside the program, \
-                 or use --account <file> or --mock <file>"
+                "no folder to keep accounts in: use --data-dir <folder>, \
+                 or --account <file> or --mock <file>"
             ),
             Self::Account(path, reason) => {
                 write!(f, "the account file {} cannot be used: {reason}", path.display())
