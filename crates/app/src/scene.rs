@@ -8,15 +8,16 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use engine::{AccountConfig, MockBackend, RealBackend};
-use model::config::Config;
 use model::{MailBackend, MailDate};
 use surface::Capabilities;
 use ui::AppView;
 use ui::icons::IconSet;
 use ui::theme::roles;
-use ui::theme::{Theme, default_theme};
+use ui::theme::Theme;
 
 use crate::cli::Options;
+use crate::config_io;
+use crate::paths::data_dir;
 use crate::errors::AppError;
 use crate::identity::identity;
 use crate::pump::pump;
@@ -41,6 +42,9 @@ pub struct Scene {
     /// A clock that stands still, so a picture of mock data never changes
     /// with the day it is taken; `None` follows the system clock.
     pub fixed_now: Option<MailDate>,
+    /// Text size in points and row height, from the command line or the
+    /// settings.
+    pub font: (u8, f32),
 }
 
 impl Scene {
@@ -84,19 +88,34 @@ impl Scene {
 /// Builds the screen and its mail source.
 pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, AppError> {
     let source = choose_for_run(options)?;
-    let theme = default_theme().map_err(|error| AppError::Theme(error.to_string()))?;
-    let base = base_colors(&theme);
-    let mut view = AppView::new(
-        identity(),
-        theme,
-        Config::default(),
-        IconSet::new(options.icons),
+    let loaded = config_io::load(data_dir(options.data_dir.as_ref()).as_deref())?;
+    let base = base_colors(&loaded.theme);
+    let font = (
+        options.points.unwrap_or(loaded.config.font.size),
+        options.line_spacing.unwrap_or(loaded.config.font.line_spacing),
     );
+    let icons = options.icons.unwrap_or_else(|| icon_kind(loaded.config.appearance.icons));
+    let mut view = AppView::new(identity(), loaded.theme, loaded.config, IconSet::new(icons));
+    view.set_config_problem(loaded.problems.first().cloned());
     view.set_capabilities(capabilities);
     let path = source.path().clone();
-    match source {
+    let mut scene = match source {
         Source::Mock(_) => mock_scene(view, base, &path),
         Source::Account(_) => account_scene(view, base, &path),
+    }?;
+    scene.font = font;
+    Ok(scene)
+}
+
+/// The icon set a setting asks for. `auto` is the Nerd set: the window
+/// carries its own font, and a terminal's first-run check is not built yet.
+fn icon_kind(mode: model::config::IconMode) -> ui::icons::IconKind {
+    use model::config::IconMode;
+    use ui::icons::IconKind;
+    match mode {
+        IconMode::Auto | IconMode::Nerd => IconKind::Nerd,
+        IconMode::Unicode => IconKind::Unicode,
+        IconMode::Ascii => IconKind::Ascii,
     }
 }
 
@@ -112,6 +131,7 @@ fn mock_scene(
         view,
         messages: backend.fixture().messages.len(),
         fixed_now: Some(backend.now()),
+        font: (12, 1.0),
         backend: Box::new(backend),
         source: path.to_path_buf(),
         real: false,
@@ -130,6 +150,7 @@ fn account_scene(
         view,
         messages: 0,
         fixed_now: None,
+        font: (12, 1.0),
         backend: Box::new(RealBackend::start(config)),
         source: path.to_path_buf(),
         real: true,

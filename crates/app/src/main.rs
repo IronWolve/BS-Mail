@@ -3,6 +3,7 @@
 
 mod cli;
 mod clock;
+mod config_io;
 mod errors;
 mod fonts;
 mod identity;
@@ -43,6 +44,7 @@ fn main() -> ExitCode {
             println!("{}", report::version_line());
             ExitCode::SUCCESS
         }
+        cli::Action::PrintConfig => print_config(&options),
         cli::Action::Draw => show(&options),
     }
 }
@@ -74,4 +76,31 @@ fn show(options: &cli::Options) -> ExitCode {
 fn live_terminal(options: &cli::Options) -> bool {
     use std::io::IsTerminal;
     !options.print && std::io::stdin().is_terminal() && std::io::stdout().is_terminal()
+}
+
+/// Writes the settings in force as TOML on standard output; what was wrong
+/// with the user's file goes to standard error.
+fn print_config(options: &cli::Options) -> ExitCode {
+    let dir = paths::data_dir(options.data_dir.as_ref());
+    match config_io::load(dir.as_deref()) {
+        Ok(loaded) => {
+            for problem in &loaded.problems {
+                report::print_error(problem);
+            }
+            match toml::to_string_pretty(&loaded.config) {
+                Ok(text) => {
+                    print!("{text}");
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    report::print_error(&format!("the settings could not be written out: {error}"));
+                    ExitCode::FAILURE
+                }
+            }
+        }
+        Err(error) => {
+            report::print_error(&error.to_string());
+            ExitCode::FAILURE
+        }
+    }
 }

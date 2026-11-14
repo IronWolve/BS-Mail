@@ -25,8 +25,8 @@ pub fn render(options: &Options, path: &Path) -> Result<Stats, AppError> {
     let (cols, rows) = window_grid(options.size);
     let metrics = CellMetrics::new(
         &fonts,
-        CellMetrics::pixel_size(options.points, 1.0),
-        options.line_spacing,
+        CellMetrics::pixel_size(scene.font.0, 1.0),
+        scene.font.1,
     );
     let (width, height) = metrics.grid_pixels(cols, rows);
     let palette = Palette::new(scene.base.0, scene.base.1);

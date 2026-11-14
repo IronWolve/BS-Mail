@@ -4,7 +4,7 @@
 
 use std::io::{IsTerminal, Write};
 
-use crate::cli::{DEFAULT_POINTS, REF_COLS, REF_ROWS};
+use crate::cli::{REF_COLS, REF_ROWS};
 use crate::identity::{display_name, slug, version};
 use crate::paths::{ACCOUNT_NAME, FIXTURE_NAME};
 use crate::stats::{Shown, Stats};
@@ -77,11 +77,12 @@ pub fn help_text() -> String {
          --mock <file>      draw mock data instead (default: {FIXTURE_NAME} beside the program)\n  \
          --size <COLSxROWS> grid to draw (default: {REF_COLS}x{REF_ROWS}, the reference size)\n  \
          --fit              use the size of this terminal instead\n  \
-         --points <n>       text size of the window and of pictures (default: {DEFAULT_POINTS})\n  \
-         --line-spacing <n> row height, 0.9 to 1.6 (default: 1.0)\n  \
+         --points <n>       text size of the window and of pictures (default: font.size)\n  \
+         --line-spacing <n> row height, 0.9 to 1.6 (default: font.line_spacing)\n  \
          --icons <set>      nerd, unicode or ascii (default: nerd)\n  \
          --no-color         write the symbols without any color\n  \
          --quiet, -q        leave out the stats block\n  \
+         --print-config     print every setting as it is now, as TOML\n  \
          --version, -V      print the version\n  \
          --help, -h         print this text\n\
          \n\

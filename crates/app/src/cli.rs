@@ -9,8 +9,6 @@ use ui::layout::{MIN_COLS, MIN_ROWS};
 /// The reference grid of the look spec; the size used when none is asked for.
 pub const REF_COLS: u16 = 145;
 pub const REF_ROWS: u16 = 48;
-/// The text size the window opens at.
-pub const DEFAULT_POINTS: u8 = 12;
 
 /// What to do once the arguments are read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -18,6 +16,9 @@ pub enum Action {
     Draw,
     Help,
     Version,
+    /// Print every setting as it is now, defaults and the user's file
+    /// together, as TOML.
+    PrintConfig,
 }
 
 /// Where the grid size comes from.
@@ -52,12 +53,13 @@ pub struct Options {
     /// program when not given.
     pub data_dir: Option<PathBuf>,
     pub size: SizeChoice,
-    pub icons: IconKind,
+    /// The icon set, when asked for; otherwise the setting's.
+    pub icons: Option<IconKind>,
     pub color: bool,
     pub stats: bool,
-    /// Text size in points, for the window and for pictures.
-    pub points: u8,
-    pub line_spacing: f32,
+    /// Text size in points, when asked for; otherwise the setting's.
+    pub points: Option<u8>,
+    pub line_spacing: Option<f32>,
     /// Open the window, draw one frame and stop, for a check with nobody
     /// watching.
     pub smoke: bool,
@@ -77,11 +79,11 @@ impl Default for Options {
             account: None,
             data_dir: None,
             size: SizeChoice::Reference,
-            icons: IconKind::Nerd,
+            icons: None,
             color: true,
             stats: true,
-            points: DEFAULT_POINTS,
-            line_spacing: 1.0,
+            points: None,
+            line_spacing: None,
             smoke: false,
             print: false,
             color_depth: None,
@@ -107,6 +109,7 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
         match argument.as_str() {
             "--help" | "-h" => options.action = Action::Help,
             "--version" | "-V" => options.action = Action::Version,
+            "--print-config" => options.action = Action::PrintConfig,
             "--window" => options.mode = Mode::Window,
             "--print" => options.print = true,
             "--color-depth" => options.color_depth = Some(parse_depth(&value(&mut rest, &argument)?)?),
@@ -118,16 +121,16 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
             "--render-once" => {
                 options.mode = Mode::Picture(PathBuf::from(value(&mut rest, &argument)?));
             }
-            "--points" => options.points = parse_points(&value(&mut rest, &argument)?)?,
+            "--points" => options.points = Some(parse_points(&value(&mut rest, &argument)?)?),
             "--line-spacing" => {
-                options.line_spacing = parse_spacing(&value(&mut rest, &argument)?)?;
+                options.line_spacing = Some(parse_spacing(&value(&mut rest, &argument)?)?);
             }
             "--mock" => options.mock = Some(PathBuf::from(value(&mut rest, &argument)?)),
             "--account" => options.account = Some(PathBuf::from(value(&mut rest, &argument)?)),
             "--data-dir" => options.data_dir = Some(PathBuf::from(value(&mut rest, &argument)?)),
             "--size" => options.size = parse_size(&value(&mut rest, &argument)?)?,
             "--fit" => options.size = SizeChoice::Fit,
-            "--icons" => options.icons = parse_icons(&value(&mut rest, &argument)?)?,
+            "--icons" => options.icons = Some(parse_icons(&value(&mut rest, &argument)?)?),
             "--no-color" => options.color = false,
             "--quiet" | "-q" => options.stats = false,
             other => return Err(format!("unknown option {other}; see --help")),

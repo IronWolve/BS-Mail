@@ -29,8 +29,8 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         rows,
         min_cols: MIN_COLS,
         min_rows: MIN_ROWS,
-        points: options.points,
-        line_spacing: options.line_spacing,
+        points: scene.font.0,
+        line_spacing: scene.font.1,
         palette: Palette::new(scene.base.0, scene.base.1),
     };
     if let Some(state) = &remembered {
@@ -57,7 +57,7 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         millis: started.elapsed().as_millis(),
         shown: Shown::Window {
             frames: screen.frames(),
-            points: options.points,
+            points: scene.font.0,
             font_bytes: fonts::embedded_bytes(),
         },
     })
