@@ -5,14 +5,17 @@
 //! selection needs go to the backend; what the backend says comes back to the
 //! view. Only the keys that close the program are read here.
 
+use std::path::PathBuf;
 use std::time::Instant;
 
 use model::{MailBackend, MailDate};
 use surface::{EventSink, Flow, InputEvent, KeyEvent, LogicalKey, Presenter};
 use ui::AppView;
+use ui::layout::LayoutPrefs;
 
 use crate::clock::system_now;
 use crate::pump::pump;
+use crate::state_file;
 use crate::ticker::Ticker;
 
 pub struct Screen {
@@ -30,6 +33,9 @@ pub struct Screen {
     ticker: Option<Ticker>,
     /// When the screen started, for the steady clock the view's timers use.
     started: Instant,
+    /// Where the sizes the user drags are remembered, and what was last
+    /// written there.
+    remember: Option<(PathBuf, LayoutPrefs)>,
 }
 
 impl Screen {
@@ -50,7 +56,15 @@ impl Screen {
             done: false,
             ticker: None,
             started: Instant::now(),
+            remember: None,
         }
+    }
+
+    /// Remembers the sizes of the bars in `dir` whenever a drag ends.
+    pub fn remember_in(mut self, dir: PathBuf) -> Self {
+        let current = self.view.prefs().clone();
+        self.remember = Some((dir, current));
+        self
     }
 
     /// Stops the run once `frames` frames have been drawn.
@@ -91,9 +105,13 @@ impl EventSink for Screen {
             }
             _ => {}
         }
-        if self.view.handle_input(&event, (self.cols, self.rows)) {
+        let used = self.view.handle_input(&event, (self.cols, self.rows));
+        if used {
             self.exchange();
             host.request_redraw();
+        }
+        if matches!(event, InputEvent::Button { state: surface::ButtonState::Released, .. }) {
+            self.remember_sizes();
         }
         Flow::Continue
     }
@@ -124,6 +142,24 @@ impl EventSink for Screen {
             // this frame before the run ends.
             self.done = true;
             host.waker().wake();
+        }
+    }
+}
+
+impl Screen {
+    /// Writes the bar sizes when they differ from what was last written. A
+    /// folder that cannot be written to costs the user their sizes next run
+    /// and nothing else, so the failure is not raised.
+    fn remember_sizes(&mut self) {
+        let Some((dir, saved)) = &mut self.remember else {
+            return;
+        };
+        let current = self.view.prefs();
+        if current == saved {
+            return;
+        }
+        if state_file::save(dir, current).is_ok() {
+            *saved = current.clone();
         }
     }
 }

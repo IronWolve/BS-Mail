@@ -15,6 +15,7 @@ mod run;
 mod scene;
 mod screen;
 mod source;
+mod state_file;
 mod stats;
 mod ticker;
 mod window_run;

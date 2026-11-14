@@ -87,6 +87,11 @@ impl AppView {
         self.capabilities
     }
 
+    /// The preferred sizes now, for saving after a drag.
+    pub fn prefs(&self) -> &LayoutPrefs {
+        &self.prefs
+    }
+
     /// Replaces the preferred sizes (a drag or a restored state file).
     pub fn set_prefs(&mut self, prefs: LayoutPrefs) {
         self.prefs = prefs;

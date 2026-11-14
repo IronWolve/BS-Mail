@@ -70,6 +70,8 @@ pub fn help_text() -> String {
          \n\
          Options:\n  \
          --account <file>   real mail from this account file (default: {ACCOUNT_NAME} beside the program)\n  \
+         --data-dir <dir>   where sizes and other settings are remembered (default: data\n  \
+                            beside the program)\n  \
          --mock <file>      draw mock data instead (default: {FIXTURE_NAME} beside the program)\n  \
          --size <COLSxROWS> grid to draw (default: {REF_COLS}x{REF_ROWS}, the reference size)\n  \
          --fit              use the size of this terminal instead\n  \

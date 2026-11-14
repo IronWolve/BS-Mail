@@ -85,6 +85,7 @@ dependencies = [
  "engine",
  "host",
  "model",
+ "serde",
  "surface",
  "toml",
  "tty_host",

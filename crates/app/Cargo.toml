@@ -13,6 +13,8 @@ host = { path = "../host" }
 tty_host = { path = "../tty_host" }
 engine = { path = "../engine" }
 chrono = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
 
 # The build script carries the display name out of the workspace manifest.
 [build-dependencies]

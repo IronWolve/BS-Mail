@@ -10,8 +10,9 @@ use crate::cli::{Options, window_grid};
 use crate::errors::AppError;
 use crate::identity::display_name;
 use crate::screen::Screen;
+use crate::paths::data_dir;
 use crate::stats::{Shown, Stats};
-use crate::{fonts, scene};
+use crate::{fonts, scene, state_file};
 
 /// Opens the window and runs until it is closed.
 pub fn run(options: &Options) -> Result<Stats, AppError> {
@@ -30,8 +31,15 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         line_spacing: options.line_spacing,
         palette: Palette::new(scene.base.0, scene.base.1),
     };
+    let data_dir = data_dir(options.data_dir.as_ref());
+    if let Some(dir) = &data_dir {
+        scene.view.set_prefs(state_file::load(dir));
+    }
     let effects = scene.view.render(cols, rows).effects.len();
     let mut screen = Screen::new(scene.view, scene.backend, (cols, rows), scene.fixed_now);
+    if let Some(dir) = data_dir {
+        screen = screen.remember_in(dir);
+    }
     if options.smoke {
         screen = screen.stop_after(1);
     }
