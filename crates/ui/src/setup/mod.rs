@@ -16,6 +16,7 @@ pub mod link_panel_input;
 pub mod prefill;
 pub mod providers;
 pub mod saved_client;
+pub mod simple_providers;
 
 pub use account_id::account_id_for;
 pub use action::SetupAction;

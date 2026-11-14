@@ -4,6 +4,7 @@
 //! names.
 
 use super::fields::Security;
+use super::simple_providers::find;
 
 /// What a provider needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,35 +53,21 @@ fn hosts(imap: &str, smtp: &str, smtp_port: u16, smtp_security: Security, note: 
     }
 }
 
+/// Microsoft's consumer mail domains, which have no password sign-in left.
+const BROWSER_ONLY_DOMAINS: [&str; 17] = [
+    "outlook.com", "hotmail.com", "live.com", "msn.com", "hotmail.co.uk", "hotmail.fr", "hotmail.de", "hotmail.it",
+    "hotmail.es", "outlook.fr", "outlook.de", "outlook.es", "outlook.it", "live.co.uk", "live.fr", "live.de", "live.it",
+];
+
 fn known(domain: &str) -> Option<Preset> {
-    let tls = Security::Starttls;
     Some(match domain {
         "gmail.com" | "googlemail.com" => with_browser_sign_in(),
-        "outlook.com" | "hotmail.com" | "live.com" | "msn.com" => browser_only(),
-        "yahoo.com" | "ymail.com" | "rocketmail.com" => hosts(
-            "imap.mail.yahoo.com",
-            "smtp.mail.yahoo.com",
-            587,
-            tls,
-            "This provider needs an app password, made in your account's security settings.",
-        ),
-        "icloud.com" | "me.com" | "mac.com" => hosts(
-            "imap.mail.me.com",
-            "smtp.mail.me.com",
-            587,
-            tls,
-            "This provider needs an app-specific password, made in your account settings.",
-        ),
-        "fastmail.com" | "fastmail.fm" => hosts(
-            "imap.fastmail.com",
-            "smtp.fastmail.com",
-            587,
-            tls,
-            "This provider needs an app password, made in your account settings.",
-        ),
-        "gmx.com" | "gmx.net" | "gmx.de" => hosts("imap.gmx.net", "mail.gmx.net", 587, tls, ""),
+        _ if BROWSER_ONLY_DOMAINS.contains(&domain) => browser_only(),
         "protonmail.com" | "proton.me" | "pm.me" | "protonmail.ch" => local_bridge(),
-        _ => return None,
+        _ => {
+            let entry = find(domain)?;
+            hosts(entry.imap, entry.smtp, 587, Security::Starttls, entry.note)
+        }
     })
 }
 
