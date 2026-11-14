@@ -10,6 +10,7 @@ use std::io::{self, Write};
 use std::sync::Arc;
 use std::sync::Once;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use crossterm::cursor::{Hide, Show};
 use crossterm::event::{
@@ -51,7 +52,9 @@ impl Session {
         }
         ACTIVE.store(true, Ordering::SeqCst);
         install_panic_hook();
-        Ok(Self { stop: stop_flag() })
+        let stop = stop_flag();
+        watch_for_stop(Arc::clone(&stop));
+        Ok(Self { stop })
     }
 }
 
@@ -93,6 +96,33 @@ fn install_panic_hook() {
         }));
     });
 }
+
+/// How long the loop is given to leave by itself after a stop was asked for.
+const LEAVE_GRACE: Duration = Duration::from_millis(1000);
+
+/// How often the watch looks at the stop flag.
+const WATCH_EVERY: Duration = Duration::from_millis(100);
+
+/// Ends the program when a stop was asked for and the loop has not left.
+///
+/// The loop looks at the flag between waits for input, but once a terminal is
+/// hung up the terminal library's wait can go on forever at full speed, so the
+/// loop never gets to look. After a short grace the terminal is given back and
+/// the program ends from here. A loop that does leave in time ends the program
+/// first, and this thread goes with it.
+fn watch_for_stop(stop: Arc<AtomicBool>) {
+    let _ = std::thread::Builder::new().name("terminal-stop".to_owned()).spawn(move || {
+        while !stop.load(Ordering::Acquire) {
+            std::thread::sleep(WATCH_EVERY);
+        }
+        std::thread::sleep(LEAVE_GRACE);
+        restore();
+        std::process::exit(STOPPED_EXIT_CODE);
+    });
+}
+
+/// The exit code when the program was ended from the watch: 128 + SIGHUP.
+const STOPPED_EXIT_CODE: i32 = 129;
 
 /// A flag that is set when the terminal is hung up or told to terminate. The
 /// loop looks at it and leaves in the ordinary way.
