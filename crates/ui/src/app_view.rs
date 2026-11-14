@@ -72,6 +72,9 @@ pub struct AppView {
     pub(crate) search: Option<ActiveSearch>,
     /// The number of the last search asked for, so answers can be told apart.
     pub(crate) next_request: u64,
+    /// What was wrong with the user's settings, shown in the footer for as
+    /// long as nothing more urgent is.
+    pub(crate) config_problem: Option<String>,
 }
 
 impl AppView {
@@ -100,6 +103,7 @@ impl AppView {
             search_bar: None,
             search: None,
             next_request: 0,
+            config_problem: None,
         }
     }
 
@@ -264,7 +268,7 @@ impl AppView {
                 connection: self.connection(),
                 mailbox: mailbox.as_ref(),
                 status: &self.mail.status,
-                error: self.mail.error.as_deref(),
+                error: self.mail.error.as_deref().or(self.config_problem.as_deref()),
             };
             draw_footer(frame, ctx, rect, &data);
         }
@@ -336,10 +340,9 @@ impl AppView {
         let title = self.mail.page.as_ref().and_then(|page| self.reader_title_data(page));
         draw_reader_title(frame, ctx, reader.title, title.as_ref());
         draw_reader_headers(frame, ctx, reader.headers, self.selected_envelope());
-        let open = self.mail.body.as_ref().filter(|(id, _)| Some(*id) == self.selection.message);
-        if let Some((_, body)) = open {
+        if let Some(lines) = self.reader_lines() {
             let view = BodyView {
-                lines: &body.lines,
+                lines: &lines,
                 first: self.scroll.reader,
                 app_name: &self.identity.name,
                 rules: HighlightRules::default(),

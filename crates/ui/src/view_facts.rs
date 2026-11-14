@@ -2,9 +2,12 @@
 //! and the host both ask for: the window's title, the open mailbox, the
 //! connection of the selected account.
 
-use model::ConnectionState;
+use std::borrow::Cow;
+
+use model::{BodyRole, ConnectionState, StyledLine, StyledSpan};
 
 use crate::app_view::AppView;
+use crate::format::format_size;
 use crate::widgets::MailboxSummary;
 
 impl AppView {
@@ -54,5 +57,38 @@ impl AppView {
             unread: u32::try_from(unread).unwrap_or(u32::MAX),
             total: page.total,
         })
+    }
+
+    /// Tells the view what was wrong with the user's settings, if anything.
+    pub fn set_config_problem(&mut self, problem: Option<String>) {
+        self.config_problem = problem;
+    }
+
+    /// The lines the reader shows for the selected message: a line for each
+    /// attachment, then a blank, then the body. `None` while its body is not
+    /// here yet. Borrowed whole when there are no attachments.
+    pub(crate) fn reader_lines(&self) -> Option<Cow<'_, [StyledLine]>> {
+        let (_, body) = self.mail.body.as_ref().filter(|(id, _)| Some(*id) == self.selection.message)?;
+        if body.attachments.is_empty() {
+            return Some(Cow::Borrowed(body.lines.as_slice()));
+        }
+        let mut lines: Vec<StyledLine> = body
+            .attachments
+            .iter()
+            .map(|attachment| StyledLine {
+                spans: vec![StyledSpan {
+                    text: format!(
+                        "Attachment: {} ({}, {})",
+                        attachment.name,
+                        attachment.content_type,
+                        format_size(attachment.size, self.config.list.size_format)
+                    ),
+                    role: BodyRole::Path,
+                }],
+            })
+            .collect();
+        lines.push(StyledLine::default());
+        lines.extend(body.lines.iter().cloned());
+        Some(Cow::Owned(lines))
     }
 }

@@ -313,15 +313,12 @@ impl AppView {
         let Some(reader) = &layout.reader else {
             return;
         };
-        let Some((id, body)) = &self.mail.body else {
+        let Some(lines) = self.reader_lines() else {
             return;
         };
-        if Some(*id) != self.selection.message {
-            return;
-        }
         let ctx = DrawContext::new(&self.theme, &self.icons, &self.config, self.now);
         let view = BodyView {
-            lines: &body.lines,
+            lines: &lines,
             first: 0,
             app_name: &self.identity.name,
             rules: HighlightRules::default(),
