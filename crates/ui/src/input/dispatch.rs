@@ -59,6 +59,15 @@ impl AppView {
             Action::FocusPrevious => self.focus = self.focus.previous(),
             Action::Enter => self.focus = deeper(self.focus),
             Action::Back => self.focus = shallower(self.focus),
+            Action::SpaceDown if self.focus == Focus::Reader => {
+                self.act(Action::PageDown, grid);
+            }
+            Action::SpaceUp if self.focus == Focus::Reader => self.act(Action::PageUp, grid),
+            Action::SpaceDown | Action::SpaceUp => {}
+            Action::ToggleRead => self.toggle_read(),
+            Action::ToggleStar => self.toggle_star(),
+            Action::Delete => self.delete_selected(),
+            Action::Sync => self.refresh(),
             movement => {
                 let layout = self.layout(grid.0, grid.1);
                 match self.focus {

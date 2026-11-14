@@ -3,6 +3,7 @@
 //! and re-exports the modules.
 
 pub mod action;
+pub mod changes;
 pub mod command_queue;
 pub mod dispatch;
 pub mod hit;

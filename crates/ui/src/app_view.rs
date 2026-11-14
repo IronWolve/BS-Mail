@@ -2,7 +2,7 @@
 //! frame comes out. No mouse and no key handling yet.
 
 use model::config::Config;
-use model::{ConnectionState, Event, MailDate};
+use model::{ConnectionState, Event, MailDate, MessageId};
 use surface::{Capabilities, Frame, Rect};
 
 use crate::app_identity::AppIdentity;
@@ -39,6 +39,12 @@ pub struct AppView {
     pub(crate) focus: Focus,
     overlays: Overlays,
     pub(crate) queue: CommandQueue,
+    /// The message that will be marked read, and when (milliseconds on the
+    /// caller's clock).
+    pub(crate) read_timer: Option<(MessageId, u64)>,
+    /// The message this view already marked read by itself, so it is not
+    /// marked again right after the user marks it unread.
+    pub(crate) auto_marked: Option<MessageId>,
 }
 
 impl AppView {
@@ -57,6 +63,8 @@ impl AppView {
             focus: Focus::default(),
             overlays: Overlays::default(),
             queue: CommandQueue::default(),
+            read_timer: None,
+            auto_marked: None,
         }
     }
 

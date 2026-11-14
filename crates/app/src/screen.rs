@@ -5,6 +5,8 @@
 //! selection needs go to the backend; what the backend says comes back to the
 //! view. Only the keys that close the program are read here.
 
+use std::time::Instant;
+
 use model::{MailBackend, MailDate};
 use surface::{EventSink, Flow, InputEvent, KeyEvent, LogicalKey, Presenter};
 use ui::AppView;
@@ -26,6 +28,8 @@ pub struct Screen {
     stop_after: Option<u32>,
     done: bool,
     ticker: Option<Ticker>,
+    /// When the screen started, for the steady clock the view's timers use.
+    started: Instant,
 }
 
 impl Screen {
@@ -45,6 +49,7 @@ impl Screen {
             stop_after: None,
             done: false,
             ticker: None,
+            started: Instant::now(),
         }
     }
 
@@ -93,6 +98,8 @@ impl EventSink for Screen {
         if self.done {
             return Flow::Quit;
         }
+        let elapsed = u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        self.view.tick(elapsed);
         if self.exchange() {
             host.request_redraw();
         }

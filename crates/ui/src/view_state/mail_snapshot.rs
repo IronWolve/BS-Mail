@@ -35,6 +35,9 @@ pub struct MailSnapshot {
     pub body: Option<(MessageId, Body)>,
     /// The last failure the backend reported, until something succeeds.
     pub error: Option<String>,
+    /// The account does not let the program change mail. A backend that
+    /// never says so is taken to allow it.
+    pub changes_refused: bool,
 }
 
 impl MailSnapshot {
@@ -55,6 +58,11 @@ impl MailSnapshot {
             Event::AccountList(accounts) => {
                 self.accounts = accounts;
                 selection.choose_account(&self.accounts);
+            }
+            Event::ChangesAllowed { account, allowed } => {
+                if is_shown(selection, &account) {
+                    self.changes_refused = !allowed;
+                }
             }
             Event::HostInfo { host_name, system } => {
                 self.host = Some(HostSummary {

@@ -56,6 +56,13 @@ pub enum Event {
         total: u32,
         envelopes: Vec<Envelope>,
     },
+    /// Whether the account lets the program change mail on the server. An
+    /// account that does not shows a note instead of trying and failing. A
+    /// backend that never says so is taken to allow it.
+    ChangesAllowed {
+        account: AccountId,
+        allowed: bool,
+    },
     /// An operation failed; the footer shows `reason`.
     OpFailed {
         account: Option<AccountId>,

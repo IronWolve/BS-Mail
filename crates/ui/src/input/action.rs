@@ -16,6 +16,14 @@ pub enum Action {
     Enter,
     /// Go back out to the previous pane.
     Back,
+    /// Space: a page down while reading, and nothing yet in the list, where
+    /// the list's own hint gives it to marking rows.
+    SpaceDown,
+    SpaceUp,
+    ToggleRead,
+    ToggleStar,
+    Delete,
+    Sync,
 }
 
 /// The action for a key press, or `None` for a key the screen ignores.
@@ -30,7 +38,11 @@ pub fn action_for(key: &KeyEvent) -> Option<Action> {
         LogicalKey::Named(named) => named_action(named, held.shift),
         LogicalKey::Char('j') if !held.shift => Some(Action::Down),
         LogicalKey::Char('k') if !held.shift => Some(Action::Up),
-        LogicalKey::Char(' ') => Some(if held.shift { Action::PageUp } else { Action::PageDown }),
+        LogicalKey::Char(' ') => Some(if held.shift { Action::SpaceUp } else { Action::SpaceDown }),
+        LogicalKey::Char('u') if !held.shift => Some(Action::ToggleRead),
+        LogicalKey::Char('*') => Some(Action::ToggleStar),
+        LogicalKey::Char('d') if !held.shift => Some(Action::Delete),
+        LogicalKey::Char('s') if !held.shift => Some(Action::Sync),
         LogicalKey::Char(_) => None,
     }
 }
