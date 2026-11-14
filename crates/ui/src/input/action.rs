@@ -16,6 +16,10 @@ pub enum Action {
     Enter,
     /// Go back out to the previous pane.
     Back,
+    /// Right and left arrows: in the folder tree they open and close a
+    /// folder, elsewhere they go in and out like Enter and Escape.
+    Right,
+    Left,
     /// Space: a page down while reading, and nothing yet in the list, where
     /// the list's own hint gives it to marking rows.
     SpaceDown,
@@ -59,8 +63,10 @@ fn named_action(named: NamedKey, shift: bool) -> Option<Action> {
         NamedKey::PageDown => Action::PageDown,
         NamedKey::Home => Action::First,
         NamedKey::End => Action::Last,
-        NamedKey::Enter | NamedKey::Right => Action::Enter,
-        NamedKey::Escape | NamedKey::Left | NamedKey::Backspace => Action::Back,
+        NamedKey::Enter => Action::Enter,
+        NamedKey::Right => Action::Right,
+        NamedKey::Left => Action::Left,
+        NamedKey::Escape | NamedKey::Backspace => Action::Back,
         _ => return None,
     })
 }

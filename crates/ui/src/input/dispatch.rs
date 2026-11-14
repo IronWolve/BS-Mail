@@ -90,6 +90,10 @@ impl AppView {
             Action::FocusPrevious => self.focus = self.focus.previous(),
             Action::Enter => self.focus = deeper(self.focus),
             Action::Back => self.focus = shallower(self.focus),
+            Action::Right if self.focus == Focus::Sidebar => self.open_folder_or_go_in(),
+            Action::Right => self.focus = deeper(self.focus),
+            Action::Left if self.focus == Focus::Sidebar => self.close_folder_or_go_up(),
+            Action::Left => self.focus = shallower(self.focus),
             Action::SpaceDown if self.focus == Focus::Reader => {
                 self.act(Action::PageDown, grid);
             }

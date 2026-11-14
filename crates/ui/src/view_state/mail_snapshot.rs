@@ -38,6 +38,9 @@ pub struct MailSnapshot {
     /// The account does not let the program change mail. A backend that
     /// never says so is taken to allow it.
     pub changes_refused: bool,
+    /// Folders the user opened or closed, which a fresh folder list must not
+    /// undo.
+    pub expanded_by_user: std::collections::HashMap<FolderId, bool>,
 }
 
 impl MailSnapshot {
@@ -73,6 +76,11 @@ impl MailSnapshot {
             Event::FolderList { account, folders } => {
                 if is_shown(selection, &account) {
                     self.folders = folders;
+                    for folder in &mut self.folders {
+                        if let Some(open) = self.expanded_by_user.get(&folder.id) {
+                            folder.expanded = *open;
+                        }
+                    }
                     selection.choose_folder(&self.folders);
                 }
             }

@@ -17,6 +17,7 @@ pub const HELP_ROWS: &[(&str, &str)] = &[
     ("Home End", "first and last"),
     ("Tab  Shift+Tab", "change pane"),
     ("Enter  Esc", "go in a pane, come back out"),
+    ("Right  Left", "open and close a folder; in the other panes, in and out"),
     ("click", "select a folder or message"),
     ("wheel", "scroll the pane under the pointer"),
     ("u", "mark read or unread"),
