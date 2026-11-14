@@ -122,6 +122,12 @@ impl AppView {
         }
     }
 
+    /// Text the user cut or copied in the composer, once, for the host to put
+    /// on the system clipboard.
+    pub fn take_copied(&mut self) -> Option<String> {
+        self.composer.as_mut()?.copied.take()
+    }
+
     /// The backend's answer to a send: accepted closes the composer, a
     /// failure gives the message back to the user with the reason.
     pub(crate) fn note_send_outcome(&mut self, event: &Event) {

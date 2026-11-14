@@ -67,6 +67,8 @@ pub struct ComposeForm {
     pub notice: Option<String>,
     /// Text cut or copied inside the composer, for paste.
     pub clipboard: String,
+    /// Text cut or copied that the system clipboard has not been given yet.
+    pub copied: Option<String>,
     /// Escape was pressed on a message with text in it; once more discards.
     pub discard_armed: bool,
     /// The first screen line of the body shown.
@@ -99,6 +101,7 @@ impl ComposeForm {
             progress: Progress::Writing,
             notice: None,
             clipboard: String::new(),
+            copied: None,
             discard_armed: false,
             body_scroll: 0,
             started_with: String::new(),

@@ -56,7 +56,7 @@ pub fn handle_text(form: &mut ComposeForm, text: &str, pane: Pane) -> Outcome {
     if form.progress == Progress::Sending {
         return Outcome::Ignored;
     }
-    if !form.focused().insert_text(text) {
+    if !form.focused().insert_text(&clean(text)) {
         return Outcome::Ignored;
     }
     form.notice = None;
@@ -131,12 +131,14 @@ fn shortcut(form: &mut ComposeForm, ch: char, shift: bool) -> Outcome {
         }
         'x' => {
             if let Some(text) = form.focused().cut() {
-                form.clipboard = text;
+                form.clipboard = text.clone();
+                form.copied = Some(text);
             }
         }
         'c' => {
             if let Some(text) = form.focused().selected_text() {
-                form.clipboard = text;
+                form.clipboard = text.clone();
+                form.copied = Some(text);
             }
         }
         'v' => {
@@ -146,6 +148,19 @@ fn shortcut(form: &mut ComposeForm, ch: char, shift: bool) -> Outcome {
         _ => return Outcome::Ignored,
     }
     Outcome::Changed
+}
+
+/// Text with the control codes taken out, so a paste cannot carry an escape
+/// sequence into a message. Newlines stay and tabs become four spaces.
+fn clean(text: &str) -> String {
+    text.chars()
+        .filter_map(|ch| match ch {
+            '\t' => Some("    ".to_string()),
+            '\n' | '\r' => Some(ch.to_string()),
+            ch if ch.is_control() => None,
+            ch => Some(ch.to_string()),
+        })
+        .collect()
 }
 
 /// Scrolls the body so the line with the cursor shows.

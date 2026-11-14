@@ -67,3 +67,5 @@ html2text = { version = "0.17", default-features = false }
 futures-util = { version = "0.3", default-features = false }
 # Stage 5: the local time zone, so Today and Yesterday turn over at local midnight (app).
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# Stage 8: the system clipboard, for copy and paste in the composer (host).
+arboard = { version = "3", default-features = false, features = ["wayland-data-control"] }

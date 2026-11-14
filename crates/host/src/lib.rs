@@ -1,6 +1,7 @@
 //! The window host: a frame of cells becomes pixels, and native window
 //! events become input events. The only crate with window code.
 
+pub mod clipboard;
 pub mod font;
 pub mod input;
 pub mod paint;

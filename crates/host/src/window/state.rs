@@ -8,6 +8,7 @@ use surface::{Capabilities, Frame, HostError, PointerShape, Presenter, Waker};
 use winit::event_loop::EventLoopProxy;
 use winit::window::{CursorIcon, Fullscreen, Window};
 
+use crate::clipboard::SystemClipboard;
 use crate::font::{CellMetrics, FontSet, GlyphCache};
 use crate::paint::{Canvas, Grid, PaintContext, paint_frame};
 use crate::present::SoftwarePresenter;
@@ -28,6 +29,7 @@ pub struct WindowState<'a> {
     presenter: Option<SoftwarePresenter>,
     proxy: Option<EventLoopProxy<()>>,
     full_screen: bool,
+    clipboard: SystemClipboard,
     pub failure: Option<HostError>,
 }
 
@@ -50,6 +52,7 @@ impl<'a> WindowState<'a> {
             presenter: None,
             proxy: None,
             full_screen: false,
+            clipboard: SystemClipboard::new(),
             failure: None,
         }
     }
@@ -167,6 +170,11 @@ impl<'a> WindowState<'a> {
         )
     }
 
+    /// The text on the system clipboard, for a paste.
+    pub fn clipboard_text(&mut self) -> Option<String> {
+        self.clipboard.text()
+    }
+
     /// Borderless full screen, on and off.
     pub fn toggle_full_screen(&mut self) {
         let Some(window) = &self.window else {
@@ -194,6 +202,10 @@ impl Presenter for WindowState<'_> {
         {
             self.failure = Some(error);
         }
+    }
+
+    fn set_clipboard(&mut self, text: &str) {
+        self.clipboard.set_text(text);
     }
 
     fn set_title(&mut self, title: &str) {

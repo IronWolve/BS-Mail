@@ -72,6 +72,9 @@ pub trait Presenter {
     /// Shows a frame, repainting only what changed since the previous one.
     fn present(&mut self, frame: &Frame);
 
+    /// Puts text on the system clipboard; a host without one ignores it.
+    fn set_clipboard(&mut self, _text: &str) {}
+
     /// Sets the title of the window; a host without one ignores it.
     fn set_title(&mut self, _title: &str) {}
 

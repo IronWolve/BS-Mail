@@ -157,6 +157,9 @@ impl WindowApp<'_, '_> {
             self.state.toggle_full_screen();
             return true;
         }
+        if self.paste_requested(event_loop, event) {
+            return true;
+        }
         let Key::Character(text) = &event.logical_key else {
             return false;
         };
@@ -171,6 +174,23 @@ impl WindowApp<'_, '_> {
             _ => return false,
         };
         self.set_points(event_loop, next);
+        true
+    }
+
+    /// Ctrl+V and Shift+Insert: the system clipboard's text goes to the
+    /// screen as a paste. With nothing on the clipboard the key does nothing.
+    fn paste_requested(&mut self, event_loop: &ActiveEventLoop, event: &winit::event::KeyEvent) -> bool {
+        let is_paste = match &event.logical_key {
+            Key::Character(text) => self.modifiers.ctrl && !self.modifiers.alt && text.eq_ignore_ascii_case("v"),
+            Key::Named(NamedKey::Insert) => self.modifiers.shift,
+            _ => false,
+        };
+        if !is_paste {
+            return false;
+        }
+        if let Some(text) = self.state.clipboard_text() {
+            self.deliver(event_loop, InputEvent::Paste(text));
+        }
         true
     }
 
