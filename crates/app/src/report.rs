@@ -6,7 +6,7 @@ use std::io::{IsTerminal, Write};
 
 use crate::cli::{REF_COLS, REF_ROWS};
 use crate::identity::{display_name, slug, version};
-use crate::paths::{ACCOUNT_NAME, FIXTURE_NAME};
+use crate::paths::ACCOUNT_NAME;
 use crate::stats::{Shown, Stats};
 
 struct Paint {
@@ -57,7 +57,7 @@ pub fn version_line() -> String {
 pub fn help_text() -> String {
     let name = slug();
     format!(
-        "{} {} - draws one screen of mock mail.\n\
+        "{} {} - a mail client.\n\
          \n\
          Usage: {name} [options]\n\
          \n\
@@ -75,7 +75,7 @@ pub fn help_text() -> String {
          --setup            show the account form, even where an account is installed\n  \
          --data-dir <dir>   where sizes and other settings are remembered (default: data\n  \
                             beside the program)\n  \
-         --mock <file>      draw mock data instead (default: {FIXTURE_NAME} beside the program)\n  \
+         --mock <file>      draw the mock mail in this file instead of an account (for trying the look)\n  \
          --size <COLSxROWS> grid to draw (default: {REF_COLS}x{REF_ROWS}, the reference size)\n  \
          --fit              use the size of this terminal instead\n  \
          --points <n>       text size of the window and of pictures (default: font.size)\n  \

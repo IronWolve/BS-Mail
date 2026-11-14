@@ -10,14 +10,11 @@ pub fn account_target() -> Option<PathBuf> {
     Some(program_dir()?.join(ACCOUNT_NAME))
 }
 
-/// The mock fixture installed beside the program.
-pub const FIXTURE_NAME: &str = "mock.toml";
-
 /// The folder the program keeps what it remembers in, beside the program.
 pub const DATA_DIR_NAME: &str = "data";
 
 /// The account file installed beside the program. When it is there, the
-/// program reads that account's real mail instead of the mock.
+/// program reads that account's real mail.
 pub const ACCOUNT_NAME: &str = "account.toml";
 
 /// The folder the running executable sits in.
@@ -40,11 +37,5 @@ pub fn data_dir(asked: Option<&PathBuf>) -> Option<PathBuf> {
 /// The account file beside the program, when one is there.
 pub fn installed_account() -> Option<PathBuf> {
     let path = program_dir()?.join(ACCOUNT_NAME);
-    path.is_file().then_some(path)
-}
-
-/// The mock fixture beside the program, when one is installed there.
-pub fn installed_fixture() -> Option<PathBuf> {
-    let path = program_dir()?.join(FIXTURE_NAME);
     path.is_file().then_some(path)
 }

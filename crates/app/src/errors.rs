@@ -4,7 +4,7 @@ use std::fmt;
 use std::io;
 use std::path::PathBuf;
 
-use crate::paths::{ACCOUNT_NAME, FIXTURE_NAME};
+use crate::paths::ACCOUNT_NAME;
 
 #[derive(Debug)]
 pub enum AppError {
@@ -23,7 +23,7 @@ impl fmt::Display for AppError {
         match self {
             Self::NoSource => write!(
                 f,
-                "no mail to show: put {ACCOUNT_NAME} or {FIXTURE_NAME} beside the program, \
+                "no account to show: put {ACCOUNT_NAME} beside the program, \
                  or use --account <file> or --mock <file>"
             ),
             Self::Account(path, reason) => {
