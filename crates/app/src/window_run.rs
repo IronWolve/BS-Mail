@@ -6,7 +6,7 @@ use host::{Palette, WindowOptions, run_window};
 use surface::Capabilities;
 use ui::layout::{MIN_COLS, MIN_ROWS};
 
-use crate::cli::{Options, window_grid};
+use crate::cli::{Options, SizeChoice, window_grid};
 use crate::errors::AppError;
 use crate::identity::display_name;
 use crate::screen::Screen;
@@ -20,7 +20,9 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
     let fonts = fonts::embedded().map_err(|error| AppError::Fonts(error.to_string()))?;
     let mut scene = scene::build(options, Capabilities::window())?;
     scene.prime();
-    let (cols, rows) = window_grid(options.size);
+    let data_dir = data_dir(options.data_dir.as_ref());
+    let remembered = data_dir.as_ref().map(|dir| state_file::load(dir));
+    let (cols, rows) = starting_grid(options.size, remembered.as_ref());
     let window = WindowOptions {
         title: display_name().to_string(),
         cols,
@@ -31,9 +33,8 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         line_spacing: options.line_spacing,
         palette: Palette::new(scene.base.0, scene.base.1),
     };
-    let data_dir = data_dir(options.data_dir.as_ref());
-    if let Some(dir) = &data_dir {
-        scene.view.set_prefs(state_file::load(dir));
+    if let Some(state) = &remembered {
+        scene.view.set_prefs(state.layout.clone());
     }
     let effects = scene.view.render(cols, rows).effects.len();
     let mut screen = Screen::new(scene.view, scene.backend, (cols, rows), scene.fixed_now);
@@ -44,6 +45,7 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         screen = screen.stop_after(1);
     }
     run_window(&fonts, window, &mut screen).map_err(|error| AppError::Window(error.to_string()))?;
+    screen.save_state();
     let (cols, rows) = screen.grid();
     Ok(Stats {
         cols,
@@ -60,3 +62,15 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         },
     })
 }
+
+/// The grid the window opens at: one asked for on the command line, else the
+/// one it had when it last closed, else the reference grid.
+fn starting_grid(size: SizeChoice, remembered: Option<&state_file::State>) -> (u16, u16) {
+    match (size, remembered.and_then(|state| state.grid)) {
+        (SizeChoice::Reference, Some(grid)) => grid,
+        _ => window_grid(size),
+    }
+}
+
+#[cfg(test)]
+include!("window_run.tests.rs");

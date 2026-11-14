@@ -11,11 +11,10 @@ use std::time::Instant;
 use model::{MailBackend, MailDate};
 use surface::{EventSink, Flow, InputEvent, KeyEvent, LogicalKey, Presenter};
 use ui::AppView;
-use ui::layout::LayoutPrefs;
 
 use crate::clock::system_now;
 use crate::pump::pump;
-use crate::state_file;
+use crate::state_file::{self, State};
 use crate::ticker::Ticker;
 
 pub struct Screen {
@@ -33,9 +32,8 @@ pub struct Screen {
     ticker: Option<Ticker>,
     /// When the screen started, for the steady clock the view's timers use.
     started: Instant,
-    /// Where the sizes the user drags are remembered, and what was last
-    /// written there.
-    remember: Option<(PathBuf, LayoutPrefs)>,
+    /// Where the sizes are remembered, and what was last written there.
+    remember: Option<(PathBuf, State)>,
     /// The title last given to the window, so it is set only when it changes.
     title: String,
 }
@@ -63,11 +61,34 @@ impl Screen {
         }
     }
 
-    /// Remembers the sizes of the bars in `dir` whenever a drag ends.
+    /// Remembers the sizes of the bars and the window in `dir`.
     pub fn remember_in(mut self, dir: PathBuf) -> Self {
-        let current = self.view.prefs().clone();
+        let current = self.state_now();
         self.remember = Some((dir, current));
         self
+    }
+
+    /// What would be remembered now.
+    fn state_now(&self) -> State {
+        State {
+            layout: self.view.prefs().clone(),
+            grid: Some((self.cols, self.rows)),
+        }
+    }
+
+    /// Writes what is remembered, when it has changed. Called when a drag
+    /// ends and when the window closes.
+    pub fn save_state(&mut self) {
+        let current = self.state_now();
+        let Some((dir, saved)) = &mut self.remember else {
+            return;
+        };
+        if current == *saved {
+            return;
+        }
+        if state_file::save(dir, &current).is_ok() {
+            *saved = current;
+        }
     }
 
     /// Stops the run once `frames` frames have been drawn.
@@ -121,7 +142,7 @@ impl EventSink for Screen {
             host.request_redraw();
         }
         if matches!(event, InputEvent::Button { state: surface::ButtonState::Released, .. }) {
-            self.remember_sizes();
+            self.save_state();
         }
         Flow::Continue
     }
@@ -157,24 +178,6 @@ impl EventSink for Screen {
             // this frame before the run ends.
             self.done = true;
             host.waker().wake();
-        }
-    }
-}
-
-impl Screen {
-    /// Writes the bar sizes when they differ from what was last written. A
-    /// folder that cannot be written to costs the user their sizes next run
-    /// and nothing else, so the failure is not raised.
-    fn remember_sizes(&mut self) {
-        let Some((dir, saved)) = &mut self.remember else {
-            return;
-        };
-        let current = self.view.prefs();
-        if current == saved {
-            return;
-        }
-        if state_file::save(dir, current).is_ok() {
-            *saved = current.clone();
         }
     }
 }
