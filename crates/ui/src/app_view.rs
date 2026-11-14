@@ -79,6 +79,22 @@ impl AppView {
         self.now = now;
     }
 
+    /// The window's title: the name, then the open folder and its unread
+    /// count when the options ask for them.
+    pub fn window_title(&self) -> String {
+        let name = self.identity.name.clone();
+        if !self.config.window.title_shows_folder {
+            return name;
+        }
+        let Some(folder) = self.selection.folder.and_then(|id| self.mail.folder(id)) else {
+            return name;
+        };
+        match folder.unread {
+            0 => format!("{name} \u{2014} {}", folder.name),
+            unread => format!("{name} \u{2014} {} ({unread})", folder.name),
+        }
+    }
+
     /// What the host showing these frames can do. A window is assumed until
     /// a host says otherwise, so the screen is laid out for every effect.
     pub fn set_capabilities(&mut self, capabilities: Capabilities) {

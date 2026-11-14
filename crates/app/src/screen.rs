@@ -36,6 +36,8 @@ pub struct Screen {
     /// Where the sizes the user drags are remembered, and what was last
     /// written there.
     remember: Option<(PathBuf, LayoutPrefs)>,
+    /// The title last given to the window, so it is set only when it changes.
+    title: String,
 }
 
 impl Screen {
@@ -57,6 +59,7 @@ impl Screen {
             ticker: None,
             started: Instant::now(),
             remember: None,
+            title: String::new(),
         }
     }
 
@@ -134,6 +137,11 @@ impl EventSink for Screen {
         }
         self.view.set_capabilities(host.capabilities());
         self.view.set_now(self.fixed_now.unwrap_or_else(system_now));
+        let title = self.view.window_title();
+        if title != self.title {
+            host.set_title(&title);
+            self.title = title;
+        }
         let frame = self.view.render(self.cols, self.rows);
         host.present(&frame);
         self.frames = self.frames.saturating_add(1);

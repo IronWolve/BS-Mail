@@ -196,6 +196,12 @@ impl Presenter for WindowState<'_> {
         }
     }
 
+    fn set_title(&mut self, title: &str) {
+        if let Some(window) = &self.window {
+            window.set_title(title);
+        }
+    }
+
     fn set_pointer_shape(&mut self, shape: PointerShape) {
         if let Some(window) = &self.window {
             window.set_cursor(cursor_icon(shape));
