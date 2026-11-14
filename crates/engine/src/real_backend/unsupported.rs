@@ -1,5 +1,5 @@
-//! The commands the backend does not carry out. Search and unlock are never
-//! available yet; changing mail (flags, move, delete) and sending mail are
+//! The commands the backend does not carry out. Unlock is never available
+//! yet; changing mail (flags, move, delete) and sending mail are
 //! refused while the account is read-only and served when it is not.
 
 use model::Command;
@@ -33,7 +33,6 @@ pub fn change_operation(command: &Command) -> Option<&'static str> {
 pub fn unavailable_operation(command: &Command, writes: bool) -> Option<&'static str> {
     match command {
         Command::Send { .. } if !writes => Some("send"),
-        Command::Search { .. } => Some("search"),
         Command::Unlock { .. } => Some("unlock"),
         other if !writes => change_operation(other),
         _ => None,

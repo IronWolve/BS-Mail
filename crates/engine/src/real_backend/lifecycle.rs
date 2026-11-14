@@ -39,18 +39,21 @@ pub fn connection(sink: &EventSink, state: ConnectionState) -> Event {
     }
 }
 
-/// The sync status event for the account.
+/// The sync status event for the account. `new_messages` is how many
+/// messages have arrived since the program started, as the checks for new
+/// mail found them.
 pub fn progress(
     sink: &EventSink,
     state: SyncState,
     last_sync: Option<i64>,
     quota: Option<Quota>,
+    new_messages: u32,
 ) -> Event {
     Event::SyncProgress {
         account: sink.account().clone(),
         status: SyncStatus {
             last_sync,
-            new_messages: 0,
+            new_messages,
             state,
             queue_len: 0,
             quota,

@@ -9,6 +9,7 @@ mod mime_render;
 pub mod mock;
 pub mod mock_backend;
 pub mod real_backend;
+mod search;
 mod send;
 mod session_state;
 mod text_clean;

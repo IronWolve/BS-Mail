@@ -226,7 +226,10 @@ impl Worker {
                 continue;
             };
             match session.status_counts(&path).await {
-                Ok((unread, total)) => moved |= self.state.set_counts(folder, unread, total),
+                Ok((unread, total)) => {
+                    moved |= self.state.set_counts(folder, unread, total);
+                    self.poll.note_counts(&path, unread, total);
+                }
                 Err(error) if error.is_lost() => return Err(error),
                 Err(_) => {}
             }

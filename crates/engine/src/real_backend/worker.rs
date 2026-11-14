@@ -9,6 +9,7 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use super::backoff::Backoff;
 use super::lifecycle::{announce, changes_allowed, connection};
 use super::online::Served;
+use super::poll_state::PollState;
 use super::save_sent::SentCopies;
 use super::sink::EventSink;
 use super::stop::Stop;
@@ -34,6 +35,11 @@ pub(super) struct Worker {
     pub state: SessionState,
     pub wanted: Wanted,
     pub last_sync: Option<i64>,
+    /// What the automatic check for new mail remembers.
+    pub(super) poll: PollState,
+    /// True while the screen is showing the answer to a search, which the
+    /// next page of the open folder would end.
+    pub(super) search_shown: bool,
     /// Sent messages whose copies are waiting to be saved in the Sent folder.
     pub(super) copies: SentCopies,
 }
@@ -55,6 +61,8 @@ impl Worker {
             state: SessionState::new(),
             wanted: Wanted::default(),
             last_sync: None,
+            poll: PollState::default(),
+            search_shown: false,
             copies: SentCopies::new(),
         }
     }

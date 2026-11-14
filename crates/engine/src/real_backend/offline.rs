@@ -8,7 +8,7 @@ use super::unsupported::{
 use super::worker::Worker;
 
 /// Why a reading command could not run.
-const OFFLINE_REASON: &str = "not connected to the server";
+pub(super) const OFFLINE_REASON: &str = "not connected to the server";
 
 impl Worker {
     /// Replies with a failure notice. A folder or body that was asked for is
@@ -41,6 +41,8 @@ impl Worker {
                 self.wanted.body = Some(message);
                 ("fetch body", true)
             }
+            // A search is asked again by the person, never replayed.
+            Command::Search { .. } => ("search", false),
             _ => ("sync", false),
         };
         let reason = if remembered {

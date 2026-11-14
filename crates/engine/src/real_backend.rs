@@ -15,6 +15,15 @@
 //! server confirmed it. A refusal or a lost connection becomes a failure
 //! notice and nothing is changed locally; nothing is queued for later.
 //!
+//! A search reads every folder it is asked to look in, one command per
+//! folder, and answers with one event: the newest matches across folders, or
+//! a failure notice. While the connection is down it is answered at once with
+//! a failure notice, and it is never replayed after a reconnect.
+//!
+//! Unless the account switches it off (`poll_seconds = 0`), the worker also
+//! looks for new mail by itself every `poll_seconds`, with commands that only
+//! read, and sends what a sync would send when something changed.
+//!
 //! A send runs on a task of its own with its own connection, so a slow mail
 //! server never holds up reading, and a mailbox connection that is down does
 //! not stop it. It is never retried and never replayed after a reconnect.
@@ -30,9 +39,13 @@ mod host_info;
 mod lifecycle;
 mod offline;
 mod online;
+mod poll;
+mod poll_state;
 mod resolve;
 mod reply_lookup;
 mod save_sent;
+mod search;
+mod search_folders;
 mod sending;
 mod sink;
 mod stop;
@@ -50,6 +63,7 @@ use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 use tokio::sync::watch;
 
 use self::lifecycle::connection;
+use self::offline::OFFLINE_REASON;
 use self::sink::EventSink;
 use self::stop::Stop;
 use self::unsupported::{
@@ -169,6 +183,9 @@ impl MailBackend for RealBackend {
             && !self.online.load(Ordering::Acquire)
         {
             return self.unavailable(operation, OFFLINE_CHANGE_REASON);
+        }
+        if matches!(command, Command::Search { .. }) && !self.online.load(Ordering::Acquire) {
+            return self.unavailable("search", OFFLINE_REASON);
         }
         let sent = self
             .commands

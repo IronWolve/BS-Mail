@@ -2,7 +2,7 @@
 //! events to send; nothing here writes to the server.
 
 use async_imap::types::Fetch;
-use model::{AccountId, Envelope, Event, FolderId, MessageId, SyncState};
+use model::{AccountId, Envelope, Event, Folder, FolderId, MessageId, SyncState};
 
 use super::lifecycle::{now_unix, progress, quota_event};
 use super::worker::Worker;
@@ -19,21 +19,31 @@ impl Worker {
         &mut self,
         session: &mut ImapSession,
     ) -> Result<Vec<Event>, SessionError> {
-        let listed = session.list_folders().await?;
-        let state = &mut self.state;
-        let folders = build_tree(&self.account, listed, &mut |path| state.folder_id(path));
+        let folders = self.read_tree(session).await?;
         self.state.set_folders(folders.clone());
         let quota = session.storage_quota().await?;
         let now = now_unix();
         self.last_sync = Some(now);
+        let arrived = self.poll.arrived();
         Ok(vec![
             Event::FolderList {
                 account: self.account.clone(),
                 folders,
             },
-            progress(&self.sink, SyncState::Idle, Some(now), quota),
+            progress(&self.sink, SyncState::Idle, Some(now), quota, arrived),
             quota_event(&self.sink, quota),
         ])
+    }
+
+    /// The folder tree as the server lists it now, with fresh counts. It
+    /// does not replace the list held.
+    pub(super) async fn read_tree(
+        &mut self,
+        session: &mut ImapSession,
+    ) -> Result<Vec<Folder>, SessionError> {
+        let listed = session.list_folders().await?;
+        let state = &mut self.state;
+        Ok(build_tree(&self.account, listed, &mut |path| state.folder_id(path)))
     }
 
     /// The newest page of a folder.
@@ -56,7 +66,7 @@ impl Worker {
 
     /// Opens the mailbox and reads its newest page. If the server refuses
     /// the range (messages were removed in between), it looks once more.
-    async fn read_first_page(
+    pub(super) async fn read_first_page(
         &mut self,
         session: &mut ImapSession,
         folder: FolderId,
@@ -71,6 +81,8 @@ impl Worker {
             other => other?,
         };
         self.state.note_validity(folder, info.uid_validity);
+        // The screen drops a search it is showing when a page arrives.
+        self.search_shown = false;
         Ok(vec![Event::EnvelopePage {
             folder,
             offset: 0,
@@ -133,13 +145,14 @@ impl Worker {
             let reason = format!("unknown account: {}", account.0);
             return Ok(vec![self.sink.failure("sync", reason)]);
         }
+        let arrived = self.poll.arrived();
         self.sink
-            .send(progress(&self.sink, SyncState::Syncing, self.last_sync, None));
+            .send(progress(&self.sink, SyncState::Syncing, self.last_sync, None, arrived));
         let mut events = match self.refresh(session).await {
             Ok(events) => events,
             Err(error) if error.is_lost() => return Err(error),
             Err(error) => {
-                let failed = progress(&self.sink, SyncState::Failed, self.last_sync, None);
+                let failed = progress(&self.sink, SyncState::Failed, self.last_sync, None, arrived);
                 return Ok(vec![failed, self.sink.failure("sync", error.text())]);
             }
         };

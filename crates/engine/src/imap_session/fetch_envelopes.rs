@@ -9,6 +9,7 @@ use super::envelope_map::FetchedRow;
 use super::error::SessionError;
 use super::session::ImapSession;
 use super::timeouts::bounded;
+use super::uid_set::UidSet;
 
 /// The data items that fill a list row.
 const ROW_ITEMS: &str = "(UID FLAGS INTERNALDATE RFC822.SIZE ENVELOPE BODYSTRUCTURE)";
@@ -44,6 +45,20 @@ impl ImapSession {
         .await;
         let mut rows: Vec<Fetch> = self.settle(result)?;
         rows.sort_by_key(|row| std::cmp::Reverse(row.message));
+        Ok(rows)
+    }
+
+    /// The list rows of exactly the messages in `set` from the open mailbox,
+    /// newest UID first. A read: the same items as a page, no body.
+    pub async fn fetch_rows(&mut self, set: &UidSet) -> Result<Vec<Fetch>, SessionError> {
+        let limit = self.limits.command;
+        let session = &mut self.inner;
+        let result = bounded(limit, async {
+            session.uid_fetch(set.to_string(), ROW_ITEMS).await?.try_collect().await
+        })
+        .await;
+        let mut rows: Vec<Fetch> = self.settle(result)?;
+        rows.sort_by_key(|row| std::cmp::Reverse(row.uid));
         Ok(rows)
     }
 }

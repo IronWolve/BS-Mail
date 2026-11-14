@@ -18,6 +18,8 @@
 //! password = "app-password"
 //! trust = "verify"           # verify | any                (default verify)
 //! read_only = true           # true | false                (default true)
+//! poll_seconds = 60          # seconds between checks for new mail
+//!                            # (default 60; 0 = never; 1 to 14 count as 15)
 //!
 //! # Sending (all optional; without `smtp_host` a send is refused):
 //! smtp_host = "smtp.example.org"
@@ -39,6 +41,11 @@
 //! the server, and flag changes, moves, deletes and sending mail are
 //! refused. Only `read_only = false` lets the program mark mail, move it,
 //! delete it, send mail and save a copy of what it sent.
+//!
+//! `poll_seconds` is how often the program asks the server whether the open
+//! folder (and the Inbox) changed, so new mail shows up without pressing
+//! Sync. It only ever reads. `0` turns the automatic check off; a value from
+//! 1 to 14 is raised to 15, the shortest wait allowed, without an error.
 
 use std::fmt;
 use std::net::IpAddr;
@@ -74,6 +81,12 @@ pub enum Trust {
     Any,
 }
 
+/// How often the program checks for new mail when the file says nothing.
+pub const DEFAULT_POLL_SECONDS: u32 = 60;
+
+/// The shortest wait between two checks; a smaller non-zero value is raised.
+pub const MIN_POLL_SECONDS: u32 = 15;
+
 /// One mail account, checked and ready to use.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AccountConfig {
@@ -91,6 +104,9 @@ pub struct AccountConfig {
     pub read_only: bool,
     /// How to submit mail; see `SmtpSettings`.
     pub smtp: SmtpSettings,
+    /// Seconds between automatic checks for new mail; 0 means never. A
+    /// non-zero value is at least `MIN_POLL_SECONDS`.
+    pub poll_seconds: u32,
 }
 
 /// Why an account file was refused.
@@ -145,6 +161,17 @@ struct RawAccount {
     smtp_password: Option<String>,
     smtp_trust: Option<Trust>,
     save_sent: Option<bool>,
+    poll_seconds: Option<u32>,
+}
+
+/// The wait between checks the file asks for, as it is used: absent means the
+/// default, 0 means never, and anything shorter than the minimum is raised.
+fn resolve_poll_seconds(asked: Option<u32>) -> u32 {
+    match asked {
+        None => DEFAULT_POLL_SECONDS,
+        Some(0) => 0,
+        Some(seconds) => seconds.max(MIN_POLL_SECONDS),
+    }
 }
 
 /// Accounts are read-only unless the file says otherwise.
@@ -193,6 +220,7 @@ impl AccountConfig {
             trust: raw.trust,
             read_only: raw.read_only,
             smtp,
+            poll_seconds: resolve_poll_seconds(raw.poll_seconds),
         };
         config.validate()?;
         Ok(config)

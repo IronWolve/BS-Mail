@@ -1,5 +1,9 @@
 //! Serving commands over a live session, with a periodic check that the
-//! connection is still there.
+//! connection is still there and, unless it is switched off, a periodic look
+//! for new mail. Everything runs one thing at a time: a timer that comes due
+//! while a command is running waits for it to finish.
+
+use std::time::Duration;
 
 use model::{Command, ConnectionState, Event};
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -15,6 +19,23 @@ pub(super) enum Served {
     Stopped,
     /// The connection is gone; try again later.
     Lost,
+}
+
+/// What a finished step means for serving: keep going, or end the session
+/// for the reason it gives. `None` from the guard means stopping was asked.
+fn verdict(step: Option<Result<(), SessionError>>) -> Option<Served> {
+    match step {
+        None => Some(Served::Stopped),
+        Some(Err(_)) => Some(Served::Lost),
+        Some(Ok(())) => None,
+    }
+}
+
+/// A timer that ticks every `period`, first after one whole period.
+fn ticker(period: Duration) -> tokio::time::Interval {
+    let mut timer = interval_at(Instant::now() + period, period);
+    timer.set_missed_tick_behavior(MissedTickBehavior::Delay);
+    timer
 }
 
 impl Worker {
@@ -39,45 +60,34 @@ impl Worker {
         commands: &mut UnboundedReceiver<Command>,
     ) -> Served {
         let stop = self.stop.clone();
-        let period = self.timing.keepalive;
-        let mut keepalive = interval_at(Instant::now() + period, period);
-        keepalive.set_missed_tick_behavior(MissedTickBehavior::Delay);
-        match stop.guard(self.go_online(session)).await {
-            None => return Served::Stopped,
-            Some(Err(_)) => return Served::Lost,
-            Some(Ok(())) => {}
+        let mut keepalive = ticker(self.timing.keepalive);
+        let poll_period = self.poll_period();
+        let mut poll = ticker(poll_period.unwrap_or(Duration::from_secs(3600)));
+        let polling = poll_period.is_some();
+        if let Some(done) = verdict(stop.guard(self.go_online(session)).await) {
+            return done;
         }
         loop {
-            tokio::select! {
+            let ended = tokio::select! {
                 biased;
-                () = stop.requested() => return Served::Stopped,
-                received = commands.recv() => {
-                    let Some(command) = received else {
-                        return Served::Stopped;
-                    };
-                    match stop.guard(self.dispatch(session, command)).await {
-                        None => return Served::Stopped,
-                        Some(Err(_)) => return Served::Lost,
-                        Some(Ok(())) => {}
-                    }
-                }
-                copy = self.copies.recv() => {
-                    let Some(copy) = copy else {
-                        continue;
-                    };
-                    match stop.guard(self.save_sent(session, copy)).await {
-                        None => return Served::Stopped,
-                        Some(Err(_)) => return Served::Lost,
-                        Some(Ok(())) => {}
-                    }
-                }
-                _ = keepalive.tick() => {
-                    match stop.guard(session.ping()).await {
-                        None => return Served::Stopped,
-                        Some(Err(error)) if error.is_lost() => return Served::Lost,
-                        Some(_) => {}
-                    }
-                }
+                () = stop.requested() => Some(Served::Stopped),
+                received = commands.recv() => match received {
+                    None => Some(Served::Stopped),
+                    Some(command) => verdict(stop.guard(self.dispatch(session, command)).await),
+                },
+                copy = self.copies.recv() => match copy {
+                    None => None,
+                    Some(copy) => verdict(stop.guard(self.save_sent(session, copy)).await),
+                },
+                _ = keepalive.tick() => match stop.guard(session.ping()).await {
+                    None => Some(Served::Stopped),
+                    Some(Err(error)) if error.is_lost() => Some(Served::Lost),
+                    Some(_) => None,
+                },
+                _ = poll.tick(), if polling => verdict(stop.guard(self.poll_check(session)).await),
+            };
+            if let Some(done) = ended {
+                return done;
             }
         }
     }
@@ -118,6 +128,10 @@ impl Worker {
                 let synced = self.sync_now(session, &account).await;
                 self.settle("sync", synced)
             }
+            Command::Search { request, account, query } => {
+                let found = self.search(session, request, &account, &query).await;
+                self.settle_search(found)
+            }
             change @ (Command::SetFlags { .. } | Command::Move { .. } | Command::Delete { .. }) => {
                 self.change(session, change).await
             }
@@ -125,6 +139,23 @@ impl Worker {
             other => {
                 self.answer_offline(other);
                 Ok(())
+            }
+        }
+    }
+
+    /// Sends the answer to a search. A connection lost on the way is still
+    /// answered, once: the search is not run again after the reconnect, the
+    /// person asks again.
+    fn settle_search(&self, result: Result<Vec<Event>, SessionError>) -> Result<(), SessionError> {
+        match result {
+            Ok(events) => {
+                self.sink.send_all(events);
+                Ok(())
+            }
+            Err(error) => {
+                let reason = "the connection was lost during the search; ask again once it is back";
+                self.sink.send(self.sink.failure("search", reason));
+                Err(error)
             }
         }
     }

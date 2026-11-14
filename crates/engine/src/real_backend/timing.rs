@@ -7,7 +7,9 @@ use crate::imap_session::Timeouts;
 use crate::send::SmtpTimeouts;
 
 /// How long the worker waits between reconnect attempts, how often it checks
-/// that the connection is alive, and how long it waits on the server.
+/// that the connection is alive, how long it waits on the server, and how
+/// long a search may go on. How often it looks for new mail is the account's
+/// `poll_seconds`, unless a test sets its own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Timing {
     pub(super) backoff_start: Duration,
@@ -15,10 +17,17 @@ pub struct Timing {
     pub(super) keepalive: Duration,
     pub(super) timeouts: Timeouts,
     pub(super) smtp: SmtpTimeouts,
+    /// A fixed wait between checks for new mail, for tests. `None`: the
+    /// account's `poll_seconds`.
+    pub(super) poll: Option<Duration>,
+    /// After this long a search stops going on to further folders and
+    /// answers with what it has.
+    pub(super) search_deadline: Duration,
 }
 
 impl Timing {
-    /// Reconnect after 2 s, doubling to 5 min; a check every 60 s.
+    /// Reconnect after 2 s, doubling to 5 min; a check every 60 s; a search
+    /// goes on to another folder only within its first 20 s.
     pub const fn production() -> Self {
         Self {
             backoff_start: Duration::from_secs(2),
@@ -26,6 +35,8 @@ impl Timing {
             keepalive: Duration::from_secs(60),
             timeouts: Timeouts::production(),
             smtp: SmtpTimeouts::production(),
+            poll: None,
+            search_deadline: Duration::from_secs(20),
         }
     }
 
@@ -46,6 +57,21 @@ impl Timing {
         self
     }
 
+    /// Looks for new mail this often instead of every `poll_seconds`. An
+    /// account that turned the check off (`poll_seconds = 0`) stays off.
+    #[cfg(feature = "test-support")]
+    pub const fn with_poll(mut self, every: Duration) -> Self {
+        self.poll = Some(every);
+        self
+    }
+
+    /// A search stops going on to further folders after this long.
+    #[cfg(feature = "test-support")]
+    pub const fn with_search_deadline(mut self, deadline: Duration) -> Self {
+        self.search_deadline = deadline;
+        self
+    }
+
     /// Milliseconds instead of seconds, for tests that watch a reconnect.
     #[cfg(feature = "test-support")]
     pub const fn quick() -> Self {
@@ -63,6 +89,8 @@ impl Timing {
                 finish: Duration::from_secs(10),
                 total: Duration::from_secs(30),
             },
+            poll: None,
+            search_deadline: Duration::from_secs(20),
         }
     }
 }
