@@ -13,6 +13,10 @@ use crate::icons::IconSet;
 use crate::composer::ComposeForm;
 use crate::composer::EditorBuffer;
 use crate::move_picker::MovePicker;
+use crate::options::OptionsState;
+use crate::options::draw::draw_options;
+use crate::options::empty_hint::draw_no_account_hint;
+use crate::options::host::OptionsHost;
 use crate::search::ActiveSearch;
 use crate::setup::SetupForm;
 use crate::setup::draw::draw_setup;
@@ -85,6 +89,10 @@ pub struct AppView {
     pub(crate) setup_online: bool,
     /// What the form asked the program to do, not yet taken.
     pub(crate) setup_actions: Vec<crate::setup::SetupAction>,
+    /// The Options screen, while it is open.
+    pub(crate) options: Option<OptionsState>,
+    /// What the program told the Options screen, and what it asked for.
+    pub(crate) options_host: OptionsHost,
 }
 
 impl AppView {
@@ -118,6 +126,8 @@ impl AppView {
             setup_request: None,
             setup_online: false,
             setup_actions: Vec::new(),
+            options: None,
+            options_host: OptionsHost::default(),
         }
     }
 
@@ -215,6 +225,10 @@ impl AppView {
             draw_setup(&mut frame, &ctx, area, form);
             return frame;
         }
+        if let Some(state) = &self.options {
+            draw_options(&mut frame, &ctx, area, &self.options_view(), state);
+            return frame;
+        }
         fill_cells(&mut frame, area, ctx.full(roles::BASE));
         let layout = self.layout(cols, rows);
         if layout.too_small {
@@ -302,6 +316,10 @@ impl AppView {
         let mailbox = self.list_summary();
         draw_list_title(frame, ctx, list.title, mailbox.as_ref());
         draw_list_header(frame, ctx, list.header, &list.columns);
+        if self.options_host.has_no_account() {
+            draw_no_account_hint(frame, ctx, list.rows);
+            return;
+        }
         let Some(page) = &self.mail.page else {
             return;
         };

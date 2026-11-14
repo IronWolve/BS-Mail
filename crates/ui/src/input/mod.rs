@@ -2,6 +2,7 @@
 //! focus, selection and the commands those cause. This file only declares
 //! and re-exports the modules.
 
+pub mod accounts;
 pub mod action;
 pub mod changes;
 pub mod compose;
@@ -12,6 +13,8 @@ pub mod dragging;
 pub mod hit;
 pub mod marks;
 pub mod movement;
+pub mod options;
+pub mod options_press;
 pub mod picker;
 pub mod search;
 pub mod setup;
@@ -21,4 +24,4 @@ pub mod viewport;
 pub use action::{Action, action_for};
 pub use command_queue::CommandQueue;
 pub use drag::Drag;
-pub use hit::{Hit, HitView, hit_at};
+pub use hit::{Hit, HitView, account_at, hit_at};

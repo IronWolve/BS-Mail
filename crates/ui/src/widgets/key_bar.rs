@@ -1,6 +1,9 @@
 //! The key bar: one keycap button per action, spread across the row with a
-//! bar in each gap. When the buttons do not fit, labels go first, from the
-//! right, then buttons from the right, never Help and Quit.
+//! bar in each gap. When the buttons do not fit, labels go first (the Options
+//! label, then the others from the right), then buttons from the right, the
+//! Options button before any other, never Help and Quit.
+
+use std::borrow::Cow;
 
 use surface::{Effect, Frame, Rect, RoundedFill};
 
@@ -13,6 +16,8 @@ use crate::theme::roles;
 const MIN_GAP: u16 = 3;
 /// Actions that are never dropped.
 const KEPT: [&str; 2] = ["help", "quit"];
+/// The action of the Options button.
+const OPTIONS: &str = "options";
 
 /// A button's default key text and label; the keys table of a later stage
 /// replaces the key text.
@@ -23,7 +28,7 @@ struct Button {
     label: &'static str,
 }
 
-const BUTTONS: [Button; 10] = [
+const BUTTONS: [Button; 11] = [
     Button { action: "compose", key: "F2", label: "Compose" },
     Button { action: "reply", key: "R", label: "Reply" },
     Button { action: "reply_all", key: "Shift+R", label: "Reply All" },
@@ -32,6 +37,7 @@ const BUTTONS: [Button; 10] = [
     Button { action: "search", key: "/", label: "Search" },
     Button { action: "move", key: "M", label: "Move" },
     Button { action: "sync", key: "S", label: "Sync" },
+    Button { action: "options", key: "F10", label: "Options" },
     Button { action: "help", key: "?", label: "Help" },
     Button { action: "quit", key: "Q", label: "Quit" },
 ];
@@ -72,16 +78,35 @@ fn fits(placed: &[Placed], available: u16) -> bool {
     spread_items(&widths, available, MIN_GAP).is_some()
 }
 
+/// The actions with the Options button in them: when the list does not name
+/// it, it goes just before Help (before Quit when there is no Help, else at
+/// the end), so it is the first button to go when the bar is narrow and Help
+/// and Quit stay.
+fn with_options(actions: &[String]) -> Cow<'_, [String]> {
+    if actions.iter().any(|action| action == OPTIONS) {
+        return Cow::Borrowed(actions);
+    }
+    let mut list = actions.to_vec();
+    let before = |name: &str| list.iter().position(|action| action == name);
+    let at = before("help").or_else(|| before("quit")).unwrap_or(list.len());
+    list.insert(at, OPTIONS.to_string());
+    Cow::Owned(list)
+}
+
 /// The buttons for `actions` that fit in `available` cells, applying the
 /// dropping rule. Unknown action names have no button and are skipped.
 fn plan_buttons(actions: &[String], available: u16) -> Vec<Placed> {
+    let actions = with_options(actions);
     let mut placed: Vec<Placed> = actions
         .iter()
         .filter_map(|action| button_for(action))
         .map(|button| Placed { button, label: true })
         .collect();
     while !fits(&placed, available) {
-        if let Some(index) = placed.iter().rposition(|p| p.label) {
+        // Labels go first, from the right; the Options label goes before them
+        // all, so the other buttons keep theirs on the reference grid.
+        let label = placed.iter().position(|p| p.label && p.button.action == OPTIONS);
+        if let Some(index) = label.or_else(|| placed.iter().rposition(|p| p.label)) {
             placed[index].label = false;
         } else if let Some(index) = placed.iter().rposition(|p| !KEPT.contains(&p.button.action)) {
             placed.remove(index);

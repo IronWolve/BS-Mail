@@ -11,6 +11,7 @@ pub mod icons;
 pub mod input;
 pub mod layout;
 pub mod move_picker;
+pub mod options;
 pub mod search;
 pub mod setup;
 pub mod theme;
@@ -21,3 +22,5 @@ pub mod widgets;
 
 pub use app_identity::AppIdentity;
 pub use app_view::AppView;
+pub use options::{AccountSummary, OptionsAction, OptionsPaths};
+pub use setup::AccountPrefill;

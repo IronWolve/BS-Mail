@@ -9,4 +9,6 @@ pub enum SetupAction {
     OpenLink(String),
     /// Stop waiting for the browser and go back to the form.
     CancelSignIn,
+    /// The form was closed without saving: stop any attempt still going.
+    Abandon,
 }

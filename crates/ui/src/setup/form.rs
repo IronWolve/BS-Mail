@@ -4,14 +4,15 @@
 //! Typing an address fills in the servers for that provider until the user
 //! changes a server field themselves; after that their choice stands. The
 //! password and the client secret are kept as typed and only ever drawn as
-//! dots. The account file text the form makes is in `form_toml.rs`.
+//! dots, and `form_debug.rs` keeps them out of any debug output. The account
+//! file text the form makes is in `form_toml.rs`.
 
 use crate::composer::EditorBuffer;
 
 use super::fields::{Security, SetupField, SignIn};
 use super::providers::{Preset, preset_for};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SetupForm {
     pub email: EditorBuffer,
     pub password: EditorBuffer,
@@ -47,12 +48,15 @@ pub struct SetupForm {
     pub copied: Option<String>,
     /// Escape was pressed once on a form with something typed in it.
     pub quit_armed: bool,
+    /// The id of the account being edited; `None` for a new account, whose id
+    /// is made from the address when the file text is made.
+    pub(super) edit_id: Option<String>,
     /// The provider files a copy of sent mail itself, so the program must not.
     pub(super) files_sent_itself: bool,
-    servers_touched: bool,
-    username_touched: bool,
-    name_touched: bool,
-    signin_touched: bool,
+    pub(super) servers_touched: bool,
+    pub(super) username_touched: bool,
+    pub(super) name_touched: bool,
+    pub(super) signin_touched: bool,
 }
 
 impl Default for SetupForm {
@@ -88,6 +92,7 @@ impl SetupForm {
             link: None,
             copied: None,
             quit_armed: false,
+            edit_id: None,
             files_sent_itself: false,
             servers_touched: false,
             username_touched: false,

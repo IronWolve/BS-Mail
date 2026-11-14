@@ -29,6 +29,8 @@ pub enum Action {
     Delete,
     Sync,
     Help,
+    /// F10: open the Options screen.
+    Options,
     Compose,
     Move,
     Search,
@@ -79,6 +81,7 @@ fn named_action(named: NamedKey, shift: bool) -> Option<Action> {
         NamedKey::Right => Action::Right,
         NamedKey::Left => Action::Left,
         NamedKey::Function(2) => Action::Compose,
+        NamedKey::Function(10) => Action::Options,
         NamedKey::Escape | NamedKey::Backspace => Action::Back,
         _ => return None,
     })

@@ -23,6 +23,9 @@ impl AppView {
         if self.setup.is_some() {
             return self.setup_input(event, grid);
         }
+        if self.options.is_some() {
+            return self.options_input(event, grid);
+        }
         if self.composer.is_some() {
             return self.composer_input(event, grid);
         }
@@ -121,6 +124,7 @@ impl AppView {
             Action::Delete => self.delete_selected(),
             Action::Sync => self.refresh(),
             Action::Help => self.overlays.open = Some(OverlayKind::Help),
+            Action::Options => self.open_options(),
             Action::Move => self.start_move(),
             Action::Search => self.start_search(),
             Action::Compose => self.start_compose(ComposeKind::New),
@@ -157,6 +161,7 @@ impl AppView {
                 self.focus = Focus::List;
                 self.select_message(index, &layout);
             }
+            Hit::Account(index) => return self.click_account(index),
             Hit::Sidebar => self.focus = Focus::Sidebar,
             Hit::ListChrome => self.focus = Focus::List,
             Hit::Reader => self.focus = Focus::Reader,
@@ -178,6 +183,7 @@ impl AppView {
             "search" => self.act(Action::Search, grid),
             "sync" => self.act(Action::Sync, grid),
             "help" => self.act(Action::Help, grid),
+            "options" => self.act(Action::Options, grid),
             "quit" => self.quit_requested = true,
             other => self.mail.error = Some(format!("{other} is not built yet")),
         }
@@ -191,7 +197,7 @@ impl AppView {
         let action = if rows < 0 { Action::Up } else { Action::Down };
         let notches = usize::from(rows.unsigned_abs()) * WHEEL_ROWS;
         let target = match self.hit(&layout, col, row) {
-            Hit::Folder(_) | Hit::Sidebar => Focus::Sidebar,
+            Hit::Folder(_) | Hit::Account(_) | Hit::Sidebar => Focus::Sidebar,
             Hit::Message(_) | Hit::ListChrome => Focus::List,
             Hit::Reader => Focus::Reader,
             Hit::KeyBar(_) | Hit::Nothing => return false,
@@ -223,6 +229,7 @@ impl AppView {
             ),
             list_first: self.list_first(layout),
             messages: self.shown_page().map_or(0, |page| page.envelopes.len()),
+            accounts: self.mail.accounts.len(),
             key_bar_actions: &self.config.key_bar.buttons,
         };
         hit_at(&view, col, row)

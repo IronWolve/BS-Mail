@@ -111,6 +111,11 @@ impl AppView {
     /// `reader.mark_read_after_ms`. `now_ms` is any steady clock in
     /// milliseconds; the caller calls this a few times a second.
     pub fn tick(&mut self, now_ms: u64) {
+        if self.options.is_some() {
+            // Mail that is hidden behind the Options screen is not marked read.
+            self.read_timer = None;
+            return;
+        }
         let Some(id) = self.selection.message else {
             self.read_timer = None;
             return;

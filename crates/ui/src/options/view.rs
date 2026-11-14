@@ -1,0 +1,45 @@
+//! The facts a page is built from, borrowed from the view for one frame or
+//! one input: the accounts the program told of, the paths, the settings now
+//! in force and what the mail snapshot knows about connections.
+
+use model::ConnectionState;
+use model::config::Config;
+
+use super::host::InfoLine;
+use super::summary::{AccountSummary, OptionsPaths};
+
+pub struct OptionsView<'a> {
+    /// `None` when the program has not said (mock mail).
+    pub accounts: Option<&'a [AccountSummary]>,
+    pub paths: &'a OptionsPaths,
+    pub theme_names: &'a [String],
+    pub config: &'a Config,
+    /// The id of the account whose mail is showing.
+    pub selected: Option<&'a str>,
+    /// The accounts of the mail snapshot, for their connection state.
+    pub connections: &'a [model::Account],
+    /// The last problem the mail backend reported.
+    pub problem: Option<&'a str>,
+    pub line: Option<&'a InfoLine>,
+}
+
+impl OptionsView<'_> {
+    /// The connection state of an account, matched by id.
+    pub fn state_of(&self, id: &str) -> Option<ConnectionState> {
+        self.connections.iter().find(|account| account.id.0 == id).map(|account| account.state)
+    }
+
+    /// The account the highlight is on, kept inside the list.
+    pub fn highlighted(&self, cursor: usize) -> Option<&AccountSummary> {
+        let list = self.accounts?;
+        list.get(cursor.min(list.len().saturating_sub(1)))
+    }
+
+    /// Whether the account is the one whose mail is showing.
+    pub fn is_selected(&self, account: &AccountSummary) -> bool {
+        self.selected == Some(account.id.as_str())
+    }
+}
+
+#[cfg(test)]
+include!("view.tests.rs");

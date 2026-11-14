@@ -21,8 +21,8 @@ pub enum Outcome {
     Changed,
     /// Check what was typed and connect.
     Submit,
-    /// Leave without saving.
-    Quit,
+    /// Close the form without saving.
+    Close,
     /// A button on the sign-in link page, by key or click.
     Panel(PanelChoice),
 }
@@ -103,7 +103,7 @@ pub fn click(form: &mut SetupForm, field: SetupField) -> Outcome {
 
 fn escape(form: &mut SetupForm) -> Outcome {
     if form.is_empty() || form.quit_armed || form.waiting {
-        return Outcome::Quit;
+        return Outcome::Close;
     }
     form.quit_armed = true;
     form.notice = Some(QUIT_NOTE.to_string());

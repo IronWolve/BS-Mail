@@ -18,6 +18,16 @@ impl Security {
         }
     }
 
+    /// The choice an account file's word names, `None` for any other word.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "implicit" => Some(Self::Implicit),
+            "starttls" => Some(Self::Starttls),
+            "none" => Some(Self::None),
+            _ => None,
+        }
+    }
+
     pub fn toml_name(self) -> &'static str {
         match self {
             Self::Implicit => "implicit",

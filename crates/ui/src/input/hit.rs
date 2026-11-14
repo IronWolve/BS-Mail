@@ -11,6 +11,9 @@ use crate::layout::{Layout, SectionKind};
 pub enum Hit {
     /// A folder row, as an index into the visible folder rows.
     Folder(usize),
+    /// A row of the sidebar's accounts, as an index into the snapshot's
+    /// accounts. Rows past the visible height are not hit.
+    Account(usize),
     /// Somewhere in the sidebar that is not a folder row.
     Sidebar,
     /// A message row, as an index into the page's envelopes.
@@ -30,6 +33,8 @@ pub struct HitView<'a> {
     pub folders_first: usize,
     pub list_first: usize,
     pub messages: usize,
+    /// How many accounts the snapshot lists.
+    pub accounts: usize,
     /// The actions the key bar offers, in order.
     pub key_bar_actions: &'a [String],
 }
@@ -44,6 +49,9 @@ pub fn hit_at(view: &HitView<'_>, col: u16, row: u16) -> Hit {
     if let Some(sidebar) = &view.layout.sidebar
         && inside(sidebar.rect, col, row)
     {
+        if let Some(index) = account_at(view.layout, view.accounts, col, row) {
+            return Hit::Account(index);
+        }
         let folders = sidebar.section(SectionKind::Folders);
         return match folders {
             Some(section) if inside(section.body, col, row) => {
@@ -66,6 +74,19 @@ pub fn hit_at(view: &HitView<'_>, col: u16, row: u16) -> Hit {
         Some(reader) if inside(reader.rect, col, row) => Hit::Reader,
         _ => Hit::Nothing,
     }
+}
+
+/// The account whose row is at column `col`, row `row` of the sidebar's
+/// accounts section, as an index into the snapshot's `accounts` accounts.
+/// Rows past the section's height are not accounts, and neither are the
+/// rows below the last account.
+pub fn account_at(layout: &Layout, accounts: usize, col: u16, row: u16) -> Option<usize> {
+    let body = layout.sidebar.as_ref()?.section(SectionKind::Accounts)?.body;
+    if !inside(body, col, row) {
+        return None;
+    }
+    let index = usize::from(row - body.y);
+    (index < accounts).then_some(index)
 }
 
 fn inside(rect: Rect, col: u16, row: u16) -> bool {

@@ -103,6 +103,8 @@ impl SetupFlow {
             match action {
                 SetupAction::OpenLink(url) => self.opener.open(&url),
                 SetupAction::CancelSignIn => self.browser = None,
+                // The form was closed: what was being tried is given up.
+                SetupAction::Abandon => self.browser = None,
             }
         }
         match self.opener.poll() {

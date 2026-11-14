@@ -5,6 +5,7 @@
 
 use crate::composer::EditorBuffer;
 
+use super::account_id::account_id_for;
 use super::fields::SignIn;
 use super::form::SetupForm;
 
@@ -16,6 +17,15 @@ const NO_BROWSER_FOR_PROVIDER: &str = "signing in through the browser is built i
 const NO_CLIENT_ID: &str = "type the client id from your provider's developer console (see docs/oauth-setup.md)";
 
 impl SetupForm {
+    /// The id the account gets: the one being edited, or one made from the
+    /// address. The program makes sure it is not taken.
+    pub fn account_id(&self) -> String {
+        match &self.edit_id {
+            Some(id) => id.clone(),
+            None => account_id_for(&self.email.text()),
+        }
+    }
+
     /// The account file this form makes, or what is wrong with it.
     pub fn to_account_toml(&self) -> Result<String, String> {
         let email = self.email.text().trim().to_string();
@@ -31,7 +41,7 @@ impl SetupForm {
         let mut put = |key: &str, value: toml::Value| {
             table.insert(key.to_string(), value);
         };
-        put("id", "main".into());
+        put("id", self.account_id().into());
         put("name", name.into());
         put("address", email.into());
         put("imap_host", imap_host.clone().into());

@@ -29,10 +29,11 @@ pub const HELP_ROWS: &[(&str, &str)] = &[
     ("/", "search the account; Esc brings the folder back"),
     ("c  F2", "write a new message"),
     ("r  R  f", "reply, reply to everyone, forward"),
-    ("Ctrl+Enter  F10", "send the message being written"),
+    ("Ctrl+Enter", "send the message being written"),
     ("drag a bar", "resize the sidebar and the list and reader split"),
     ("Ctrl + - 0  Ctrl wheel", "text size, and back to normal"),
     ("F11", "full screen"),
+    ("F10", "options: accounts, appearance, data (sends, while writing)"),
     ("?", "this help"),
     ("q  Ctrl+Q", "quit"),
 ];

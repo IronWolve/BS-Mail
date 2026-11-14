@@ -15,7 +15,7 @@ use crate::theme::roles;
 use crate::widgets::{DrawContext, fill_cells, put_text};
 
 const WAITING_BUTTON: &str = " Connecting\u{2026} ";
-const HINT: &str = "Tab next   Shift+Tab back   Space or arrows change a choice   F10 connect   Esc quit";
+const HINT: &str = "Tab next   Shift+Tab back   Space or arrows change a choice   F10 connect   Esc close";
 
 /// Draws the whole screen: the form fills it.
 pub fn draw_setup(frame: &mut Frame, ctx: &DrawContext<'_>, area: Rect, form: &SetupForm) {

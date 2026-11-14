@@ -11,7 +11,7 @@ use model::{ConnectionState, Event};
 use surface::{ButtonState, InputEvent, PointerButton};
 
 use crate::app_view::AppView;
-use crate::setup::SetupForm;
+use crate::setup::{AccountPrefill, SetupForm};
 use crate::setup::input::{Outcome, click, handle_key, handle_text};
 use crate::setup::layout::{area_of, layout};
 use crate::setup::link_panel::PanelChoice;
@@ -23,6 +23,15 @@ impl AppView {
     /// title when there is something to say about where it will be saved.
     pub fn open_setup(&mut self) {
         self.setup = Some(SetupForm::new());
+        self.setup_request = None;
+        self.setup_online = false;
+        self.setup_actions.clear();
+    }
+
+    /// Shows the account form filled with an existing account's details, for
+    /// the user to change.
+    pub fn open_setup_with(&mut self, prefill: AccountPrefill) {
+        self.setup = Some(SetupForm::from_prefill(prefill));
         self.setup_request = None;
         self.setup_online = false;
         self.setup_actions.clear();
@@ -139,8 +148,13 @@ impl AppView {
         match outcome {
             Outcome::Ignored => false,
             Outcome::Changed => true,
-            Outcome::Quit => {
-                self.quit_requested = true;
+            Outcome::Close => {
+                // A closed form is never saved: forget what was handed over
+                // and tell the program to stop any attempt still going.
+                self.setup = None;
+                self.setup_request = None;
+                self.setup_online = false;
+                self.setup_actions.push(SetupAction::Abandon);
                 true
             }
             Outcome::Submit => {
