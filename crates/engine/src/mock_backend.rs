@@ -5,12 +5,14 @@ use std::path::Path;
 use std::str::FromStr;
 
 use model::{
-    AccountId, Body, BodyRole, Command, ConnectionState, Envelope, Event, FlagChange, FolderId,
-    MailBackend, MailDate, MessageId, RequestId, StyledLine, StyledSpan, SyncStatus,
+    AccountId, Body, BodyRole, Command, Envelope, Event, FlagChange, FolderId, MailBackend, MailDate,
+    MessageId, RequestId, StyledLine, StyledSpan, SyncStatus,
 };
 
+use crate::change_refusals::{DELETED_NOT_HERE, move_refusal};
 use crate::mock::mutate::{MoveOutcome, apply_flags, delete_messages, move_messages};
 use crate::mock::search;
+use crate::mock::{account_state, select_account};
 use crate::mock::{Fixture, FixtureError};
 
 /// What a message with no fixture body shows when it is opened.
@@ -57,27 +59,14 @@ impl MockBackend {
     /// be applied: host, accounts, folders, connection, quota, sync status,
     /// the open folder's first page, then the open message's body.
     pub fn startup_events(&self) -> Vec<Event> {
-        let account = self.data.account.clone();
         let mut events = vec![
             Event::HostInfo {
                 host_name: self.data.host_name.clone(),
                 system: self.data.system.clone(),
             },
             Event::AccountList(self.data.accounts.clone()),
-            self.folder_list(),
-            Event::ConnectionState {
-                account: account.clone(),
-                state: self.selected_connection(),
-            },
-            Event::Quota {
-                account: account.clone(),
-                quota: self.data.status.quota,
-            },
-            Event::SyncProgress {
-                account,
-                status: self.data.status.clone(),
-            },
         ];
+        events.extend(account_state(&self.data));
         if let Some(folder) = self.data.open_folder() {
             events.push(self.envelope_page(folder));
             events.push(Event::BodyReady {
@@ -86,14 +75,6 @@ impl MockBackend {
             });
         }
         events
-    }
-
-    fn selected_connection(&self) -> ConnectionState {
-        self.data
-            .accounts
-            .iter()
-            .find(|account| account.selected)
-            .map_or(ConnectionState::Offline, |account| account.state)
     }
 
     fn folder_list(&self) -> Event {
@@ -177,24 +158,41 @@ impl MockBackend {
         vec![Event::BodyReady { message, body }]
     }
 
+    /// The real backend never changes the deleted flag this way: it says so
+    /// and carries out the rest of the change.
     fn set_flags(&mut self, ids: &[MessageId], change: FlagChange) -> Vec<Event> {
-        let outcome = apply_flags(&mut self.data, ids, change);
+        let deleted_asked = change.deleted.is_some();
+        let change = FlagChange {
+            deleted: None,
+            ..change
+        };
         let mut events = Vec::new();
-        if !outcome.updates.is_empty() {
-            events.push(Event::FlagsChanged {
-                updates: outcome.updates,
-            });
+        let mut unknown = Vec::new();
+        if change != FlagChange::default() {
+            let outcome = apply_flags(&mut self.data, ids, change);
+            unknown = outcome.unknown;
+            if !outcome.updates.is_empty() {
+                events.push(Event::FlagsChanged {
+                    updates: outcome.updates,
+                });
+            }
+            if outcome.counts_moved {
+                events.push(self.folder_list());
+            }
         }
-        if outcome.counts_moved {
-            events.push(self.folder_list());
+        if deleted_asked {
+            events.push(self.failure("set flags", DELETED_NOT_HERE.to_owned()));
         }
-        events.extend(self.unknown_messages("set flags", &outcome.unknown));
+        events.extend(self.unknown_messages("set flags", &unknown));
         events
     }
 
     fn move_to(&mut self, ids: &[MessageId], to: FolderId) -> Vec<Event> {
-        if !self.knows_folder(to) {
+        let Some(target) = self.data.folders.iter().find(|entry| entry.id == to) else {
             return vec![self.failure("move", format!("unknown folder id: {}", to.0))];
+        };
+        if let Some(reason) = move_refusal(target.role) {
+            return vec![self.failure("move", reason.to_owned())];
         }
         let outcome = move_messages(&mut self.data, ids, to);
         self.after_relocation("move", outcome)
@@ -219,6 +217,9 @@ impl MockBackend {
             );
         }
         events.extend(self.unknown_messages(operation, &outcome.unknown));
+        if let Some(reason) = outcome.refused {
+            events.push(self.failure(operation, reason.to_owned()));
+        }
         events
     }
 
@@ -296,7 +297,9 @@ impl FromStr for MockBackend {
 
 impl MailBackend for MockBackend {
     /// Answers at once. A command the mock has nothing to say about
-    /// (`Unlock`) gets no events; a send is accepted.
+    /// (`Unlock`) gets no events; a send is accepted; a switch of account is
+    /// answered as a backend with several accounts does (see
+    /// `select_account`).
     fn handle(&mut self, command: Command) -> Vec<Event> {
         match command {
             Command::OpenFolder { folder } => self.open_folder(folder),
@@ -315,7 +318,8 @@ impl MailBackend for MockBackend {
             Command::Send { message } => vec![Event::MessageSent {
                 account: message.account,
             }],
-            Command::Unlock { .. } | Command::SelectAccount { .. } => Vec::new(),
+            Command::SelectAccount { account } => select_account(&self.data, &account),
+            Command::Unlock { .. } => Vec::new(),
         }
     }
 

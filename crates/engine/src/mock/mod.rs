@@ -1,6 +1,7 @@
 //! Fixture loading and the small helpers the mock backend is built from.
 //! This file only declares and re-exports the modules.
 
+mod account_state;
 mod convert_address;
 mod convert_body;
 mod convert_date;
@@ -11,5 +12,6 @@ mod fixture_schema;
 pub(crate) mod mutate;
 pub(crate) mod search;
 
+pub(crate) use account_state::{account_state, select_account};
 pub use fixture_error::FixtureError;
 pub use fixture_load::Fixture;
