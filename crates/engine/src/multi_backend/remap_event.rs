@@ -55,15 +55,10 @@ pub(super) fn remap_event(slot: Slot, event: Event) -> Mapped<Event> {
                 .map(|(message, flags)| Ok((message_id(slot, message)?, flags)))
                 .collect::<Mapped<_>>()?,
         },
-        Event::SearchResults {
-            request,
-            total,
-            envelopes,
-        } => Event::SearchResults {
-            request,
-            total,
-            envelopes: remap_envelopes(slot, envelopes)?,
-        },
+        Event::SearchResults { request, total, envelopes, incomplete } => {
+            let envelopes = remap_envelopes(slot, envelopes)?;
+            Event::SearchResults { request, total, envelopes, incomplete }
+        }
         unchanged @ (Event::AccountList(_)
         | Event::HostInfo { .. }
         | Event::ConnectionState { .. }

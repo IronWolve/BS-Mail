@@ -65,6 +65,11 @@ pub enum Event {
         request: RequestId,
         total: u32,
         envelopes: Vec<Envelope>,
+        /// What the search could not cover, in a sentence, when it did not
+        /// cover every folder it set out to (time ran out, a server refused
+        /// one): the list may then be missing messages. `None`: all of it
+        /// ran.
+        incomplete: Option<String>,
     },
     /// Whether the account lets the program change mail on the server. An
     /// account that does not shows a note instead of trying and failing. A

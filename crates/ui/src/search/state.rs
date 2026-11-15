@@ -8,4 +8,7 @@ use model::RequestId;
 pub struct ActiveSearch {
     pub query: String,
     pub request: RequestId,
+    /// What the answer says it could not cover, when it says so: the list may
+    /// then be missing messages.
+    pub incomplete: Option<String>,
 }

@@ -62,8 +62,9 @@ impl AppView {
         };
         let page = self.mail.page.as_ref()?;
         let unread = page.envelopes.iter().filter(|envelope| !envelope.flags.seen).count();
+        let marker = if search.incomplete.is_some() { " (incomplete)" } else { "" };
         Some(MailboxSummary {
-            name: format!("Search: {}", search.query),
+            name: format!("Search: {}{marker}", search.query),
             unread: u32::try_from(unread).unwrap_or(u32::MAX),
             total: page.total,
         })

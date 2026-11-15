@@ -85,6 +85,7 @@ impl AppView {
         self.search = Some(ActiveSearch {
             query: query.clone(),
             request,
+            incomplete: None,
         });
         self.queue.push(Command::Search {
             request,
@@ -109,11 +110,17 @@ impl AppView {
     /// ends the search.
     pub(crate) fn note_search_event(&mut self, event: &Event) {
         match event {
-            Event::SearchResults { request, total, envelopes } => {
+            Event::SearchResults { request, total, envelopes, incomplete } => {
                 let current = self.search.as_ref().is_some_and(|search| search.request == *request);
                 let Some(folder) = self.selection.folder.filter(|_| current) else {
                     return;
                 };
+                if let Some(search) = self.search.as_mut() {
+                    search.incomplete.clone_from(incomplete);
+                }
+                // The footer says what was missed, so a partial answer is
+                // not taken for the whole one.
+                self.mail.error = incomplete.clone();
                 self.mail.page = Some(ListPage {
                     folder,
                     offset: 0,

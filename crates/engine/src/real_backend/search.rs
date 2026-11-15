@@ -11,7 +11,10 @@
 //! next command that needs the open folder opens it again.
 //!
 //! Exactly one event answers a search: the results, or a failure notice named
-//! `search` with a plain sentence.
+//! `search` with a plain sentence. When some folders were not searched (the
+//! time ran out before they were reached, a server refused the search in
+//! them, or they could not be opened) the results say so in `incomplete`
+//! instead of passing for the whole answer.
 
 use std::time::Instant;
 
@@ -47,6 +50,36 @@ struct Tally {
     searched: usize,
     /// The first reason a server refused a search or a fetch.
     refusal: Option<String>,
+    /// Folders never reached because the search ran out of time.
+    not_reached: usize,
+    /// Folders in which the server refused the search or the fetch.
+    refused_in: usize,
+    /// Folders that could not be opened.
+    unopened: usize,
+}
+
+impl Tally {
+    /// What the search missed, in a sentence, or `None` when it covered all
+    /// `folders`.
+    fn incomplete(&self, folders: usize) -> Option<String> {
+        let missed = self.not_reached + self.refused_in + self.unopened;
+        if missed == 0 {
+            return None;
+        }
+        let mut reasons = Vec::new();
+        if self.not_reached > 0 {
+            reasons.push(format!("{} not reached before the search ran out of time", self.not_reached));
+        }
+        if self.refused_in > 0 {
+            let why = self.refusal.as_deref().map(|text| format!(" ({text})")).unwrap_or_default();
+            reasons.push(format!("{} refused the search{why}", self.refused_in));
+        }
+        if self.unopened > 0 {
+            reasons.push(format!("{} could not be opened", self.unopened));
+        }
+        let covered = folders.saturating_sub(missed);
+        Some(format!("searched {covered} of {folders} folders, so messages may be missing: {}", reasons.join("; ")))
+    }
 }
 
 impl Worker {
@@ -71,11 +104,13 @@ impl Worker {
         let started = Instant::now();
         for (at, target) in targets.iter().enumerate() {
             if at > 0 && started.elapsed() >= self.timing.search_deadline {
+                tally.not_reached = targets.len() - at;
                 break;
             }
             self.search_folder(session, target, &keys, &mut tally).await?;
         }
-        Ok(vec![self.search_answer(request, tally)])
+        let incomplete = tally.incomplete(targets.len());
+        Ok(vec![self.search_answer(request, tally, incomplete)])
     }
 
     /// The folders to search and the keys to search them with, or the
@@ -109,7 +144,10 @@ impl Worker {
         let info = match session.examine(&target.path).await {
             Ok(info) => info,
             Err(error) if error.is_lost() => return Err(error),
-            Err(_) => return Ok(()),
+            Err(_) => {
+                tally.unopened += 1;
+                return Ok(());
+            }
         };
         self.state.note_validity(target.id, info.uid_validity);
         tally.opened += 1;
@@ -121,6 +159,7 @@ impl Worker {
             Err(error) if error.is_lost() => return Err(error),
             Err(error) => {
                 tally.refusal.get_or_insert_with(|| error.text().to_owned());
+                tally.refused_in += 1;
                 return Ok(());
             }
         };
@@ -146,6 +185,7 @@ impl Worker {
             Err(error) if error.is_lost() => return Err(error),
             Err(error) => {
                 tally.refusal.get_or_insert_with(|| error.text().to_owned());
+                tally.refused_in += 1;
                 return Ok(());
             }
         };
@@ -159,7 +199,7 @@ impl Worker {
     }
 
     /// The event that answers the search.
-    fn search_answer(&mut self, request: RequestId, mut tally: Tally) -> Event {
+    fn search_answer(&mut self, request: RequestId, mut tally: Tally, incomplete: Option<String>) -> Event {
         if tally.searched == 0 {
             if let Some(text) = &tally.refusal {
                 let reason = format!("the server refused the search: {text}");
@@ -174,6 +214,7 @@ impl Worker {
             request,
             total: tally.total,
             envelopes: newest_first(&mut tally.hits),
+            incomplete,
         }
     }
 }

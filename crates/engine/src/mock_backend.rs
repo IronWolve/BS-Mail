@@ -240,6 +240,7 @@ impl MockBackend {
             request,
             total: u32::try_from(envelopes.len()).unwrap_or(u32::MAX),
             envelopes,
+            incomplete: None,
         }]
     }
 
