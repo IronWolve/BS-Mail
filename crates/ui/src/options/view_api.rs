@@ -38,7 +38,7 @@ impl AppView {
     /// Switches the drawn theme at once.
     pub fn set_theme(&mut self, theme: Theme) {
         self.config.appearance.theme = theme.name().to_string();
-        self.theme = theme;
+        self.theme = self.at_host_depth(theme);
     }
 
     /// Switches the drawn icon set at once. Auto is the icon-font set.
@@ -51,8 +51,13 @@ impl AppView {
     /// the icon set made from it.
     pub fn apply_settings(&mut self, config: Config, theme: Theme, icons: IconSet) {
         self.config = config;
-        self.theme = theme;
+        self.theme = self.at_host_depth(theme);
         self.icons = icons;
+    }
+
+    /// `theme` as the host showing these frames has to draw it.
+    fn at_host_depth(&self, theme: Theme) -> Theme {
+        theme.for_depth(self.capabilities().color_depth).unwrap_or(theme)
     }
 
     /// A line for the user at the bottom of the Options screen.

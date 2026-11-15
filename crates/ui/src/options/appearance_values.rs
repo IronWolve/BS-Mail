@@ -48,15 +48,20 @@ pub fn step_font_size(size: u8, plus: bool) -> u8 {
 
 /// The next multiple of 0.05 up or down, within the limits, to two places.
 pub fn step_line_spacing(value: f32, plus: bool) -> f32 {
+    // A spacing that is no number (the file can say `nan`) steps from the
+    // plain row height; every comparison with it would otherwise fail and the
+    // buttons would stay stuck on it.
+    let value = if value.is_nan() { 1.0 } else { value };
     let scaled = value / SPACING_STEP;
     let steps = if plus { (scaled + 1e-3).floor() + 1.0 } else { (scaled - 1e-3).ceil() - 1.0 };
     let next = (steps * SPACING_STEP).clamp(LINE_SPACING_MIN, LINE_SPACING_MAX);
     (next * 100.0).round() / 100.0
 }
 
-/// Whether two spacings differ by more than rounding.
+/// Whether two spacings differ by more than rounding. A spacing that is no
+/// number differs from every other, or a press that leaves it would be lost.
 pub fn spacing_differs(a: f32, b: f32) -> bool {
-    (a - b).abs() > 1e-4
+    a.is_nan() != b.is_nan() || (a - b).abs() > 1e-4
 }
 
 pub fn spacing_text(value: f32) -> String {
