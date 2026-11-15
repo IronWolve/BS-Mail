@@ -60,7 +60,7 @@ pub(crate) struct RawSmtp {
     pub port: Option<u16>,
     pub security: Option<Security>,
     pub username: Option<String>,
-    pub password: Option<String>,
+    pub password: Option<Secret>,
     pub trust: Option<Trust>,
     pub save_sent: Option<bool>,
 }
@@ -101,9 +101,7 @@ impl SmtpSettings {
             port: raw.port.unwrap_or(default_port),
             security,
             username: raw.username.unwrap_or_else(|| mailbox_user.to_owned()),
-            password: raw
-                .password
-                .map_or_else(|| mailbox_password.clone(), Secret::new),
+            password: raw.password.unwrap_or_else(|| mailbox_password.clone()),
             auth,
             sign_in_set,
             trust: raw.trust.unwrap_or_default(),

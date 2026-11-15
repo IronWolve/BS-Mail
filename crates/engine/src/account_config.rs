@@ -58,7 +58,7 @@ use std::fmt;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 
-use model::Secret;
+use model::{Secret, wipe_text};
 use serde::Deserialize;
 
 use crate::account_oauth::{AuthKind, OAuthSettings, RawOAuth, token_file_in};
@@ -164,12 +164,14 @@ struct RawAccount {
     #[serde(default)]
     security: Security,
     username: String,
-    password: Option<String>,
+    #[serde(default, deserialize_with = "secret_field")]
+    password: Option<Secret>,
     #[serde(default)]
     auth: AuthKind,
     oauth_provider: Option<String>,
     oauth_client_id: Option<String>,
-    oauth_client_secret: Option<String>,
+    #[serde(default, deserialize_with = "secret_field")]
+    oauth_client_secret: Option<Secret>,
     oauth_auth_url: Option<String>,
     oauth_token_url: Option<String>,
     oauth_scopes: Option<Vec<String>>,
@@ -182,10 +184,17 @@ struct RawAccount {
     smtp_port: Option<u16>,
     smtp_security: Option<Security>,
     smtp_username: Option<String>,
-    smtp_password: Option<String>,
+    #[serde(default, deserialize_with = "secret_field")]
+    smtp_password: Option<Secret>,
     smtp_trust: Option<Trust>,
     save_sent: Option<bool>,
     poll_seconds: Option<u32>,
+}
+
+/// Reads an optional text value of the file straight into a `Secret`, so the
+/// password is never a plain `String` that outlives its parse.
+fn secret_field<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<Secret>, D::Error> {
+    Option::<String>::deserialize(deserializer).map(|text| text.map(Secret::new))
 }
 
 /// The wait between checks the file asks for, as it is used: absent means the
@@ -223,9 +232,9 @@ fn resolve_oauth(raw: &mut RawAccount) -> Result<Option<OAuthSettings>, ConfigEr
 
 /// The mailbox password: whatever the file says for a password account
 /// (which must say something), nothing for an OAuth2 account.
-fn mailbox_password(given: Option<String>, oauth: bool) -> Result<String, ConfigError> {
+fn mailbox_password(given: Option<Secret>, oauth: bool) -> Result<Secret, ConfigError> {
     if oauth {
-        return Ok(String::new());
+        return Ok(Secret::new(""));
     }
     given.ok_or_else(|| {
         ConfigError::Parse("missing field `password` (it is only optional when auth = \"oauth2\")".to_owned())
@@ -237,9 +246,12 @@ impl AccountConfig {
     /// its tokens in `oauth/<id>.token` in the same folder.
     pub fn from_file(path: &Path) -> Result<Self, ConfigError> {
         check_private(path)?;
-        let text = std::fs::read_to_string(path).map_err(|e| ConfigError::Read(e.to_string()))?;
+        let mut text = std::fs::read_to_string(path).map_err(|e| ConfigError::Read(e.to_string()))?;
         let folder = path.parent().unwrap_or_else(|| Path::new(""));
-        Self::from_toml_str(&text).map(|config| config.with_state_dir(folder))
+        let parsed = Self::from_toml_str(&text);
+        // The file text holds the password and the client secret.
+        wipe_text(&mut text);
+        parsed.map(|config| config.with_state_dir(folder))
     }
 
     /// Gives the account its folder: an OAuth2 account keeps its tokens in
@@ -263,7 +275,7 @@ impl AccountConfig {
             Security::Starttls | Security::None => 143,
         };
         let oauth = resolve_oauth(&mut raw)?;
-        let password = Secret::new(mailbox_password(raw.password.take(), oauth.is_some())?);
+        let password = mailbox_password(raw.password.take(), oauth.is_some())?;
         let smtp = SmtpSettings::resolve(
             RawSmtp {
                 host: raw.smtp_host,

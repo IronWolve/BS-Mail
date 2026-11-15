@@ -49,7 +49,7 @@ const REDIRECT_HOSTS: [&str; 2] = ["127.0.0.1", "localhost"];
 pub(crate) struct RawOAuth {
     pub provider: Option<String>,
     pub client_id: Option<String>,
-    pub client_secret: Option<String>,
+    pub client_secret: Option<Secret>,
     pub auth_url: Option<String>,
     pub token_url: Option<String>,
     pub scopes: Option<Vec<String>>,
@@ -123,7 +123,7 @@ impl OAuthSettings {
                 .map(|e| e.extra_params.iter().map(|(n, v)| ((*n).to_owned(), (*v).to_owned())).collect())
                 .unwrap_or_default(),
             client_id,
-            client_secret: raw.client_secret.map(Secret::new),
+            client_secret: raw.client_secret,
             token_file: PathBuf::new(),
         };
         settings.validate()?;

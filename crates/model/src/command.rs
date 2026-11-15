@@ -2,11 +2,17 @@
 
 use std::fmt;
 
+use zeroize::Zeroize;
+
 use crate::address::Address;
 use crate::flags::FlagChange;
 use crate::ids::{AccountId, FolderId, MessageId, RequestId};
 
-/// A secret string that never shows up in debug output or logs.
+/// A secret string that never shows up in debug output or logs, and whose
+/// bytes are overwritten with zeros when it is dropped.
+///
+/// Only this copy is wiped. A `&str` from `expose` that the caller copied
+/// elsewhere is the caller's to clean up.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Secret(String);
 
@@ -19,12 +25,31 @@ impl Secret {
     pub fn expose(&self) -> &str {
         &self.0
     }
+
+    /// Overwrites the text with zeros and leaves it empty. The drop does the
+    /// same, so this is only for a caller that keeps the value around.
+    pub fn wipe(&mut self) {
+        wipe_text(&mut self.0);
+    }
+}
+
+impl Drop for Secret {
+    fn drop(&mut self) {
+        self.wipe();
+    }
 }
 
 impl fmt::Debug for Secret {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("Secret(<redacted>)")
     }
+}
+
+/// Overwrites the whole buffer of `text` with zeros, spare room included, and
+/// leaves it empty. For text that held a secret and is not a `Secret`, such as
+/// the account file's contents once they are parsed.
+pub fn wipe_text(text: &mut String) {
+    text.zeroize();
 }
 
 /// A message ready to send.
@@ -76,3 +101,6 @@ pub enum Command {
     /// Open the credential vault.
     Unlock { passphrase: Secret },
 }
+
+#[cfg(test)]
+include!("command.tests.rs");

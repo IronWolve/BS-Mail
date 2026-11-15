@@ -75,3 +75,5 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 arboard = { version = "3", default-features = false, features = ["wayland-data-control"] }
 # Stage 4: leaving the terminal in good order when it is hung up or told to stop (tty_host).
 signal-hook = { version = "0.3", default-features = false }
+# Wiping a secret's bytes when it is dropped (model); already in the tree through the TLS crate.
+zeroize = "1"
