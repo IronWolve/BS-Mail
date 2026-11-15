@@ -30,6 +30,8 @@ static HOOK: Once = Once::new();
 pub struct Session {
     /// Set when the terminal is hung up or told to terminate.
     pub stop: Arc<AtomicBool>,
+    /// Set when the loop has left, so the watch knows it is not stuck.
+    left: Arc<AtomicBool>,
 }
 
 impl Session {
@@ -53,14 +55,16 @@ impl Session {
         ACTIVE.store(true, Ordering::SeqCst);
         install_panic_hook();
         let stop = stop_flag();
-        watch_for_stop(Arc::clone(&stop));
-        Ok(Self { stop })
+        let left = Arc::new(AtomicBool::new(false));
+        watch_for_stop(Arc::clone(&stop), Arc::clone(&left));
+        Ok(Self { stop, left })
     }
 }
 
 impl Drop for Session {
     fn drop(&mut self) {
         restore();
+        self.left.store(true, Ordering::Release);
     }
 }
 
@@ -103,19 +107,48 @@ const LEAVE_GRACE: Duration = Duration::from_millis(1000);
 /// How often the watch looks at the stop flag.
 const WATCH_EVERY: Duration = Duration::from_millis(100);
 
-/// Ends the program when a stop was asked for and the loop has not left.
-///
-/// The loop looks at the flag between waits for input, but once a terminal is
-/// hung up the terminal library's wait can go on forever at full speed, so the
-/// loop never gets to look. After a short grace the terminal is given back and
-/// the program ends from here. A loop that does leave in time ends the program
-/// first, and this thread goes with it.
-fn watch_for_stop(stop: Arc<AtomicBool>) {
+/// How long the program is given to finish once the loop has left: it saves
+/// its state and its backend waits for a send that is still on its way (up to
+/// eight seconds) before the program ends by itself.
+const FINISH_GRACE: Duration = Duration::from_millis(12_000);
+
+/// What the watch found when a stop was asked for.
+#[derive(Debug, PartialEq, Eq)]
+enum Ending {
+    /// The loop did not leave in time: the terminal's wait never returns.
+    Stuck,
+    /// The loop left but the program had still not ended after the time it is
+    /// given to finish.
+    TooSlow,
+}
+
+/// Waits for a stop to be asked for and then says how it went. The loop looks
+/// at the flag between waits for input, but once a terminal is hung up the
+/// terminal library's wait can go on forever at full speed, so the loop may
+/// never get to look: after `leave` it is `Stuck`. A loop that did leave is
+/// not stuck: the program is saving and its backend is letting a send finish,
+/// so it is given `finish` more before it is `TooSlow`.
+fn wait_for_ending(stop: &AtomicBool, left: &AtomicBool, every: Duration, leave: Duration, finish: Duration) -> Ending {
+    while !stop.load(Ordering::Acquire) {
+        std::thread::sleep(every);
+    }
+    std::thread::sleep(leave);
+    if !left.load(Ordering::Acquire) {
+        return Ending::Stuck;
+    }
+    let until = std::time::Instant::now() + finish;
+    while std::time::Instant::now() < until {
+        std::thread::sleep(every);
+    }
+    Ending::TooSlow
+}
+
+/// Ends the program when a stop was asked for and it does not end by itself
+/// (see `wait_for_ending`). A program that ends in time takes this thread
+/// with it.
+fn watch_for_stop(stop: Arc<AtomicBool>, left: Arc<AtomicBool>) {
     let _ = std::thread::Builder::new().name("terminal-stop".to_owned()).spawn(move || {
-        while !stop.load(Ordering::Acquire) {
-            std::thread::sleep(WATCH_EVERY);
-        }
-        std::thread::sleep(LEAVE_GRACE);
+        wait_for_ending(&stop, &left, WATCH_EVERY, LEAVE_GRACE, FINISH_GRACE);
         restore();
         std::process::exit(STOPPED_EXIT_CODE);
     });
@@ -133,3 +166,6 @@ fn stop_flag() -> Arc<AtomicBool> {
     }
     flag
 }
+
+#[cfg(test)]
+include!("session.tests.rs");
