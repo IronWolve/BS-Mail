@@ -8,6 +8,7 @@ use tokio::sync::mpsc::UnboundedReceiver;
 
 use super::backoff::Backoff;
 use super::lifecycle::{announce, changes_allowed, connection};
+use super::inbox::Inbox;
 use super::online::Served;
 use super::poll_state::PollState;
 use super::retry_ids::RetryIds;
@@ -15,6 +16,7 @@ use super::save_sent::{SentCopies, SentCopy};
 use super::sent_queue::SentQueue;
 use super::sink::EventSink;
 use super::stop::Stop;
+use super::thread_cache::ThreadCache;
 use super::timing::Timing;
 use crate::account_config::AccountConfig;
 use crate::imap_session::{ConnectError, ImapSession};
@@ -53,6 +55,12 @@ pub(super) struct Worker {
     pub(super) queue: SentQueue,
     /// The message ids of sends that did not end well.
     pub(super) retry_ids: RetryIds,
+    /// The thread ids of the messages opened lately, for replies to them.
+    pub(super) threads: ThreadCache,
+    /// Originals of replies the server accepted, reported by the send tasks.
+    pub(super) answers: Inbox<MessageId>,
+    /// Originals still to be marked as answered, waiting for the mailbox.
+    pub(super) answered_waiting: Vec<MessageId>,
 }
 
 /// How a pause between connection attempts ended.
@@ -79,6 +87,9 @@ impl Worker {
             unsaved: Vec::new(),
             queue,
             retry_ids: RetryIds::default(),
+            threads: ThreadCache::default(),
+            answers: Inbox::new(),
+            answered_waiting: Vec::new(),
         }
     }
 
@@ -169,6 +180,11 @@ impl Worker {
                 copy = self.copies.recv() => {
                     if let Some(copy) = copy {
                         self.sent_copy_offline(copy);
+                    }
+                }
+                original = self.answers.recv() => {
+                    if let Some(original) = original {
+                        self.answered_offline(original);
                     }
                 }
             }

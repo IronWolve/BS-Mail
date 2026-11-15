@@ -79,6 +79,10 @@ impl Worker {
                     None => None,
                     Some(copy) => verdict(stop.guard(self.save_sent(session, copy)).await),
                 },
+                original = self.answers.recv() => match original {
+                    None => None,
+                    Some(original) => verdict(stop.guard(self.mark_answered(session, original)).await),
+                },
                 _ = keepalive.tick() => match stop.guard(session.ping()).await {
                     None => Some(Served::Stopped),
                     Some(Err(error)) if error.is_lost() => Some(Served::Lost),
@@ -106,7 +110,8 @@ impl Worker {
             let body = self.fetch_body(session, message).await;
             self.settle("fetch body", body)?;
         }
-        self.save_unsaved(session).await
+        self.save_unsaved(session).await?;
+        self.mark_waiting_answered(session).await
     }
 
     /// Runs one command that needs the server.

@@ -8,6 +8,7 @@ use super::lifecycle::{now_unix, progress, quota_event};
 use super::worker::Worker;
 use crate::imap_session::{ImapSession, SessionError, build_envelope, build_tree, fetched_row};
 use crate::mime_render::render_message;
+use crate::send::parse_threading_headers;
 
 /// How many times a message is asked for when the connection keeps being lost
 /// while it comes: the first time and one replay after the reconnect.
@@ -185,6 +186,8 @@ impl Worker {
             let reason = "the message is no longer on the server";
             return Ok(vec![self.sink.failure("fetch body", reason)]);
         };
+        // A reply to this message needs no look-up, even with the mailbox down.
+        self.threads.keep(message, parse_threading_headers(&raw.bytes));
         Ok(vec![Event::BodyReady {
             message,
             body: render_message(raw.bytes, raw.total),

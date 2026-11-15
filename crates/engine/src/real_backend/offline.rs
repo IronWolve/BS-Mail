@@ -23,8 +23,9 @@ impl Worker {
         }
         if let Command::Send { message } = command {
             // Sending has its own connection: a mailbox that is down does
-            // not stop it. The reply headers cannot be looked up, so a
-            // reply goes out without them.
+            // not stop it. A reply carries the thread ids kept when its
+            // original was opened; one that was not opened lately cannot be
+            // looked up now and goes out without them.
             self.send_offline(message);
             return;
         }

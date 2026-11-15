@@ -1,6 +1,7 @@
 //! Finding the ids of the message a reply answers: the `Message-ID` and
-//! `References` of the original, read from the server with PEEK so the
-//! original is not marked as read.
+//! `References` of the original. They are kept when a message is opened, so
+//! the usual reply needs no look-up at all; otherwise they are read from the
+//! server with PEEK, so the original is not marked as read.
 
 use model::MessageId;
 
@@ -17,6 +18,9 @@ impl Worker {
         session: &mut ImapSession,
         original: MessageId,
     ) -> Result<Option<ReplyIds>, SessionError> {
+        if let Some(known) = self.threads.get(original) {
+            return Ok(known);
+        }
         let Some((folder, uid)) = self.state.message_key(original) else {
             return Ok(None);
         };
@@ -28,6 +32,10 @@ impl Worker {
             return Ok(None);
         }
         let raw = session.fetch_threading_headers(uid.0).await?;
-        Ok(raw.as_deref().and_then(parse_threading_headers))
+        let found = raw.as_deref().and_then(parse_threading_headers);
+        if raw.is_some() {
+            self.threads.keep(original, found.clone());
+        }
+        Ok(found)
     }
 }

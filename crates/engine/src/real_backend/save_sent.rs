@@ -16,8 +16,7 @@
 
 use std::path::PathBuf;
 
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
-
+use super::inbox::Inbox;
 use super::sent_queue::forget;
 use super::worker::Worker;
 use crate::imap_session::{ImapSession, SentFolder, SessionError};
@@ -35,27 +34,7 @@ pub(super) struct SentCopy {
 }
 
 /// The queue between the send tasks and the worker, which owns the session.
-pub(super) struct SentCopies {
-    sender: UnboundedSender<SentCopy>,
-    receiver: UnboundedReceiver<SentCopy>,
-}
-
-impl SentCopies {
-    pub(super) fn new() -> Self {
-        let (sender, receiver) = unbounded_channel();
-        Self { sender, receiver }
-    }
-
-    pub(super) fn sender(&self) -> UnboundedSender<SentCopy> {
-        self.sender.clone()
-    }
-
-    /// The next copy to save. The queue never ends while the worker lives,
-    /// because the worker holds a sender itself.
-    pub(super) async fn recv(&mut self) -> Option<SentCopy> {
-        self.receiver.recv().await
-    }
-}
+pub(super) type SentCopies = Inbox<SentCopy>;
 
 impl Worker {
     /// Appends the copy to the Sent folder when there is one. A lost

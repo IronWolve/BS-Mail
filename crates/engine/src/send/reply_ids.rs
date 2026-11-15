@@ -8,6 +8,10 @@ const MAX_ID_LEN: usize = 200;
 /// How many ids a reply's `References` keeps: the first, and the newest.
 const MAX_REFERENCES: usize = 25;
 
+/// How much of a message's top is read for its ids. A header is never this
+/// long in practice; a hostile one is not read further.
+const MAX_HEADER_BYTES: usize = 256 * 1024;
+
 /// What the original message says about itself and its thread. Ids are
 /// stored without their angle brackets.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +21,19 @@ pub struct ReplyIds {
 }
 
 impl ReplyIds {
+    /// The same ids with a very long `References` cut down to what a reply
+    /// would use anyway: the first id and the newest. What `thread` gives
+    /// does not change, but what is kept stays small.
+    pub fn compact(mut self) -> Self {
+        let keep = MAX_REFERENCES - 1;
+        if self.references.len() > keep + 1 {
+            let tail = self.references.split_off(self.references.len() - keep);
+            self.references.truncate(1);
+            self.references.extend(tail);
+        }
+        self
+    }
+
     /// The value of `In-Reply-To`.
     pub fn in_reply_to(&self) -> String {
         format!("<{}>", self.message_id)
@@ -40,11 +57,12 @@ impl ReplyIds {
     }
 }
 
-/// Reads `Message-ID` and `References` from header text (the answer to a
-/// fetch of just those two fields). `None` when there is no usable
+/// Reads `Message-ID` and `References` from header text: the answer to a
+/// fetch of just those two fields, or a whole message, of which only the top
+/// (up to the first blank line) is looked at. `None` when there is no usable
 /// `Message-ID`: a reply then goes out without the thread headers.
 pub fn parse_threading_headers(raw: &[u8]) -> Option<ReplyIds> {
-    let text = String::from_utf8_lossy(raw);
+    let text = String::from_utf8_lossy(header_part(raw));
     let unfolded = text.replace("\r\n", "\n").replace("\n ", " ").replace("\n\t", " ");
     let mut message_id = None;
     let mut references = Vec::new();
@@ -60,7 +78,20 @@ pub fn parse_threading_headers(raw: &[u8]) -> Option<ReplyIds> {
             _ => {}
         }
     }
-    message_id.map(|message_id| ReplyIds { message_id, references })
+    message_id.map(|message_id| ReplyIds { message_id, references }.compact())
+}
+
+/// The top of a message: everything before the first blank line, and never
+/// more than `MAX_HEADER_BYTES`.
+fn header_part(raw: &[u8]) -> &[u8] {
+    let raw = &raw[..raw.len().min(MAX_HEADER_BYTES)];
+    let end = raw
+        .windows(4)
+        .position(|w| w == b"\r\n\r\n")
+        .into_iter()
+        .chain(raw.windows(2).position(|w| w == b"\n\n"))
+        .min();
+    &raw[..end.unwrap_or(raw.len())]
 }
 
 /// Every `<id>` in a header value that is safe to repeat in another header.

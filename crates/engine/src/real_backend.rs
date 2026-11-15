@@ -31,6 +31,7 @@
 //! The copy for the Sent folder is another matter: it is kept on disk until
 //! the mailbox has it, however long that takes (see `save_sent`).
 
+mod answered;
 mod backoff;
 mod change_flags;
 mod change_relocate;
@@ -38,6 +39,7 @@ mod change_rules;
 mod changes;
 mod handlers;
 mod host_info;
+mod inbox;
 mod lifecycle;
 mod offline;
 mod online;
@@ -53,6 +55,7 @@ mod search_folders;
 mod sending;
 mod sink;
 mod stop;
+mod thread_cache;
 mod timing;
 mod unsupported;
 mod worker;

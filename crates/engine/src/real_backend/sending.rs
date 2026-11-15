@@ -1,18 +1,20 @@
 //! Carrying out a Send.
 //!
-//! The message is checked first, with no network at all. When the mailbox
-//! connection is up and the message is a reply, the one thing read from it
-//! is the original's `Message-ID` and `References`, so the reply can name
-//! them; a reply whose original cannot be found goes out without them. The
-//! send itself then runs on a task of its own, with its own connection.
+//! The message is checked first, with no network at all. A reply names the
+//! `Message-ID` and `References` of its original, which were kept when the
+//! original was opened; only for an original that was not opened lately, and
+//! only while the mailbox connection is up, are they read from the server. A
+//! reply whose original cannot be found goes out without them. The send
+//! itself then runs on a task of its own, with its own connection.
 //!
 //! Exactly one event answers a send: `MessageSent` when the server's final
 //! answer to DATA was a success, or a failure notice named `send`. A send is
 //! never repeated: nothing here keeps the message once the task has it, so
 //! no reconnect can replay it. The saved copy is handed back to the worker
-//! only after `MessageSent` has been sent.
+//! only after `MessageSent` has been sent. The original of a reply is told to
+//! the worker after that too, so it can be marked as answered.
 
-use model::{Event, OutgoingMessage};
+use model::{Event, MessageId, OutgoingMessage};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::save_sent::SentCopy;
@@ -43,6 +45,10 @@ struct SendJob {
     queue: SentQueue,
     /// Told when the server accepts the message.
     retry_ids: RetryIds,
+    /// Told the original of a reply, to be marked as answered, when the
+    /// server accepts it.
+    answers: UnboundedSender<MessageId>,
+    original: Option<MessageId>,
     /// Which message this is, for `retry_ids`.
     key: u64,
 }
@@ -72,14 +78,15 @@ impl Worker {
                 Err(_) => {}
             }
         }
-        self.launch(checked, ids.as_ref());
+        self.launch(checked, ids.as_ref(), message.in_reply_to);
         lost.map_or(Ok(()), Err)
     }
 
     /// Serves a Send while the mailbox connection is down.
     pub(super) fn send_offline(&self, message: OutgoingMessage) {
         if let Some(checked) = self.accept(&message) {
-            self.launch(checked, None);
+            let ids = message.in_reply_to.and_then(|original| self.threads.get(original)).flatten();
+            self.launch(checked, ids.as_ref(), message.in_reply_to);
         }
     }
 
@@ -108,7 +115,7 @@ impl Worker {
     }
 
     /// Dates and numbers the message and starts the task that sends it.
-    fn launch(&self, checked: Checked, ids: Option<&ReplyIds>) {
+    fn launch(&self, checked: Checked, ids: Option<&ReplyIds>, original: Option<MessageId>) {
         let key = checked.fingerprint();
         let earlier = self.retry_ids.earlier(key);
         let prepared = match checked.finish_as(ids, now_unix(), earlier) {
@@ -132,6 +139,8 @@ impl Worker {
             copies: self.copies.sender(),
             queue: self.queue.clone(),
             retry_ids: self.retry_ids.clone(),
+            answers: self.answers.sender(),
+            original,
             key,
         };
         tokio::spawn(watched(job, prepared));
@@ -157,6 +166,9 @@ async fn deliver(job: SendJob, prepared: Prepared) {
         Some(Ok(mut accepted)) => {
             job.retry_ids.accepted(job.key);
             job.sink.send(Event::MessageSent { account: job.sink.account().clone() });
+            if let Some(original) = job.original {
+                let _ = job.answers.send(original);
+            }
             if job.settings.save_sent {
                 let bytes = prepared.sent_copy(&accepted.take_bytes());
                 let file = job.queue.store(&bytes);
