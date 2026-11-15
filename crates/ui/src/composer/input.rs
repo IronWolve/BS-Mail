@@ -29,9 +29,15 @@ pub struct Pane {
     pub rows: usize,
 }
 
+/// What Escape says while the message is with the server. It is not a way
+/// out: a message that is on its way cannot be called back, and the text
+/// stays here until the server answers.
+const ESCAPE_WHILE_SENDING: &str = "this message is being sent and cannot be called back: it may still go out. \
+     Wait for the server's answer; closing the window asks first";
+
 pub fn handle_key(form: &mut ComposeForm, key: &KeyEvent, pane: Pane) -> Outcome {
     if form.progress == Progress::Sending {
-        return Outcome::Ignored;
+        return sending_key(form, key);
     }
     let held = key.modifiers;
     let outcome = match key.key {
@@ -65,6 +71,17 @@ pub fn handle_text(form: &mut ComposeForm, text: &str, pane: Pane) -> Outcome {
     form.close_armed = false;
     keep_cursor_in_view(form, pane);
     Outcome::Changed
+}
+
+/// Every key is left alone while sending, except that Escape says what is
+/// true instead of seeming to do nothing.
+fn sending_key(form: &mut ComposeForm, key: &KeyEvent) -> Outcome {
+    let plain = !key.modifiers.alt && !key.modifiers.meta;
+    if plain && matches!(key.key, LogicalKey::Named(NamedKey::Escape)) {
+        form.notice = Some(ESCAPE_WHILE_SENDING.to_string());
+        return Outcome::Changed;
+    }
+    Outcome::Ignored
 }
 
 fn escape(form: &mut ComposeForm) -> Outcome {
