@@ -20,6 +20,7 @@ use super::inbox::Inbox;
 use super::sent_queue::forget;
 use super::worker::Worker;
 use crate::imap_session::{ImapSession, SentFolder, SessionError};
+use crate::send::parse_threading_headers;
 use model::{Event, FolderRole};
 
 /// The name of this notice.
@@ -31,6 +32,10 @@ pub(super) struct SentCopy {
     /// The file keeping the copy on disk; `None` when it is held in memory
     /// only.
     pub file: Option<PathBuf>,
+    /// The folder may already have it: the connection was lost while the
+    /// server was answering the APPEND, or the copy was left by an earlier
+    /// run. The folder is looked in before the copy is saved again.
+    pub uncertain: bool,
 }
 
 /// The queue between the send tasks and the worker, which owns the session.
@@ -50,6 +55,10 @@ impl Worker {
             drop_file(&copy);
             return Ok(());
         };
+        if copy.uncertain && self.sent_already_has(session, &target, &copy).await? {
+            drop_file(&copy);
+            return self.report_new_copy(session, folder.id).await;
+        }
         match session.append_sent(&target, &copy.bytes).await {
             Ok(()) => {
                 drop_file(&copy);
@@ -59,9 +68,10 @@ impl Worker {
                 self.sink.send(self.sink.failure(
                     OPERATION,
                     "the connection was lost, so the copy in the Sent folder may not have been saved; \
-                     it is kept and will be saved once the connection is back",
+                     it is kept and will be saved once the connection is back, unless the folder turns \
+                     out to have it already",
                 ));
-                self.unsaved.push(copy);
+                self.unsaved.push(SentCopy { uncertain: true, ..copy });
                 Err(error)
             }
             Err(error) => {
@@ -74,6 +84,28 @@ impl Worker {
                 self.sink.send(self.sink.failure(OPERATION, reason));
                 Ok(())
             }
+        }
+    }
+
+    /// Whether the Sent folder already holds this copy, by its Message-ID.
+    /// When that cannot be found out (no id, a refusal) the answer is no and
+    /// the copy is saved as before; only a lost connection is an error.
+    async fn sent_already_has(
+        &mut self,
+        session: &mut ImapSession,
+        target: &SentFolder,
+        copy: &SentCopy,
+    ) -> Result<bool, SessionError> {
+        let Some(ids) = parse_threading_headers(&copy.bytes) else {
+            return Ok(false);
+        };
+        match session.sent_holds(target, &ids.message_id).await {
+            Ok(held) => Ok(held),
+            Err(error) if error.is_lost() => {
+                self.unsaved.push(SentCopy { bytes: copy.bytes.clone(), file: copy.file.clone(), uncertain: true });
+                Err(error)
+            }
+            Err(_) => Ok(false),
         }
     }
 

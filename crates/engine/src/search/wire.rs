@@ -25,6 +25,21 @@ pub struct Keys {
 }
 
 impl Keys {
+    /// The key that matches messages whose header `name` holds `value`
+    /// (`HEADER name "value"`), for looking a message up by its Message-ID.
+    /// `None` when the value is not plain printable ASCII, since it is then
+    /// not worth a literal.
+    pub fn header_holds(name: &str, value: &str) -> Option<Keys> {
+        let plain = |text: &str| !text.is_empty() && text.chars().all(|c| c.is_ascii_graphic());
+        if !plain(name) || !plain(value) {
+            return None;
+        }
+        let mut writer = KeyWriter::default();
+        writer.text(&format!("HEADER {name} "));
+        writer.string(value);
+        writer.finish().ok()
+    }
+
     /// The pieces, in order.
     pub fn parts(&self) -> &[Part] {
         &self.parts

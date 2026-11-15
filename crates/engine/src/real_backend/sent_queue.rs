@@ -76,7 +76,7 @@ impl SentQueue {
         files.sort();
         files
             .into_iter()
-            .filter_map(|file| fs::read(&file).ok().map(|bytes| SentCopy { bytes, file: Some(file) }))
+            .filter_map(|file| fs::read(&file).ok().map(|bytes| SentCopy { bytes, file: Some(file), uncertain: true }))
             .collect()
     }
 }

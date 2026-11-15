@@ -181,7 +181,7 @@ async fn deliver(job: SendJob, prepared: Prepared) {
             let copy = job.settings.save_sent.then(|| {
                 let bytes = prepared.sent_copy(&accepted.take_bytes());
                 let file = job.queue.store(&bytes);
-                SentCopy { bytes, file }
+                SentCopy { bytes, file, uncertain: false }
             });
             job.sink.send(Event::MessageSent { account: job.sink.account().clone() });
             if let Some(copy) = copy {
