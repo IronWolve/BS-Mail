@@ -106,6 +106,10 @@ pub fn save(dir: &Path, state: &State) -> io::Result<()> {
     }
     let mut file = fs::OpenOptions::new().write(true).create_new(true).open(&temporary)?;
     io::Write::write_all(&mut file, text.as_bytes())?;
+    // The bytes are on disk before the name points at them, so a power loss
+    // after the rename cannot leave an empty or torn file in place of the
+    // last good one.
+    file.sync_all()?;
     drop(file);
     fs::rename(&temporary, &target)
 }

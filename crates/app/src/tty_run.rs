@@ -34,7 +34,7 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
     }
     let mut host = TtyHost::new(depth);
     host.run(&mut screen).map_err(|error| AppError::Window(error.to_string()))?;
-    screen.save_state();
+    screen.save_state()?;
     let (cols, rows) = screen.grid();
     Ok(Stats {
         cols,

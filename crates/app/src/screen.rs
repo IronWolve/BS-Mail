@@ -14,6 +14,7 @@ use ui::AppView;
 
 use crate::accounts::Live;
 use crate::clock::system_now;
+use crate::errors::AppError;
 use crate::options_flow::{self, Opened, Settings, is_setting};
 use crate::pump::pump;
 use crate::setup_flow::SetupFlow;
@@ -124,18 +125,20 @@ impl Screen {
     }
 
     /// Writes what is remembered, when it has changed. Called when a drag
-    /// ends and when the window closes.
-    pub fn save_state(&mut self) {
+    /// ends and when the window closes. A write that failed is an error, and
+    /// what was saved before is left as it was; the sizes stay marked as not
+    /// saved, so the next call tries again.
+    pub fn save_state(&mut self) -> Result<(), AppError> {
         let current = self.state_now();
         let Some((dir, saved)) = &mut self.remember else {
-            return;
+            return Ok(());
         };
         if current == *saved {
-            return;
+            return Ok(());
         }
-        if state_file::save(dir, &current).is_ok() {
-            *saved = current;
-        }
+        state_file::save(dir, &current).map_err(|error| AppError::State(dir.clone(), error))?;
+        *saved = current;
+        Ok(())
     }
 
     /// Stops the run once `frames` frames have been drawn.
@@ -209,6 +212,26 @@ impl Screen {
         self.setup = self.live.clone().map(|live| SetupFlow::new(live, edit));
     }
 
+    /// What a key that closes the program does, or `None` when it is only a
+    /// letter for a text box. While text is being typed every letter is for
+    /// the text. A message that is being sent takes no text and cannot be
+    /// called back, so there `q` and `Ctrl+Q` ask to quit the way the
+    /// window's close button does: the first press says what quitting costs
+    /// and the second goes ahead. A key held down counts as one press.
+    fn close_key(&mut self, key: &KeyEvent, host: &mut dyn Presenter) -> Option<Flow> {
+        if !self.view.is_sending() {
+            return (!self.view.takes_text()).then_some(Flow::Quit);
+        }
+        if key.repeat {
+            return Some(Flow::Continue);
+        }
+        if self.view.may_close() {
+            return Some(Flow::Quit);
+        }
+        host.request_redraw();
+        Some(Flow::Continue)
+    }
+
     /// Answers the account form. The flow is made when the form opens, and
     /// let go when it closes.
     fn setup_step(&mut self) -> bool {
@@ -243,8 +266,19 @@ impl EventSink for Screen {
                 host.request_redraw();
                 return Flow::Continue;
             }
-            // While text is being typed every letter is for the text.
-            InputEvent::Key(key) if closes(key) && !self.view.takes_text() => return Flow::Quit,
+            InputEvent::Key(key) if closes(key) => {
+                if let Some(flow) = self.close_key(key, host) {
+                    return flow;
+                }
+            }
+            // Ctrl+Z is undo wherever text is being typed; anywhere else a
+            // terminal gives the shell its display back and stops.
+            InputEvent::Key(key) if suspends(key) && !self.view.takes_text() => {
+                if host.suspend() {
+                    host.request_redraw();
+                    return Flow::Continue;
+                }
+            }
             InputEvent::PointerMoved { pos, .. } => {
                 let shape = self.view.pointer_shape(pos.col, pos.row, (self.cols, self.rows));
                 host.set_pointer_shape(shape);
@@ -263,7 +297,9 @@ impl EventSink for Screen {
             host.request_redraw();
         }
         if matches!(event, InputEvent::Button { state: surface::ButtonState::Released, .. }) {
-            self.save_state();
+            // A failure here waits: closing the program tries again and says
+            // so if it still cannot.
+            let _ = self.save_state();
         }
         Flow::Continue
     }
@@ -301,6 +337,12 @@ impl EventSink for Screen {
             host.waker().wake();
         }
     }
+}
+
+/// The key that suspends a terminal: `Ctrl+Z`, as in every terminal program.
+fn suspends(key: &KeyEvent) -> bool {
+    let held = key.modifiers;
+    key.key == LogicalKey::Char('z') && held.ctrl && !held.shift && !held.alt && !held.meta
 }
 
 /// The keys that close the program: `q`, as the key bar says, and `Ctrl+Q`.

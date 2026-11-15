@@ -20,6 +20,9 @@ pub enum AppError {
     Output(io::Error),
     Picture(String),
     Window(String),
+    /// The bar and window sizes could not be written when the program ended.
+    /// The sizes saved before are still in the folder.
+    State(PathBuf, io::Error),
 }
 
 impl fmt::Display for AppError {
@@ -56,6 +59,11 @@ impl fmt::Display for AppError {
             Self::Output(error) => write!(f, "writing the screen failed: {error}"),
             Self::Picture(reason) => write!(f, "{reason}"),
             Self::Window(reason) => write!(f, "the window could not run: {reason}"),
+            Self::State(folder, error) => write!(
+                f,
+                "the bar and window sizes could not be saved in {}: {error}; the sizes saved before are kept",
+                folder.display()
+            ),
         }
     }
 }

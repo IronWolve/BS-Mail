@@ -103,6 +103,12 @@ impl AppView {
         })
     }
 
+    /// Whether a message is with the server: the composer takes no text and
+    /// no key then, so the keys that close the program are not for a text box.
+    pub fn is_sending(&self) -> bool {
+        self.composer.as_ref().is_some_and(|form| form.progress == Progress::Sending)
+    }
+
     /// Whether the program may close now. A message with text in it, or one
     /// being sent, asks first: the first ask only says what closing costs,
     /// and the second goes ahead.

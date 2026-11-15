@@ -55,7 +55,7 @@ pub enum Progress {
 const CLOSE_WITH_TEXT: &str = "this message has text in it and is not saved: close the window again to discard it and quit";
 
 /// What it says while the message is being handed to the server.
-const CLOSE_WHILE_SENDING: &str = "this message is being sent: close the window again to quit anyway; \
+const CLOSE_WHILE_SENDING: &str = "this message is being sent: close the window again (or press Ctrl+Q again) to quit anyway; \
      the program waits a few seconds for the server's answer, and the message may still go out";
 
 #[derive(Debug, Clone)]

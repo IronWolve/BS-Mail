@@ -51,7 +51,7 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         screen = screen.stop_after(1);
     }
     run_window(&fonts, window, &mut screen).map_err(|error| AppError::Window(error.to_string()))?;
-    screen.save_state();
+    screen.save_state()?;
     let (cols, rows) = screen.grid();
     Ok(Stats {
         cols,
