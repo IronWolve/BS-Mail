@@ -4,6 +4,7 @@
 use model::{BodyRole, StyledLine, StyledSpan};
 use surface::{Frame, Rect};
 
+use super::cache::{self, Wrapped, fingerprint};
 use super::wrap::{Piece, wrap_line};
 use crate::theme::roles;
 use crate::widgets::body_highlight::{HighlightRules, highlight_line};
@@ -55,9 +56,22 @@ fn wrap_width(ctx: &DrawContext<'_>, rect: Rect) -> u16 {
     }
 }
 
-fn wrapped(ctx: &DrawContext<'_>, rect: Rect, view: &BodyView<'_>) -> Vec<Vec<Piece>> {
+/// The wrapped lines of the body: highlighted when the options ask for it and
+/// cut to the width. The last body's lines are kept, so scrolling and drawing
+/// one body again and again does the work once.
+fn wrapped(ctx: &DrawContext<'_>, rect: Rect, view: &BodyView<'_>) -> Wrapped {
     let width = wrap_width(ctx, rect);
     let highlight = ctx.config.reader.highlight_body;
+    let key = fingerprint(view.lines, width, highlight, &view.rules, view.app_name);
+    if let Some(kept) = cache::remembered(key) {
+        return kept;
+    }
+    let made = std::rc::Rc::new(wrap_all(view, width, highlight));
+    cache::remember(key, &made);
+    made
+}
+
+fn wrap_all(view: &BodyView<'_>, width: u16, highlight: bool) -> Vec<Vec<Piece>> {
     let mut visual = Vec::new();
     for line in view.lines {
         let spans: Vec<StyledSpan> = if highlight {
