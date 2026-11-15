@@ -26,11 +26,14 @@ pub fn minimum_pixels(metrics: &CellMetrics, cols: u16, rows: u16) -> (u32, u32)
     metrics.grid_pixels(cols.max(1), rows.max(1))
 }
 
-/// The grid a window of this pixel size holds, never below the minimum, so
-/// the screen's own "window too small" line has room to show.
-pub fn grid_for(metrics: &CellMetrics, size: (u32, u32), least: (u16, u16)) -> (u16, u16) {
+/// The grid a window of this pixel size holds, as it is: when fewer cells fit
+/// than the screen needs (a small window, or the text zoomed up), the screen
+/// is told so and draws its own "window too small" line in what there is,
+/// instead of laying a full screen out over a canvas too small for it and
+/// clipping the controls. One cell is the least it can be.
+pub fn grid_for(metrics: &CellMetrics, size: (u32, u32)) -> (u16, u16) {
     let (cols, rows) = metrics.grid_cells(size.0, size.1);
-    (cols.max(least.0), rows.max(least.1))
+    (cols.max(1), rows.max(1))
 }
 
 #[cfg(test)]

@@ -94,8 +94,7 @@ impl<'a> WindowState<'a> {
     /// The window changed size: a new canvas and, where it changed, a new grid.
     pub fn resized(&mut self, width: u32, height: u32) -> bool {
         self.canvas.resize(width.max(1), height.max(1), self.options.palette.bg);
-        let least = (self.options.min_cols, self.options.min_rows);
-        let grid = grid_for(&self.metrics, (width, height), least);
+        let grid = grid_for(&self.metrics, (width, height));
         let changed = grid != self.grid;
         self.grid = grid;
         changed
