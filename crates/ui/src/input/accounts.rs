@@ -57,6 +57,8 @@ impl AppView {
         self.search_bar = None;
         self.marked.clear();
         self.picker = None;
+        self.account_cursor = None;
+        self.moved_note = None;
         self.read_timer = None;
         self.auto_marked = None;
         self.queue.forget();
@@ -76,6 +78,8 @@ impl AppView {
         self.search_bar = None;
         self.marked.clear();
         self.picker = None;
+        self.account_cursor = None;
+        self.moved_note = None;
         self.composer = None;
         self.read_timer = None;
         self.auto_marked = None;

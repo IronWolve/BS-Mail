@@ -9,12 +9,13 @@ use surface::{ButtonState, InputEvent, PointerButton};
 use super::action::{Action, action_for};
 use super::compose::ComposeKind;
 use super::hit::{Hit, HitView, hit_at};
-use super::movement::{WHEEL_ROWS, step};
+use super::motion::folders_height;
+use super::movement::WHEEL_ROWS;
 use super::viewport::{folders_first, list_first};
 use crate::app_view::AppView;
-use crate::layout::{Layout, SectionKind};
+use crate::layout::Layout;
 use crate::view_state::{Focus, ListPage, OverlayKind};
-use crate::widgets::{BodyView, DrawContext, HighlightRules, row_offsets, visible_rows, visual_len};
+use crate::widgets::{row_offsets, visible_rows};
 
 impl AppView {
     /// Reacts to one input event on a `cols` x `rows` grid, once the text a
@@ -121,9 +122,15 @@ impl AppView {
     }
 
     fn act(&mut self, action: Action, grid: (u16, u16)) {
+        if self.account_cursor.is_some() && self.account_cursor_key(action, grid) {
+            return;
+        }
+        if self.act_on_messages(action, grid) {
+            return;
+        }
         match action {
-            Action::FocusNext => self.focus = self.focus.next(),
-            Action::FocusPrevious => self.focus = self.focus.previous(),
+            Action::FocusNext => self.change_focus(self.focus.next()),
+            Action::FocusPrevious => self.change_focus(self.focus.previous()),
             Action::Enter => self.focus = deeper(self.focus),
             Action::Back if self.focus == Focus::List && !self.marked.is_empty() => self.clear_marks(),
             Action::Back if self.focus == Focus::List && self.search.is_some() => self.end_search(),
@@ -139,16 +146,12 @@ impl AppView {
             Action::SpaceDown if self.focus == Focus::List => self.mark_and_move(Action::Down, grid),
             Action::SpaceUp if self.focus == Focus::List => self.mark_and_move(Action::Up, grid),
             Action::SpaceDown | Action::SpaceUp => {}
-            Action::ToggleRead => self.toggle_read(),
-            Action::ToggleStar => self.toggle_star(),
-            Action::Delete => self.delete_selected(),
             Action::Sync => self.refresh(),
             Action::Help => {
                 self.overlays.open = Some(OverlayKind::Help);
                 self.overlays.help_scroll = 0;
             }
             Action::Options => self.open_options(),
-            Action::Move => self.start_move(),
             Action::Search => self.start_search(),
             Action::Compose => self.start_compose(ComposeKind::New),
             Action::Reply => self.start_compose(ComposeKind::Reply),
@@ -157,12 +160,22 @@ impl AppView {
             movement => {
                 let layout = self.layout(grid.0, grid.1);
                 match self.focus {
-                    Focus::Sidebar => self.move_folder(movement, &layout),
+                    Focus::Sidebar => {
+                        if !self.run_on_into_accounts(movement, &layout) {
+                            self.move_folder(movement, &layout);
+                        }
+                    }
                     Focus::List => self.move_message(movement, &layout),
                     Focus::Reader => self.scroll_reader(movement, &layout),
                 }
             }
         }
+    }
+
+    /// Moves focus to another pane; the sidebar's account cursor stays behind.
+    fn change_focus(&mut self, focus: Focus) {
+        self.account_cursor = None;
+        self.focus = focus;
     }
 
     /// Space in the list: marks the message and moves on, so a run of Space
@@ -174,6 +187,7 @@ impl AppView {
     }
 
     fn click(&mut self, col: u16, row: u16, grid: (u16, u16)) -> bool {
+        self.account_cursor = None;
         let layout = self.layout(grid.0, grid.1);
         match self.hit(&layout, col, row) {
             Hit::Folder(index) => {
@@ -202,6 +216,12 @@ impl AppView {
             "reply_all" => self.act(Action::ReplyAll, grid),
             "forward" => self.act(Action::Forward, grid),
             "delete" => self.act(Action::Delete, grid),
+            "archive" => self.act(Action::Archive, grid),
+            "spam" => self.act(Action::Spam, grid),
+            "mark_all" => self.act(Action::MarkAll, grid),
+            "unmark_all" => self.act(Action::UnmarkAll, grid),
+            "invert_marks" => self.act(Action::InvertMarks, grid),
+            "next_unread" => self.act(Action::NextUnread, grid),
             "move" => self.act(Action::Move, grid),
             "search" => self.act(Action::Search, grid),
             "sync" => self.act(Action::Sync, grid),
@@ -270,94 +290,6 @@ impl AppView {
         let total = self.shown_page().map_or(0, |page| page.envelopes.len());
         list_first(self.scroll.list, self.selection.message_index, visible, total)
     }
-
-    fn move_folder(&mut self, action: Action, layout: &Layout) {
-        let rows = visible_rows(&self.mail.folders);
-        if rows.is_empty() {
-            return;
-        }
-        let height = folders_height(layout);
-        let current = rows
-            .iter()
-            .position(|row| Some(row.folder.id) == self.selection.folder)
-            .unwrap_or(0);
-        let next = step(action, current, rows.len(), usize::from(height));
-        let chosen = rows[next].folder.id;
-        let spacing = layout.sidebar.as_ref().map(|sidebar| sidebar.spacing);
-        let first = spacing.map(|spacing| {
-            let offsets = row_offsets(&rows, spacing);
-            folders_first(&rows, &offsets, Some(chosen), self.scroll.folders, height)
-        });
-        self.change_folder(chosen);
-        if let Some(first) = first {
-            self.scroll.folders = first;
-        }
-    }
-
-    fn select_folder_row(&mut self, index: usize) {
-        let rows = visible_rows(&self.mail.folders);
-        let Some(row) = rows.get(index) else {
-            return;
-        };
-        let chosen = row.folder.id;
-        self.change_folder(chosen);
-    }
-
-    fn move_message(&mut self, action: Action, layout: &Layout) {
-        let visible = layout.list.as_ref().map_or(1, |list| usize::from(list.rows.height));
-        let Some(page) = self.shown_page() else {
-            return;
-        };
-        let next = step(action, self.selection.message_index, page.envelopes.len(), visible);
-        self.select_message(next, layout);
-    }
-
-    fn select_message(&mut self, index: usize, layout: &Layout) {
-        let visible = layout.list.as_ref().map_or(1, |list| usize::from(list.rows.height));
-        let Some(page) = self.mail.page.as_ref().filter(|p| Some(p.folder) == self.selection.folder)
-        else {
-            return;
-        };
-        let Some(envelope) = page.envelopes.get(index) else {
-            return;
-        };
-        let changed = self.selection.message != Some(envelope.id);
-        self.selection.message = Some(envelope.id);
-        self.selection.message_index = index;
-        self.scroll.list = list_first(self.scroll.list, index, visible, page.envelopes.len());
-        if changed {
-            self.scroll.reader = 0;
-        }
-    }
-
-    fn scroll_reader(&mut self, action: Action, layout: &Layout) {
-        let Some(reader) = &layout.reader else {
-            return;
-        };
-        let Some(content) = self.reader_content() else {
-            return;
-        };
-        let ctx = DrawContext::new(&self.theme, &self.icons, &self.config, self.now);
-        let view = BodyView {
-            lead: &content.lead,
-            lines: content.body,
-            first: 0,
-            app_name: &self.identity.name,
-            rules: HighlightRules::default(),
-        };
-        let height = usize::from(reader.body.height);
-        let last = visual_len(&ctx, reader.body, &view).saturating_sub(height);
-        let next = match action {
-            Action::Up => self.scroll.reader.saturating_sub(1),
-            Action::Down => self.scroll.reader.saturating_add(1),
-            Action::PageUp => self.scroll.reader.saturating_sub(height.saturating_sub(1).max(1)),
-            Action::PageDown => self.scroll.reader.saturating_add(height.saturating_sub(1).max(1)),
-            Action::First => 0,
-            Action::Last => last,
-            _ => self.scroll.reader,
-        };
-        self.scroll.reader = next.min(last);
-    }
 }
 
 /// Into the next pane: from the folders to the list, from the list to the
@@ -375,15 +307,6 @@ fn shallower(focus: Focus) -> Focus {
         Focus::Reader => Focus::List,
         Focus::List | Focus::Sidebar => Focus::Sidebar,
     }
-}
-
-/// How many rows the folder section's body has.
-fn folders_height(layout: &Layout) -> u16 {
-    layout
-        .sidebar
-        .as_ref()
-        .and_then(|sidebar| sidebar.section(SectionKind::Folders))
-        .map_or(0, |section| section.body.height)
 }
 
 #[cfg(test)]

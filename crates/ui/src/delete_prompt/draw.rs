@@ -1,5 +1,5 @@
 //! The question on screen: a box over the middle of the screen with what will
-//! happen and two buttons.
+//! happen (a move to the Trash, or a delete for good) and two buttons.
 
 use surface::{Frame, Modifier, Rect};
 
@@ -8,14 +8,18 @@ use crate::theme::roles;
 use crate::widgets::help_overlay::overlaps;
 use crate::widgets::{DrawContext, fill_cells, put_text};
 
+/// The first button when some of the mail is removed for good.
 pub const DELETE: &str = " Delete for good ";
+/// The first button when all of it only moves to the Trash.
+pub const MOVE_TO_TRASH: &str = " Move to Trash ";
 pub const KEEP: &str = " Keep them ";
-const WIDTH: u16 = 60;
+const TITLE: &str = " Delete mail ";
+const WIDTH: u16 = 70;
 const HEIGHT: u16 = 7;
-const WARNING: &str = "This removes it from the server for good, with no undo.";
+const WARNING: &str = "This cannot be undone.";
 /// Said instead when some of the messages only move to the Trash.
 const WARNING_MIXED: &str = "Removed for good: no undo. The rest can be got back.";
-const HINT: &str = " y deletes   n or Esc keeps ";
+const HINT: &str = " y yes   n or Esc keeps ";
 
 /// Where the box and its buttons sit.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,15 +33,21 @@ fn cells(text: &str) -> u16 {
     u16::try_from(text.chars().count()).unwrap_or(0)
 }
 
-/// The box for a grid, or `None` when the grid is too small for it.
-pub fn prompt_rects(grid: Rect) -> Option<PromptRects> {
+/// The text of the first button: what a yes does.
+pub fn confirm_label(for_good: usize) -> &'static str {
+    if for_good == 0 { MOVE_TO_TRASH } else { DELETE }
+}
+
+/// The box for a grid whose first button reads `confirm`, or `None` when the
+/// grid is too small for it.
+pub fn prompt_rects(grid: Rect, confirm: &str) -> Option<PromptRects> {
     let width = WIDTH.min(grid.width.saturating_sub(2));
-    if width < cells(DELETE) + cells(KEEP) + 6 || grid.height < HEIGHT {
+    if width < cells(confirm) + cells(KEEP) + 6 || grid.height < HEIGHT {
         return None;
     }
     let frame = Rect::new(grid.x + (grid.width - width) / 2, grid.y + (grid.height - HEIGHT) / 3, width, HEIGHT);
     let row = frame.y + 4;
-    let delete = Rect::new(frame.x + 3, row, cells(DELETE), 1);
+    let delete = Rect::new(frame.x + 3, row, cells(confirm), 1);
     let keep = Rect::new(delete.right() + 3, row, cells(KEEP), 1);
     Some(PromptRects { frame, delete, keep })
 }
@@ -55,32 +65,46 @@ pub fn button_at(rects: &PromptRects, col: u16, row: u16) -> Option<Choice> {
 }
 
 pub fn draw_delete_prompt(frame: &mut Frame, ctx: &DrawContext<'_>, grid: Rect, prompt: &DeletePrompt) {
-    let Some(rects) = prompt_rects(grid) else {
+    let confirm = confirm_label(prompt.for_good);
+    let Some(rects) = prompt_rects(grid, confirm) else {
         return;
     };
     let rect = rects.frame;
     frame.effects.retain(|effect| !overlaps(effect.area(), rect));
     fill_cells(frame, rect, ctx.full(roles::MENU_BASE));
     draw_border(frame, ctx, rect);
-    let question = question(prompt.for_good, prompt.targets.len().saturating_sub(prompt.for_good));
-    let warning = if prompt.for_good < prompt.targets.len() { WARNING_MIXED } else { WARNING };
+    let to_trash = prompt.targets.len().saturating_sub(prompt.for_good);
+    let question = question(prompt.for_good, to_trash);
+    let warning = warning(prompt.for_good, to_trash);
     let inner = Rect::new(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2);
     put_text(frame, inner, inner.x + 2, rect.y + 2, &question, ctx.fg(roles::FOOTER_ERROR).add_modifier(Modifier::BOLD));
     put_text(frame, inner, inner.x + 2, rect.y + 3, warning, ctx.fg(roles::MENU_BASE));
-    draw_button(frame, ctx, rects.delete, DELETE, prompt.focus == Choice::Delete);
+    draw_button(frame, ctx, rects.delete, confirm, prompt.focus == Choice::Delete);
     draw_button(frame, ctx, rects.keep, KEEP, prompt.focus == Choice::Keep);
 }
 
-/// What is asked: how many messages are removed for good and, when some of the
-/// targets are not in the Trash, how many only move there. Saying only the
-/// first would let a yes remove mail the question never named.
+/// What is asked: how many messages move to the Trash and how many are
+/// removed for good. Saying only one of the two would let a yes do what the
+/// question never named.
 pub(super) fn question(for_good: usize, to_trash: usize) -> String {
     let messages = |count: usize| if count == 1 { "1 message".to_string() } else { format!("{count} messages") };
     match (for_good, to_trash) {
+        (0, moved) => format!("Move {} to the Trash?", messages(moved)),
         (1, 0) => "Delete this message for good?".to_string(),
         (count, 0) => format!("Delete {count} messages for good?"),
         (count, 1) => format!("Delete {} for good and move 1 other to the Trash?", messages(count)),
         (count, moved) => format!("Delete {} for good and move {moved} others to the Trash?", messages(count)),
+    }
+}
+
+/// The second line: that a delete for good has no way back, or that a move to
+/// the Trash has.
+pub(super) fn warning(for_good: usize, to_trash: usize) -> &'static str {
+    match (for_good, to_trash) {
+        (0, 1) => "You can get it back from the Trash.",
+        (0, _) => "You can get them back from the Trash.",
+        (_, 0) => WARNING,
+        _ => WARNING_MIXED,
     }
 }
 
@@ -101,7 +125,7 @@ fn draw_border(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect) {
     put(frame, right, top, set.top_right);
     put(frame, left, bottom, set.bottom_left);
     put(frame, right, bottom, set.bottom_right);
-    put_text(frame, rect, left + 2, top, " Delete for good ", ctx.fg(roles::SECTION_TITLE));
+    put_text(frame, rect, left + 2, top, TITLE, ctx.fg(roles::SECTION_TITLE));
     let hint_at = right.saturating_sub(cells(HINT) + 1);
     put_text(frame, rect, hint_at, bottom, HINT, ctx.fg(roles::FOOTER_TEXT));
 }

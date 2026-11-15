@@ -26,6 +26,7 @@ pub enum Action {
     SpaceUp,
     ToggleRead,
     ToggleStar,
+    /// `d` and the Delete key: delete, after asking.
     Delete,
     Sync,
     Help,
@@ -37,6 +38,22 @@ pub enum Action {
     Reply,
     ReplyAll,
     Forward,
+    /// `a`: mark every message shown.
+    MarkAll,
+    /// `A`: clear every mark.
+    UnmarkAll,
+    /// `i`: mark the unmarked messages and unmark the marked ones.
+    InvertMarks,
+    /// `e`: move the marked messages, or the selected one, to the Archive.
+    Archive,
+    /// `!`: move them to the Spam folder.
+    Spam,
+    /// `n`: show the next message of the list, from the list or the reader.
+    NextMessage,
+    /// `p`: show the previous message.
+    PreviousMessage,
+    /// `N`: show the next unread message.
+    NextUnread,
 }
 
 /// The action for a key press, or `None` for a key the screen ignores.
@@ -62,6 +79,14 @@ pub fn action_for(key: &KeyEvent) -> Option<Action> {
         LogicalKey::Char('R') => Some(Action::ReplyAll),
         LogicalKey::Char('f') if !held.shift => Some(Action::Forward),
         LogicalKey::Char('d') if !held.shift => Some(Action::Delete),
+        LogicalKey::Char('a') if !held.shift => Some(Action::MarkAll),
+        LogicalKey::Char('A') => Some(Action::UnmarkAll),
+        LogicalKey::Char('i') if !held.shift => Some(Action::InvertMarks),
+        LogicalKey::Char('e') if !held.shift => Some(Action::Archive),
+        LogicalKey::Char('!') => Some(Action::Spam),
+        LogicalKey::Char('n') if !held.shift => Some(Action::NextMessage),
+        LogicalKey::Char('p') if !held.shift => Some(Action::PreviousMessage),
+        LogicalKey::Char('N') => Some(Action::NextUnread),
         LogicalKey::Char('s') if !held.shift => Some(Action::Sync),
         LogicalKey::Char(_) => None,
     }
@@ -80,6 +105,7 @@ fn named_action(named: NamedKey, shift: bool) -> Option<Action> {
         NamedKey::Enter => Action::Enter,
         NamedKey::Right => Action::Right,
         NamedKey::Left => Action::Left,
+        NamedKey::Delete => Action::Delete,
         NamedKey::Function(2) => Action::Compose,
         NamedKey::Function(10) => Action::Options,
         NamedKey::Escape | NamedKey::Backspace => Action::Back,

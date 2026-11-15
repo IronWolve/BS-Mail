@@ -28,6 +28,7 @@ impl AppView {
                     section.body,
                     &self.mail.accounts,
                     self.selection.account.as_ref(),
+                    self.account_cursor_row(),
                 ),
                 SectionKind::Status => {
                     let lines = StatusLine::list_from_names(&self.config.sidebar.status_lines);

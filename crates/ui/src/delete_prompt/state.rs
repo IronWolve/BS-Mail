@@ -31,6 +31,11 @@ impl DeletePrompt {
         Self { targets, for_good, focus: Choice::Keep }
     }
 
+    /// How many of the messages only move to the Trash.
+    pub fn to_trash(&self) -> usize {
+        self.targets.len().saturating_sub(self.for_good)
+    }
+
     /// Moves focus to the other button.
     pub fn toggle(&mut self) {
         self.focus = match self.focus {

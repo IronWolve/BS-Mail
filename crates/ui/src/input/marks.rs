@@ -1,9 +1,11 @@
 //! Marking messages, so one key can act on many.
 //!
 //! Space marks the message under the cursor and moves on to the next, so a
-//! run of Space marks a run of messages; Escape clears the marks. The change
-//! keys act on the marked messages when there are any, and on the selected
-//! one when there are none. A marked row shows its number in reverse.
+//! run of Space marks a run of messages; `a` marks every message shown, `i`
+//! inverts the marks and `A` or Escape clears them. The change keys act on the
+//! marked messages when there are any, and on the selected one when there are
+//! none. A marked row shows its number in reverse, and the list's title says
+//! how many are marked.
 
 use model::{Envelope, MessageId};
 use surface::{Frame, Modifier};
@@ -19,6 +21,23 @@ impl AppView {
         };
         if !self.marked.remove(&id) {
             self.marked.insert(id);
+        }
+    }
+
+    /// Marks every message shown in the list (the ones loaded so far, which
+    /// include the answer to a search while one is showing).
+    pub(crate) fn mark_all(&mut self) {
+        let ids: Vec<MessageId> = self.shown_page_for_marks().map(|page| page.iter().map(|e| e.id).collect()).unwrap_or_default();
+        self.marked.extend(ids);
+    }
+
+    /// Marks the messages that are not marked and unmarks the ones that are.
+    pub(crate) fn invert_marks(&mut self) {
+        let ids: Vec<MessageId> = self.shown_page_for_marks().map(|page| page.iter().map(|e| e.id).collect()).unwrap_or_default();
+        for id in ids {
+            if !self.marked.remove(&id) {
+                self.marked.insert(id);
+            }
         }
     }
 

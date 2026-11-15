@@ -1,12 +1,14 @@
-//! Deleting mail for good: `d` in the Trash asks first. `y` deletes, `n` or
-//! Escape keeps, the arrows and Tab move between the two buttons, Enter does
-//! what the focused button says (and starts on Keep), and a click on a button
-//! does the same. Nothing else reaches the screen underneath.
+//! Deleting mail: `d` and the Delete key (and the Delete button) always ask
+//! first, for one message or for many, whether the mail moves to the Trash or,
+//! in the Trash, goes for good. `y` confirms, `n` or Escape keeps, the arrows
+//! and Tab move between the two buttons, Enter does what the focused button
+//! says (and starts on Keep), and a click on a button does the same. Nothing
+//! else reaches the screen underneath.
 
 use surface::{ButtonState, InputEvent, KeyEvent, LogicalKey, NamedKey, PointerButton, Rect};
 
 use crate::app_view::AppView;
-use crate::delete_prompt::draw::{button_at, prompt_rects};
+use crate::delete_prompt::draw::{button_at, confirm_label, prompt_rects};
 use crate::delete_prompt::{Choice, DeletePrompt};
 use model::{Command, MessageId};
 
@@ -19,7 +21,7 @@ fn refuses(key: &KeyEvent) -> bool {
 }
 
 impl AppView {
-    /// How many of `ids` `d` would remove for good: the ones whose own folder
+    /// How many of `ids` a delete would remove for good: the ones whose own folder
     /// is the Trash. The folder shown says nothing about it when the list is
     /// the answer to a search, which holds mail from every folder. Mail whose
     /// folder cannot be told is judged by the folder shown, the careful way.
@@ -35,7 +37,8 @@ impl AppView {
         in_trash + unknown_in_trash
     }
 
-    /// Asks before `targets` are removed, `for_good` of them for good.
+    /// Asks before `targets` are deleted, `for_good` of them for good and the
+    /// rest to the Trash.
     pub(crate) fn ask_before_deleting(&mut self, targets: Vec<MessageId>, for_good: usize) {
         self.delete_prompt = Some(DeletePrompt::counting(targets, for_good));
     }
@@ -58,7 +61,8 @@ impl AppView {
             InputEvent::Key(key) => self.delete_prompt_key(key),
             InputEvent::Button { button: PointerButton::Left, state: ButtonState::Pressed, pos, .. } => {
                 let area = Rect::new(0, 0, grid.0, grid.1);
-                let choice = prompt_rects(area).and_then(|rects| button_at(&rects, pos.col, pos.row));
+                let confirm = confirm_label(self.delete_prompt.as_ref().map_or(0, |prompt| prompt.for_good));
+                let choice = prompt_rects(area, confirm).and_then(|rects| button_at(&rects, pos.col, pos.row));
                 match choice {
                     Some(choice) => self.answer_delete_prompt(choice),
                     None => return false,

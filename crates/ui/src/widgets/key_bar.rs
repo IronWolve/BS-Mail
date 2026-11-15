@@ -20,7 +20,9 @@ const KEPT: [&str; 2] = ["help", "quit"];
 const OPTIONS: &str = "options";
 
 /// A button's default key text and label; the keys table of a later stage
-/// replaces the key text.
+/// replaces the key text. The default bar (`[keybar] buttons`) offers the ten
+/// buttons of the reference picture; the others (Archive, Spam, Mark all,
+/// Unmark all, Invert marks, Next unread) are there for a bar that lists them.
 #[derive(Debug, PartialEq, Eq)]
 struct Button {
     action: &'static str,
@@ -28,12 +30,18 @@ struct Button {
     label: &'static str,
 }
 
-const BUTTONS: [Button; 11] = [
+const BUTTONS: [Button; 17] = [
     Button { action: "compose", key: "F2", label: "Compose" },
     Button { action: "reply", key: "R", label: "Reply" },
     Button { action: "reply_all", key: "Shift+R", label: "Reply All" },
     Button { action: "forward", key: "F", label: "Forward" },
     Button { action: "delete", key: "D", label: "Delete" },
+    Button { action: "archive", key: "E", label: "Archive" },
+    Button { action: "spam", key: "!", label: "Spam" },
+    Button { action: "mark_all", key: "A", label: "Mark all" },
+    Button { action: "unmark_all", key: "Shift+A", label: "Unmark all" },
+    Button { action: "invert_marks", key: "I", label: "Invert marks" },
+    Button { action: "next_unread", key: "Shift+N", label: "Next unread" },
     Button { action: "search", key: "/", label: "Search" },
     Button { action: "move", key: "M", label: "Move" },
     Button { action: "sync", key: "S", label: "Sync" },

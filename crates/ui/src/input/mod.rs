@@ -2,6 +2,7 @@
 //! focus, selection and the commands those cause. This file only declares
 //! and re-exports the modules.
 
+pub mod account_cursor;
 pub mod accounts;
 pub mod action;
 pub mod changes;
@@ -16,12 +17,16 @@ pub mod help_scroll;
 pub mod hidden;
 pub mod hit;
 pub mod links;
+pub mod mail_keys;
 pub mod marks;
+pub mod motion;
 pub mod movement;
 pub mod options;
 pub mod options_press;
 pub mod paired_text;
 pub mod picker;
+pub mod read_next;
+pub mod role_moves;
 pub mod search;
 pub mod setup;
 pub mod tree;

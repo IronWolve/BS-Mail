@@ -79,8 +79,14 @@ pub struct AppView {
     pub(crate) marked: BTreeSet<MessageId>,
     /// The folder picker, while one is open to move messages.
     pub(crate) picker: Option<MovePicker>,
-    /// The question before mail is deleted for good, while it is open.
+    /// The question before mail is deleted, while it is open.
     pub(crate) delete_prompt: Option<DeletePrompt>,
+    /// The account row the keyboard cursor is on, once the sidebar's cursor
+    /// has run on past the last folder.
+    pub(crate) account_cursor: Option<usize>,
+    /// What the footer says once the move the user just asked for is done
+    /// ("Moved 3 to Archive"); dropped when the backend reports a failure.
+    pub(crate) moved_note: Option<String>,
     /// The search box, while one is open to take a query.
     pub(crate) search_bar: Option<EditorBuffer>,
     /// The search whose results are showing in the list.
@@ -134,6 +140,8 @@ impl AppView {
             marked: BTreeSet::new(),
             picker: None,
             delete_prompt: None,
+            account_cursor: None,
+            moved_note: None,
             search_bar: None,
             search: None,
             next_request: 0,
@@ -185,7 +193,11 @@ impl AppView {
             self.queue.first_page_arrived();
         }
         let (folder, message) = (self.selection.folder, self.selection.message);
+        let done = self.settle_moved_note(&event);
         self.mail.apply(event, &mut self.selection);
+        if done.is_some() {
+            self.mail.set_note(done);
+        }
         // A folder list that no longer has the open folder moves the
         // selection to another one: nothing of the old folder stays shown.
         if folder.is_some() && self.selection.folder != folder {
@@ -302,11 +314,10 @@ impl AppView {
     /// Underlines the title of the pane that has focus.
     fn mark_focus(&self, frame: &mut Frame, layout: &Layout) {
         let title = match self.focus {
-            Focus::Sidebar => layout
-                .sidebar
-                .as_ref()
-                .and_then(|sidebar| sidebar.section(SectionKind::Folders))
-                .map(|section| section.title),
+            Focus::Sidebar => {
+                let kind = if self.account_cursor_row().is_some() { SectionKind::Accounts } else { SectionKind::Folders };
+                layout.sidebar.as_ref().and_then(|sidebar| sidebar.section(kind)).map(|section| section.title)
+            }
             Focus::List => layout.list.as_ref().map(|list| list.title),
             Focus::Reader => layout.reader.as_ref().map(|reader| reader.title),
         };

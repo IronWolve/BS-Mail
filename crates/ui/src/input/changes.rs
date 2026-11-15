@@ -21,7 +21,7 @@ impl AppView {
     }
 
     /// Whether a change may be sent; when it may not, says why in the footer.
-    fn changes_allowed_or_note(&mut self) -> bool {
+    pub(crate) fn changes_allowed_or_note(&mut self) -> bool {
         if self.mail.changes_refused {
             self.mail.set_note(Some(READ_ONLY_NOTE.to_string()));
             return false;
@@ -71,10 +71,11 @@ impl AppView {
         self.queue.push(set_flags_for(ids, FlagChange { flagged: Some(make_flagged), ..FlagChange::default() }));
     }
 
-    /// Deletes the marked messages, or the selected one, and moves the
-    /// selection to the nearest message that stays, so the refreshed page
-    /// keeps the user's place. In the Trash that removes mail for good, so
-    /// the user is asked first.
+    /// Asks before deleting the marked messages, or the selected one. A yes
+    /// (see `delete_prompt`) moves them to the Trash, or removes them for good
+    /// in the Trash, and moves the selection to the nearest message that
+    /// stays, so the refreshed page keeps the user's place. Nothing is sent
+    /// before the answer.
     pub(crate) fn delete_selected(&mut self) {
         let ids = self.targets();
         if ids.is_empty() {
@@ -84,11 +85,7 @@ impl AppView {
             return;
         }
         let for_good = self.count_deleted_for_good(&ids);
-        if for_good > 0 {
-            self.ask_before_deleting(ids, for_good);
-            return;
-        }
-        self.send_delete(ids);
+        self.ask_before_deleting(ids, for_good);
     }
 
     fn current_selected_id(&self) -> Option<MessageId> {
@@ -110,12 +107,18 @@ impl AppView {
     }
 
     /// Moves the selection to the nearest message that stays when `going` are
-    /// moved or deleted. The row and the id move together, so the highlight,
+    /// moved or deleted, when the selected message is one of them. The row and the id move together, so the highlight,
     /// the headers and the body all name the neighbor from here on, whether
     /// the change is carried out (its page then keeps the place) or refused
     /// (nothing arrives, and the neighbor is still the one shown). With no
     /// message left to go to, the selection stays where it is.
     pub(crate) fn select_neighbor_outside(&mut self, going: &[MessageId]) {
+        // The selection only moves off a message that leaves: marks made with
+        // Space leave the cursor on the first message after the run, and a
+        // change to the marked ones must not push it on from there.
+        if !self.selection.message.is_some_and(|selected| going.contains(&selected)) {
+            return;
+        }
         let Some((row, id)) = self.neighbor_outside(going) else {
             return;
         };
