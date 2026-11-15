@@ -11,7 +11,8 @@ pub fn unflow(text: &str, delsp: bool) -> String {
     for raw in text.split('\n') {
         let line = raw.strip_suffix('\r').unwrap_or(raw);
         let (depth, content) = split_quote(line);
-        let soft = content.ends_with(' ') && !(depth == 0 && content == "-- ");
+        // The signature separator is a fixed line at any quote depth (RFC 3676 4.3).
+        let soft = content.ends_with(' ') && content != "-- ";
         if !matches!(&current, Some((open, _)) if *open == depth) {
             flush(current.take(), &mut out);
             current = Some((depth, String::new()));
