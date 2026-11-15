@@ -21,6 +21,9 @@ const SIDE_CELLS: u16 = 2;
 /// What to draw: the lines, where they are scrolled to and the name to
 /// highlight.
 pub struct BodyView<'a> {
+    /// Lines shown before the body (the attachments), kept apart from it so
+    /// the body, which can be large, is borrowed and not copied to add them.
+    pub lead: &'a [StyledLine],
     pub lines: &'a [StyledLine],
     /// Index of the first visual (wrapped) line shown.
     pub first: usize,
@@ -62,7 +65,7 @@ fn wrap_width(ctx: &DrawContext<'_>, rect: Rect) -> u16 {
 fn wrapped(ctx: &DrawContext<'_>, rect: Rect, view: &BodyView<'_>) -> Wrapped {
     let width = wrap_width(ctx, rect);
     let highlight = ctx.config.reader.highlight_body;
-    let key = fingerprint(view.lines, width, highlight, &view.rules, view.app_name);
+    let key = fingerprint(view.lead, view.lines, width, highlight, &view.rules, view.app_name);
     if let Some(kept) = cache::remembered(key) {
         return kept;
     }
@@ -73,7 +76,7 @@ fn wrapped(ctx: &DrawContext<'_>, rect: Rect, view: &BodyView<'_>) -> Wrapped {
 
 fn wrap_all(view: &BodyView<'_>, width: u16, highlight: bool) -> Vec<Vec<Piece>> {
     let mut visual = Vec::new();
-    for line in view.lines {
+    for line in view.lead.iter().chain(view.lines) {
         let spans: Vec<StyledSpan> = if highlight {
             highlight_line(line, &view.rules, view.app_name)
         } else {

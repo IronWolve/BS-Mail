@@ -30,15 +30,43 @@ impl Cell {
 /// Spaces per tab, since a tab has no width of its own in a cell grid.
 const TAB: &str = "    ";
 
+/// Whether `mark` is a continuation of `base`: the two make one grapheme, as
+/// an accent does with its letter. A control or a bidi override does not.
+fn continues(base: &str, mark: &str) -> bool {
+    let mut both = String::with_capacity(base.len() + mark.len());
+    both.push_str(base);
+    both.push_str(mark);
+    both.graphemes(true).count() == 1
+}
+
 fn flatten(spans: &[StyledSpan]) -> Vec<Cell> {
-    let mut out = Vec::new();
+    let mut out: Vec<Cell> = Vec::new();
+    // The last grapheme was kept, so a mark that opens the next span has a
+    // character to belong to.
+    let mut open = false;
     for span in spans {
         let text = span.text.replace('\t', TAB);
-        for grapheme in text.graphemes(true) {
+        for (index, grapheme) in text.graphemes(true).enumerate() {
             let width = cells(grapheme);
-            if width == 0 || grapheme.chars().any(char::is_control) {
+            if grapheme.chars().any(char::is_control) {
+                open = false;
                 continue;
             }
+            if width == 0 {
+                // Highlighting cuts spans at characters, not graphemes, so an
+                // accent can open a span of its own: it goes back to the
+                // character before it, as it would in one span. A mark with no
+                // base, or after something dropped, is left out.
+                match out.last_mut() {
+                    Some(last) if open && index == 0 && continues(&last.symbol, grapheme) => {
+                        last.symbol.push_str(grapheme);
+                        last.width = cells(&last.symbol).max(1);
+                    }
+                    _ => open = false,
+                }
+                continue;
+            }
+            open = true;
             out.push(Cell {
                 symbol: grapheme.to_string(),
                 width,

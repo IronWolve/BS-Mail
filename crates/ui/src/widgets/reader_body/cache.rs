@@ -25,8 +25,11 @@ thread_local! {
     static LAST: RefCell<Option<(u64, Wrapped)>> = const { RefCell::new(None) };
 }
 
-/// A number that differs when anything the wrapped lines depend on does.
+/// A number that differs when anything the wrapped lines depend on does. The
+/// `lead` lines (the attachment lines) come before `lines` and are part of it,
+/// so a body with a different attachment is never given the old lines.
 pub(super) fn fingerprint(
+    lead: &[StyledLine],
     lines: &[StyledLine],
     width: u16,
     highlight: bool,
@@ -34,8 +37,8 @@ pub(super) fn fingerprint(
     app_name: &str,
 ) -> u64 {
     let mut hasher = DefaultHasher::new();
-    (width, highlight, format!("{rules:?}"), app_name, lines.len()).hash(&mut hasher);
-    for line in lines {
+    (width, highlight, format!("{rules:?}"), app_name, lead.len(), lines.len()).hash(&mut hasher);
+    for line in lead.iter().chain(lines) {
         line.spans.len().hash(&mut hasher);
         for span in &line.spans {
             std::mem::discriminant(&span.role).hash(&mut hasher);
