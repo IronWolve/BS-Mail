@@ -1,6 +1,8 @@
 //! Role names as constants, so a widget never types a role as a bare string.
 //!
 //! `ALL` lists every role a widget may ask for; a theme must define each one.
+//! Six are reserved: no widget asks for them yet (marked `not drawn yet`
+//! below), so a theme that changes them changes no frame.
 //! A role is named for its place and meaning (`list.selected`), never for its
 //! color. A child name (`list.date.recent`) starts from its parent's style.
 
@@ -18,8 +20,8 @@ roles! {
     BASE = "base";
     BORDER = "border";
     BORDER_FOCUSED = "border.focused";
-    BORDER_HOVER = "border.hover";
-    BORDER_DRAG = "border.drag";
+    BORDER_HOVER = "border.hover"; // not drawn yet
+    BORDER_DRAG = "border.drag"; // not drawn yet
     BORDER_RULE = "border.rule";
     SEPARATOR = "separator";
 
@@ -79,10 +81,10 @@ roles! {
     LIST_HEADER = "list.header";
     LIST_HEADER_BAR = "list.header.bar";
     LIST_ROW = "list.row";
-    LIST_ROW_UNREAD = "list.row.unread";
-    LIST_ROW_HOVER = "list.row.hover";
+    LIST_ROW_UNREAD = "list.row.unread"; // not drawn yet
+    LIST_ROW_HOVER = "list.row.hover"; // not drawn yet
     LIST_SELECTED = "list.selected";
-    LIST_MARKED = "list.marked";
+    LIST_MARKED = "list.marked"; // not drawn yet: a marked row reverses its number cell
     LIST_FLAG_UNREAD = "list.flag.unread";
     LIST_FLAG_ALERT = "list.flag.alert";
     LIST_STAR = "list.star";
@@ -120,7 +122,7 @@ roles! {
     // Key bar and footer.
     KEYBAR_CAP = "keybar.cap";
     KEYBAR_LABEL = "keybar.label";
-    KEYBAR_HOVER = "keybar.hover";
+    KEYBAR_HOVER = "keybar.hover"; // not drawn yet
     FOOTER_SLASHES = "footer.slashes";
     FOOTER_TEXT = "footer.text";
     FOOTER_OK = "footer.ok";
@@ -134,8 +136,6 @@ roles! {
     MENU_BASE = "menu.base";
     MENU_SELECTED = "menu.selected";
     MENU_BORDER = "menu.border";
-
-    // Used only in terminal mode on 16-color terminals; ignored by the window.
 }
 
 #[cfg(test)]

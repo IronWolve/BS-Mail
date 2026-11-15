@@ -151,6 +151,9 @@ impl AppView {
     /// a host says otherwise, so the screen is laid out for every effect.
     pub fn set_capabilities(&mut self, capabilities: Capabilities) {
         self.capabilities = capabilities;
+        if let Some(shown) = self.theme.for_depth(capabilities.color_depth) {
+            self.theme = shown;
+        }
     }
 
     pub fn capabilities(&self) -> Capabilities {

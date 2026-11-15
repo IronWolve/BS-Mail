@@ -6,6 +6,7 @@ use std::iter;
 use std::sync::{Mutex, PoisonError};
 
 use model::theme_schema::{Ansi16Color, BASE_ROLE, Palette, Rgb, Role, ThemeFile};
+use surface::ColorDepth;
 
 use super::loader::{ThemeError, color_of};
 use super::resolved_style::ResolvedStyle;
@@ -23,6 +24,9 @@ struct PartialRole {
 
 #[derive(Debug)]
 pub struct Theme {
+    /// The flat file this theme was made from, kept to make it again for a
+    /// terminal that shows sixteen colors.
+    file: ThemeFile,
     name: String,
     palette: BTreeMap<String, Rgb>,
     ansi16: BTreeMap<String, Ansi16Color>,
@@ -49,6 +53,7 @@ impl Theme {
             .collect();
         let base = resolve_role(&partials, BASE_ROLE, base_fg);
         Ok(Self {
+            file: file.clone(),
             name: file.name.clone(),
             palette: file.palette.colors.clone(),
             ansi16: file.ansi16.clone(),
@@ -60,6 +65,27 @@ impl Theme {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// The theme remade for a terminal of `depth`, or `None` when that depth
+    /// leaves it as it is (every depth but sixteen colors, and a theme with
+    /// no `[ansi16]` table).
+    ///
+    /// At sixteen colors every palette color the table names becomes that
+    /// terminal color's own value, which the terminal host maps back to it
+    /// exactly. A palette color the table does not name, and a `#rrggbb`
+    /// written in a role, keep their value and get the nearest of the sixteen.
+    pub fn for_depth(&self, depth: ColorDepth) -> Option<Self> {
+        if depth != ColorDepth::Ansi16 || self.ansi16.is_empty() {
+            return None;
+        }
+        let mut file = self.file.clone();
+        for (name, color) in &self.ansi16 {
+            if let Some(entry) = file.palette.colors.get_mut(name) {
+                *entry = color.rgb();
+            }
+        }
+        Self::from_file(&file).ok()
     }
 
     /// The style of `name`. A role the theme does not define returns the base

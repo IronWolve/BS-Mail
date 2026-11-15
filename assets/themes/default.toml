@@ -36,8 +36,8 @@ on_accent  = "#04121c"   # dark text on cyan and keycap blocks
 "base"                   = { fg = "text", bg = "bg" }
 "border"                 = { fg = "border" }
 "border.focused"         = { fg = "green" }
-"border.hover"           = { fg = "yellow", bold = true }
-"border.drag"            = { fg = "yellow", bold = true }
+"border.hover"           = { fg = "yellow", bold = true }   # not drawn yet
+"border.drag"            = { fg = "yellow", bold = true }   # not drawn yet
 "border.rule"            = {}
 "separator"              = { fg = "text" }
 
@@ -97,10 +97,10 @@ on_accent  = "#04121c"   # dark text on cyan and keycap blocks
 "list.header"            = { fg = "text" }
 "list.header.bar"        = { fg = "cyan" }
 "list.row"               = { fg = "text" }
-"list.row.unread"        = { fg = "text" }
-"list.row.hover"         = { bg = "bg_raised" }
+"list.row.unread"        = { fg = "text" }                  # not drawn yet
+"list.row.hover"         = { bg = "bg_raised" }             # not drawn yet
 "list.selected"          = { fg = "text", bg = "blue_sel", bold = true }
-"list.marked"            = { bg = "bg_raised", bold = true }
+"list.marked"            = { bg = "bg_raised", bold = true } # not drawn yet; a marked row reverses its number cell
 "list.flag.unread"       = { fg = "green" }
 "list.flag.alert"        = { fg = "yellow", bold = true }
 "list.star"              = { fg = "yellow" }
@@ -138,7 +138,7 @@ on_accent  = "#04121c"   # dark text on cyan and keycap blocks
 # Key bar and footer.
 "keybar.cap"             = { fg = "on_accent", bg = "keycap", bold = true }
 "keybar.label"           = { fg = "text" }
-"keybar.hover"           = { bg = "bg_raised" }
+"keybar.hover"           = { bg = "bg_raised" }             # not drawn yet
 "footer.slashes"         = { fg = "lime", italic = true }
 "footer.text"            = { fg = "text" }
 "footer.ok"              = { fg = "green" }

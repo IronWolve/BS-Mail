@@ -87,3 +87,30 @@ pub enum Ansi16Color {
     BrightCyan,
     BrightWhite,
 }
+
+impl Ansi16Color {
+    /// The color most terminals draw for this name. A frame that carries it
+    /// is mapped back to the same terminal color, which is how a 16-color
+    /// terminal gets the color the theme chose and not just the nearest one.
+    pub fn rgb(self) -> Rgb {
+        let (r, g, b) = match self {
+            Self::Black => (0, 0, 0),
+            Self::Red => (205, 0, 0),
+            Self::Green => (0, 205, 0),
+            Self::Yellow => (205, 205, 0),
+            Self::Blue => (0, 0, 238),
+            Self::Magenta => (205, 0, 205),
+            Self::Cyan => (0, 205, 205),
+            Self::White => (229, 229, 229),
+            Self::BrightBlack => (127, 127, 127),
+            Self::BrightRed => (255, 0, 0),
+            Self::BrightGreen => (0, 255, 0),
+            Self::BrightYellow => (255, 255, 0),
+            Self::BrightBlue => (92, 92, 255),
+            Self::BrightMagenta => (255, 0, 255),
+            Self::BrightCyan => (0, 255, 255),
+            Self::BrightWhite => (255, 255, 255),
+        };
+        Rgb { r, g, b }
+    }
+}
