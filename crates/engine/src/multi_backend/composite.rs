@@ -8,6 +8,7 @@ use super::entry::Entry;
 use super::handle::MembersHandle;
 use super::member::Member;
 use super::pending::Pending;
+use super::retire::Retired;
 use super::slots::Slot;
 
 /// Serves several mail accounts as one backend: one member backend per
@@ -32,6 +33,9 @@ pub struct MultiBackend {
     /// Failures of the composite's own, sent at the next poll.
     pub(super) notices: Vec<Event>,
     pub(super) shared: Arc<Mutex<Pending>>,
+    /// Members that left, being stopped off the polling thread. Last, so that
+    /// closing waits for them while the other members are stopping too.
+    pub(super) retired: Retired,
 }
 
 impl MultiBackend {
@@ -42,6 +46,7 @@ impl MultiBackend {
         for member in members {
             pending.add(member, Vec::new());
         }
+        let retired = Retired::new(pending.winding());
         let mut multi = Self {
             entries: Vec::new(),
             active: None,
@@ -51,6 +56,7 @@ impl MultiBackend {
             replay_due: false,
             notices: Vec::new(),
             shared: Arc::new(Mutex::new(pending)),
+            retired,
         };
         multi.apply_pending();
         multi

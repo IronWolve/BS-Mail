@@ -21,6 +21,7 @@ mod pending;
 mod policy;
 mod polling;
 mod remap_event;
+mod retire;
 mod router;
 pub mod slots;
 

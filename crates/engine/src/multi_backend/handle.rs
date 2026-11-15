@@ -30,15 +30,17 @@ impl MembersHandle {
         self.with(|pending| pending.add(member, early_events));
     }
 
-    /// Removes the member with this id, dropping its backend. An id that is
-    /// not a member changes nothing.
+    /// Removes the member with this id; its backend is stopped on a thread of
+    /// its own, so the other members are not held up (see `winding_down`). An
+    /// id that is not a member changes nothing.
     pub fn remove(&self, id: &AccountId) {
         self.with(|pending| pending.remove(id));
     }
 
     /// Swaps in a new backend for the member with the same id, which keeps
-    /// its place in the list and gets a new slot; the old backend is dropped.
-    /// An id that is not a member yet is added at the end.
+    /// its place in the list and gets a new slot; the old backend is stopped
+    /// on a thread of its own. An id that is not a member yet is added at the
+    /// end.
     pub fn replace(&self, member: Member, early_events: Vec<Event>) {
         self.with(|pending| pending.replace(member, early_events));
     }
@@ -47,6 +49,15 @@ impl MembersHandle {
     /// far has taken effect. Empty when the composite is gone.
     pub fn ids(&self) -> Vec<AccountId> {
         self.with(|pending| pending.ids()).unwrap_or_default()
+    }
+
+    /// Whether a member with this id that left (removed, or replaced by a new
+    /// backend) is still stopping: its sends under way may not be finished
+    /// and its worker may still be writing. Files of the account are safe to
+    /// delete once this is false after the change was applied. False when the
+    /// composite is gone.
+    pub fn winding_down(&self, id: &AccountId) -> bool {
+        self.with(|pending| pending.winding().contains(id)).unwrap_or(false)
     }
 
     fn with<R>(&self, work: impl FnOnce(&mut Pending) -> R) -> Option<R> {

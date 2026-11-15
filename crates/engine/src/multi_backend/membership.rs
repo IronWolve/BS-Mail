@@ -44,9 +44,17 @@ impl MultiBackend {
 
     fn remove(&mut self, id: &AccountId) {
         if let Some(at) = self.entries.iter().position(|entry| &entry.id == id) {
-            self.entries.remove(at);
+            let gone = self.entries.remove(at);
+            self.retire(gone);
             self.list_due = true;
         }
+    }
+
+    /// Hands the backend of a member that left to its own thread to stop. Its
+    /// events, queued or later, are never polled, so none reaches the screen.
+    fn retire(&mut self, gone: Entry) {
+        let Entry { id, backend, .. } = gone;
+        self.retired.retire(id, backend);
     }
 
     /// The member keeps its place and gets a slot of its own, so ids the old
@@ -57,7 +65,8 @@ impl MultiBackend {
             return;
         };
         let slot = self.take_slot();
-        self.entries[at] = Entry::new(slot, member, early);
+        let old = std::mem::replace(&mut self.entries[at], Entry::new(slot, member, early));
+        self.retire(old);
         self.list_due = true;
     }
 

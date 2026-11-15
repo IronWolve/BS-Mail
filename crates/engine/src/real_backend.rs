@@ -33,6 +33,7 @@
 
 mod answered;
 mod backoff;
+mod bounded_join;
 mod change_flags;
 mod change_lost;
 mod change_relocate;
@@ -73,6 +74,7 @@ use model::{AccountId, Command, ConnectionState, Event, MailBackend};
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 use tokio::sync::watch;
 
+use self::bounded_join::join_within;
 use self::in_flight::SendsInFlight;
 use self::lifecycle::connection;
 use self::offline::OFFLINE_REASON;
@@ -104,6 +106,8 @@ pub struct RealBackend {
     /// The sends that are on their way, which closing waits for.
     sends: SendsInFlight,
     send_grace: Duration,
+    /// How long closing waits for the stopped worker to end.
+    join_limit: Duration,
 }
 
 impl RealBackend {
@@ -132,6 +136,7 @@ impl RealBackend {
         let sends = SendsInFlight::default();
         let worker_sends = sends.clone();
         let send_grace = timing.send_grace;
+        let join_limit = timing.join_limit;
         let spawned = std::thread::Builder::new()
             .name("mail-worker".to_owned())
             .spawn(move || run_worker(Worker::new(config, timing, sink, stop, worker_sends), command_receiver));
@@ -152,6 +157,7 @@ impl RealBackend {
             worker,
             sends,
             send_grace,
+            join_limit,
         }
     }
 
@@ -230,7 +236,9 @@ impl MailBackend for RealBackend {
 impl Drop for RealBackend {
     /// Lets the sends that are under way finish, for a few seconds at most,
     /// then stops the worker and waits for it. Every wait in the worker gives
-    /// way to the stop signal, so that returns promptly.
+    /// way to the stop signal, so that returns promptly; a worker that is
+    /// stuck anyway is left to end by itself after `join_limit`, so closing
+    /// never hangs on it.
     fn drop(&mut self) {
         let until = Instant::now() + self.send_grace;
         while self.sends.count() > 0 && Instant::now() < until {
@@ -239,7 +247,7 @@ impl Drop for RealBackend {
         let _ = self.stop.send(true);
         drop(self.commands.take());
         if let Some(worker) = self.worker.take() {
-            let _ = worker.join();
+            join_within(worker, self.join_limit);
         }
     }
 }

@@ -7,6 +7,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 use model::{AccountId, Event};
 
 use super::member::Member;
+use super::retire::Winding;
 
 /// One membership change, in the order it was asked for.
 pub(super) enum Change {
@@ -22,6 +23,8 @@ pub(super) struct Pending {
     changes: Vec<Change>,
     /// The ids the members will have once every queued change is applied.
     ids: Vec<AccountId>,
+    /// The members that left and are still stopping.
+    winding: Winding,
 }
 
 impl Pending {
@@ -57,6 +60,12 @@ impl Pending {
 
     pub fn ids(&self) -> Vec<AccountId> {
         self.ids.clone()
+    }
+
+    /// The list of members that left and are still stopping, which the
+    /// composite adds to and the handle reads.
+    pub fn winding(&self) -> Winding {
+        self.winding.clone()
     }
 
     pub fn take(&mut self) -> Vec<Change> {

@@ -28,6 +28,9 @@ pub struct Timing {
     pub(super) search_deadline: Duration,
     /// Closing waits this long for sends that are under way to finish.
     pub(super) send_grace: Duration,
+    /// After the worker was told to stop, closing waits this long for it to
+    /// end, and then leaves it to end by itself.
+    pub(super) join_limit: Duration,
 }
 
 impl Timing {
@@ -45,6 +48,7 @@ impl Timing {
             poll: None,
             search_deadline: Duration::from_secs(20),
             send_grace: Duration::from_secs(8),
+            join_limit: Duration::from_secs(5),
         }
     }
 
@@ -88,6 +92,13 @@ impl Timing {
         self
     }
 
+    /// Closing waits this long for a stopped worker to end, for tests.
+    #[cfg(feature = "test-support")]
+    pub const fn with_join_limit(mut self, limit: Duration) -> Self {
+        self.join_limit = limit;
+        self
+    }
+
     /// A search stops going on to further folders after this long.
     #[cfg(feature = "test-support")]
     pub const fn with_search_deadline(mut self, deadline: Duration) -> Self {
@@ -117,6 +128,7 @@ impl Timing {
             poll: None,
             search_deadline: Duration::from_secs(20),
             send_grace: Duration::from_secs(3),
+            join_limit: Duration::from_secs(5),
         }
     }
 }
