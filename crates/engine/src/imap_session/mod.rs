@@ -18,6 +18,7 @@ mod folder_roles;
 mod folder_tree;
 mod header_text;
 mod login;
+mod login_modes;
 mod move_copy;
 mod mutf7;
 mod sent_check;

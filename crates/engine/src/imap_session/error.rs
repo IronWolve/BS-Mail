@@ -4,6 +4,7 @@ use std::io;
 
 use async_imap::error::Error as ImapError;
 
+use crate::scrub::scrub;
 use crate::sign_in_advice::sign_in_again;
 use crate::text_clean::single_line;
 
@@ -22,6 +23,10 @@ pub enum ConnectError {
     /// The server refused the user name or password. Holds the server's own
     /// words, or nothing.
     AuthFailed(String),
+    /// The server allows no password sign-in on this connection (it forbids
+    /// LOGIN and offers no PLAIN), so the password was not sent. Holds the
+    /// sentence.
+    PasswordNotAccepted(String),
     /// The access token could not be had just now (no network to the sign-in
     /// service, or it is down). Worth retrying later.
     SignInTrouble(String),
@@ -45,7 +50,7 @@ impl ConnectError {
     /// The operation name the footer shows with the reason.
     pub fn operation(&self) -> &'static str {
         match self {
-            Self::AuthFailed(_) | Self::OAuthRefused(_) | Self::SignInTrouble(_) => "login",
+            Self::AuthFailed(_) | Self::PasswordNotAccepted(_) | Self::OAuthRefused(_) | Self::SignInTrouble(_) => "login",
             _ => "connect",
         }
     }
@@ -64,6 +69,7 @@ impl ConnectError {
                 .to_owned(),
             Self::AuthFailed(words) if words.is_empty() => "wrong user name or password".to_owned(),
             Self::AuthFailed(words) => format!("wrong user name or password (the server said: {words})"),
+            Self::PasswordNotAccepted(sentence) => sentence.clone(),
             Self::OAuthRefused(words) => format!(
                 "the sign-in was refused or has ended; {} ({words})",
                 sign_in_again()
@@ -77,17 +83,43 @@ impl ConnectError {
 }
 
 /// The server's own words in an error from the IMAP library, which wraps
-/// them as `code: <code>, info: Some("<words>")`: only the words, with
-/// control characters removed. Text that is not in that form is taken as the
-/// words themselves.
+/// them as `code: <code>, info: Some("<words>")` (EXAMINE and STATUS use
+/// `outcome: Outcome { code: <code>, information: Some("<words>") }`): only
+/// the words, with control characters removed. Text that is not in either
+/// form is taken as the words themselves.
 pub fn server_words(text: &str) -> String {
-    const OPEN: &str = "info: Some(\"";
-    let words = match text.split_once(OPEN) {
-        Some((_, rest)) => unquote(rest.strip_suffix("\")").unwrap_or(rest)),
-        None if text.contains("info: None") => String::new(),
-        None => text.to_owned(),
-    };
-    let one_line = single_line(&words);
+    short_line(&words_inside(text))
+}
+
+/// `server_words` with every secret taken out first. A server that repeats a
+/// command would otherwise put the password or token in the line shown to
+/// the user. Taken out of the wrapped text, again after the words are
+/// unquoted (the library quotes what it wraps, so a quoted password only
+/// shows up whole then), and always before the words are cut, so a secret
+/// that straddles the cut is not left in part.
+pub fn server_words_without(text: &str, secrets: &[&str]) -> String {
+    let words = words_inside(&scrub(text, secrets));
+    short_line(&scrub(&words, secrets))
+}
+
+/// The words of the library's wrapper, unquoted and not yet cut.
+fn words_inside(text: &str) -> String {
+    for open in ["info: Some(\"", "information: Some(\""] {
+        if let Some((_, rest)) = text.split_once(open) {
+            let inner = rest.strip_suffix("\") }").or_else(|| rest.strip_suffix("\")")).unwrap_or(rest);
+            return unquote(inner);
+        }
+    }
+    if text.contains("info: None") || text.contains("information: None") {
+        String::new()
+    } else {
+        text.to_owned()
+    }
+}
+
+/// One line of single blanks, cut to the length that is kept.
+fn short_line(words: &str) -> String {
+    let one_line = single_line(words);
     one_line.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(SERVER_WORDS_MAX).collect()
 }
 
@@ -151,11 +183,24 @@ impl From<ImapError> for SessionError {
         match error {
             ImapError::Io(inner) => Self::Lost(inner.to_string()),
             ImapError::ConnectionLost => Self::Lost("the server closed the connection".to_owned()),
-            ImapError::No(text) => Self::Refused(format!("the server said no: {text}")),
-            ImapError::Bad(text) => Self::Refused(format!("the server rejected the request: {text}")),
+            ImapError::No(text) => Self::Refused(format!("the server said no: {}", refusal_words(&text))),
+            ImapError::Bad(text) => Self::Refused(format!("the server rejected the request: {}", refusal_words(&text))),
             other => Self::Refused(other.to_string()),
         }
     }
+}
+
+/// The words of a refusal. The library gives EXAMINE, STATUS and a few other
+/// commands its own wrapper (`outcome: Outcome { .. }`, `code: .., info: ..`)
+/// instead of the server's sentence; only the sentence is shown, or a short
+/// fallback when the server gave none. Text from this program's own code,
+/// which is already the sentence, is left as it is.
+fn refusal_words(text: &str) -> String {
+    if !(text.starts_with("outcome: Outcome {") || text.starts_with("code: ")) {
+        return text.to_owned();
+    }
+    let words = server_words(text);
+    if words.is_empty() { "no reason given".to_owned() } else { words }
 }
 
 impl From<io::Error> for SessionError {
