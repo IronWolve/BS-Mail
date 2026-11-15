@@ -4,7 +4,6 @@
 //! at all. A connection that may be plain or unverified must really lead to
 //! this machine, whatever its name resolved to.
 
-use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
 
 use rustls::pki_types::ServerName;
@@ -18,11 +17,15 @@ use crate::account_config::{Security, Trust};
 use crate::account_smtp::SmtpSettings;
 use crate::imap_session::{ConnectError, MailStream, classify_tls, client_config};
 
+/// What this end calls itself in EHLO. A fixed literal, never this machine's
+/// own address or name: some servers copy the name into a `Received` header
+/// that every recipient can read, and the address of a home network is not
+/// theirs to know.
+pub const HELLO_NAME: &str = "[127.0.0.1]";
+
 /// A connection with TLS settled for now, no greeting read yet.
 pub struct Opened {
     pub wire: Wire,
-    /// This end's address in the form EHLO takes: `[192.0.2.7]`.
-    pub identity: String,
     /// True when the connection is under TLS.
     pub secure: bool,
 }
@@ -35,12 +38,11 @@ pub async fn open(
 ) -> Result<Opened, SmtpError> {
     let bare = host.trim_matches(['[', ']']);
     let tcp = tcp_connect(settings, bare, limits.connect).await?;
-    let identity = identity_of(tcp.local_addr().ok());
     if settings.security == Security::Implicit {
         let stream = upgrade(settings, bare, tcp, limits.connect).await?;
-        return Ok(Opened { wire: Wire::new(stream), identity, secure: true });
+        return Ok(Opened { wire: Wire::new(stream), secure: true });
     }
-    Ok(Opened { wire: Wire::new(MailStream::plain(tcp)), identity, secure: false })
+    Ok(Opened { wire: Wire::new(MailStream::plain(tcp)), secure: false })
 }
 
 /// Turns the connection into a secure one after the server agreed to
@@ -118,15 +120,6 @@ async fn upgrade(
             other => SmtpError::TlsFailed(other.reason()),
         }),
         Err(_) => Err(SmtpError::TlsFailed("the secure handshake timed out".to_owned())),
-    }
-}
-
-/// An address in the bracketed form of the EHLO command.
-fn identity_of(local: Option<SocketAddr>) -> String {
-    match local.map(|addr| addr.ip().to_canonical()) {
-        Some(IpAddr::V4(v4)) => format!("[{v4}]"),
-        Some(IpAddr::V6(v6)) => format!("[IPv6:{v6}]"),
-        None => "[127.0.0.1]".to_owned(),
     }
 }
 

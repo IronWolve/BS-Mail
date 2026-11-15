@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use super::caps::ServerCaps;
-use super::connect::{self, Opened};
+use super::connect::{self, HELLO_NAME, Opened};
 use super::error::{Said, SmtpError, Step, from_wire};
 use super::reply::Reply;
 use super::timeouts::SmtpTimeouts;
@@ -45,7 +45,6 @@ pub struct Link {
     pub(super) wire: Wire,
     pub(super) limits: SmtpTimeouts,
     pub(super) progress: Progress,
-    identity: String,
     pub(super) secure: bool,
     /// The password, and whatever else was sent that is a secret, kept only
     /// to remove it from anything the server says.
@@ -58,7 +57,6 @@ impl Link {
             wire: opened.wire,
             limits,
             progress,
-            identity: opened.identity,
             secure: opened.secure,
             secrets: vec![settings.password.expose().to_owned()],
         }
@@ -94,7 +92,7 @@ impl Link {
 
     /// EHLO, and what the server offers.
     pub async fn hello(&mut self) -> Result<ServerCaps, SmtpError> {
-        let line = format!("EHLO {}", self.identity);
+        let line = format!("EHLO {HELLO_NAME}");
         let reply = self.ask(&line, Step::Hello).await?;
         if reply.is_positive() {
             Ok(ServerCaps::from_ehlo(&reply))
@@ -118,9 +116,9 @@ impl Link {
         if reply.code != 220 {
             return Err(SmtpError::StartTlsMissing);
         }
-        let Self { wire, limits, progress, identity, secrets, .. } = self;
+        let Self { wire, limits, progress, secrets, .. } = self;
         let wire = connect::start_tls(settings, host, wire, limits.connect).await?;
-        Ok(Self { wire, limits, progress, identity, secure: true, secrets })
+        Ok(Self { wire, limits, progress, secure: true, secrets })
     }
 
     /// Says goodbye and waits a moment for the answer; never fails. For a
