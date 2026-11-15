@@ -32,7 +32,26 @@ pub fn map_flags(flags: &[Flag<'_>]) -> (Flags, Vec<String>) {
     (out, tags)
 }
 
+/// A system flag the server spelled in another letter case. The IMAP
+/// library knows only the exact spelling (`\Seen`) as a system flag and hands
+/// the rest over as keywords, but the standard treats the names as the same
+/// whatever the case.
+fn set_system_flag(name: &str, flags: &mut Flags) -> bool {
+    match name.to_ascii_lowercase().as_str() {
+        "\\seen" => flags.seen = true,
+        "\\flagged" => flags.flagged = true,
+        "\\answered" => flags.answered = true,
+        "\\draft" => flags.draft = true,
+        "\\deleted" => flags.deleted = true,
+        _ => return false,
+    }
+    true
+}
+
 fn classify_keyword(name: &str, flags: &mut Flags, tags: &mut Vec<String>) {
+    if set_system_flag(name, flags) {
+        return;
+    }
     let lower = name.to_ascii_lowercase();
     let bare = lower.trim_start_matches(['$', '\\']);
     if bare == "important" {
