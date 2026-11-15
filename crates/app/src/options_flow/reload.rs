@@ -46,6 +46,7 @@ impl Settings {
         let spacing = self.cli.line_spacing.unwrap_or(loaded.config.font.line_spacing);
         self.text = (points, spacing);
         tell_the_host(host, &loaded.theme);
+        engine::set_body_preference(loaded.config.reader.prefer);
         view.apply_settings(loaded.config, loaded.theme, IconSet::new(kind));
         self.names = theme_names(self.dir.as_deref());
         view.set_theme_names(self.names.clone());

@@ -40,6 +40,7 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
         options.line_spacing.unwrap_or(loaded.config.font.line_spacing),
     );
     let icons = options.icons.unwrap_or_else(|| icon_kind(loaded.config.appearance.icons));
+    engine::set_body_preference(loaded.config.reader.prefer);
     let mut view = AppView::new(identity(), loaded.theme, loaded.config, IconSet::new(icons));
     // What is wrong with an account comes before what is wrong with a setting.
     let note_is_about_settings = scanned.problems.is_empty() && !loaded.problems.is_empty();

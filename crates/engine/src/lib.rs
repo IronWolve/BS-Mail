@@ -22,6 +22,7 @@ mod text_clean;
 
 pub use account_config::{AccountConfig, ConfigError, Security, SmtpAuth, SmtpSettings, Trust};
 pub use account_oauth::{AuthKind, OAuthSettings};
+pub use mime_render::{body_preference, set_body_preference};
 pub use mock::{Fixture, FixtureError};
 pub use mock_backend::MockBackend;
 pub use multi_backend::{Member, MembersHandle, MultiBackend};

@@ -1,10 +1,12 @@
 //! Choosing which part of a message is its text.
 
 use mail_parser::{Message, MessagePart, MimeHeaders, PartType};
+use model::config::BodyPreference;
 
 use super::flowed::unflow;
 use super::html_to_text::{html_to_text, too_nested};
 use super::limits::{MAX_HTML_BYTES, MAX_TEXT_BYTES, keep, megabytes};
+use crate::text_clean::has_visible_text;
 
 /// The text of a message and what was left out of it, for the notices.
 pub struct Picked {
@@ -12,23 +14,43 @@ pub struct Picked {
     pub notes: Vec<String>,
 }
 
-/// The body text: the first non-empty `text/plain` part; failing that, the
-/// first non-empty `text/html` part converted to text. `None` when the
-/// message has neither. A very long text, or HTML too large or too deeply
-/// nested for the converter, is shortened or simplified, and says so.
-pub fn pick_body(message: &Message<'_>) -> Option<Picked> {
+/// The body text. By default (`Plain`) it is the first `text/plain` part that
+/// shows something, and failing that the first non-empty `text/html` part
+/// converted to text. With `Html` the order is the other way round: the
+/// converted HTML part when it shows something, else the plain part. A part
+/// made only of blanks, controls and zero-width characters shows nothing and
+/// is passed over. `None` when the message has neither. A very long text, or
+/// HTML too large or too deeply nested for the converter, is shortened or
+/// simplified, and says so.
+pub fn pick_body(message: &Message<'_>, prefer: BodyPreference) -> Option<Picked> {
+    match prefer {
+        BodyPreference::Plain => plain_body(message).or_else(|| html_body(message)),
+        BodyPreference::Html => match html_body(message) {
+            Some(html) if has_visible_text(&html.text) => Some(html),
+            other => plain_body(message).or(other),
+        },
+    }
+}
+
+/// The first plain text part that shows something.
+fn plain_body(message: &Message<'_>) -> Option<Picked> {
     for &id in &message.text_body {
         let Some(part) = message.parts.get(id as usize) else {
             continue;
         };
         if let PartType::Text(text) = &part.body
             && is_plain(part)
-            && !text.trim().is_empty()
+            && has_visible_text(text)
         {
             let mut notes = Vec::new();
             return Some(Picked { text: cut_text(plain_text(part, text), &mut notes), notes });
         }
     }
+    None
+}
+
+/// The first non-empty HTML part, converted to text.
+fn html_body(message: &Message<'_>) -> Option<Picked> {
     for &id in &message.html_body {
         let Some(part) = message.parts.get(id as usize) else {
             continue;

@@ -7,7 +7,7 @@ use model::{AccountId, Envelope, Event, Folder, FolderId, MessageId, SyncState};
 use super::lifecycle::{now_unix, progress, quota_event};
 use super::worker::Worker;
 use crate::imap_session::{ImapSession, SessionError, build_envelope, build_tree, fetched_row};
-use crate::mime_render::render_message;
+use crate::mime_render::{body_preference, render_message};
 use crate::send::parse_threading_headers;
 
 /// How many times a message is asked for when the connection keeps being lost
@@ -190,7 +190,7 @@ impl Worker {
         self.threads.keep(message, parse_threading_headers(&raw.bytes));
         Ok(vec![Event::BodyReady {
             message,
-            body: render_message(raw.bytes, raw.total),
+            body: render_message(raw.bytes, raw.total, body_preference()),
         }])
     }
 

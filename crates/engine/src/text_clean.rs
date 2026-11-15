@@ -19,6 +19,32 @@ pub fn is_direction_override(c: char) -> bool {
     matches!(c, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')
 }
 
+/// Characters that take no room on screen: format characters such as the
+/// zero-width space and joiners, direction marks and overrides, the byte order
+/// mark, variation selectors and tag characters. Drawing skips them.
+fn is_format(c: char) -> bool {
+    matches!(
+        c,
+        '\u{AD}'
+            | '\u{61C}'
+            | '\u{180E}'
+            | '\u{200B}'..='\u{200F}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2060}'..='\u{206F}'
+            | '\u{FE00}'..='\u{FE0F}'
+            | '\u{FEFF}'
+            | '\u{FFF9}'..='\u{FFFB}'
+            | '\u{E0000}'..='\u{E007F}'
+    )
+}
+
+/// Whether `text` shows anything: some character that is not whitespace, a
+/// control code or a format character. A part made only of those looks empty
+/// on screen, so it must not stand in for a body that has real text.
+pub fn has_visible_text(text: &str) -> bool {
+    text.chars().any(|c| !c.is_whitespace() && !c.is_control() && !is_format(c))
+}
+
 /// One line of header text: controls and direction overrides removed, and a
 /// line break or tab (with the folding blanks around it) becomes a single
 /// blank.
