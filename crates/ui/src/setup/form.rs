@@ -11,7 +11,8 @@ use crate::composer::EditorBuffer;
 
 use super::fields::{Security, SetupField, SignIn};
 use super::local_host::is_local_host;
-use super::providers::{Preset, preset_for};
+use super::provider_menu::{ProviderChoice, ProviderMenu};
+use super::providers::Preset;
 use super::saved_client::SavedClient;
 
 const NO_BROWSER_SIGN_IN: &str =
@@ -34,6 +35,11 @@ pub struct SetupForm {
     pub smtp_security: Security,
     /// A password, or the provider's page in a browser.
     pub signin: SignIn,
+    /// Which provider the servers are for: the one the address says, or one
+    /// picked from the list.
+    pub provider: ProviderChoice,
+    /// The provider list, while it is open.
+    pub provider_menu: Option<ProviderMenu>,
     /// The provider the browser sign-in is set up for, from the address.
     pub oauth_provider: Option<&'static str>,
     /// Off keeps the account read-only: nothing is ever changed or sent.
@@ -99,6 +105,8 @@ impl SetupForm {
             imap_security: Security::Implicit,
             smtp_security: Security::Starttls,
             signin: SignIn::Password,
+            provider: ProviderChoice::Auto,
+            provider_menu: None,
             oauth_provider: None,
             allow_changes: false,
             focus: SetupField::Email,
@@ -165,6 +173,7 @@ impl SetupForm {
             && !username_typed
             && !self.name_touched
             && !self.servers_touched
+            && self.provider == ProviderChoice::Auto
     }
 
     /// Whether the row shows with the way of signing in chosen now.
@@ -206,7 +215,7 @@ impl SetupForm {
             let local = email.split('@').next().unwrap_or("");
             self.name.set_text(local);
         }
-        let preset = preset_for(email);
+        let preset = self.preset_in_use(email);
         self.provider_note = preset.as_ref().map_or("", |preset| preset.note);
         self.oauth_provider = preset.as_ref().and_then(|preset| preset.oauth);
         self.fill_saved_client();
@@ -272,7 +281,7 @@ impl SetupForm {
     /// copy of sent mail itself, so the program must not add another.
     fn servers_file_sent_mail(&self) -> bool {
         let email = self.email.text();
-        let Some(preset) = preset_for(email.trim()) else {
+        let Some(preset) = self.preset_in_use(email.trim()) else {
             return false;
         };
         let same = |buffer: &EditorBuffer, host: &str| buffer.text().trim().eq_ignore_ascii_case(host);
@@ -310,6 +319,10 @@ impl SetupForm {
             SetupField::SmtpSecurity => {
                 let local = is_local_host(self.smtp_host.text().trim());
                 self.smtp_security = self.smtp_security.step(forward, local);
+            }
+            SetupField::Provider => {
+                self.open_provider_menu();
+                return;
             }
             SetupField::SignIn => {
                 if self.signin.other() == SignIn::Browser && self.oauth_provider.is_none() {

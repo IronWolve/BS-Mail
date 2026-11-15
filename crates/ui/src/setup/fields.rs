@@ -95,6 +95,7 @@ impl SignIn {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SetupField {
     Email,
+    Provider,
     SignIn,
     Password,
     ClientId,
@@ -112,8 +113,9 @@ pub enum SetupField {
 }
 
 impl SetupField {
-    pub const ALL: [SetupField; 15] = [
+    pub const ALL: [SetupField; 16] = [
         Self::Email,
+        Self::Provider,
         Self::SignIn,
         Self::Password,
         Self::ClientId,
@@ -155,6 +157,7 @@ impl SetupField {
     pub fn label(self) -> &'static str {
         match self {
             Self::Email => "Email address",
+            Self::Provider => "Provider",
             Self::SignIn => "Sign in with",
             Self::Password => "Password",
             Self::ClientId => "Client id",
@@ -183,7 +186,7 @@ impl SetupField {
     pub fn is_choice(self) -> bool {
         matches!(
             self,
-            Self::SignIn | Self::ImapSecurity | Self::SmtpSecurity | Self::AllowChanges | Self::Save
+            Self::Provider | Self::SignIn | Self::ImapSecurity | Self::SmtpSecurity | Self::AllowChanges | Self::Save
         )
     }
 

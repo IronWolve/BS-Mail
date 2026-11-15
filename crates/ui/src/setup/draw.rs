@@ -9,6 +9,7 @@ use super::fields::{SetupField, SignIn};
 use super::form::SetupForm;
 use super::layout::{BUTTON, FORM_COLS, FORM_ROWS, SetupRects, layout};
 use super::link_panel::draw_panel;
+use super::provider_menu_draw::draw_provider_menu;
 use crate::composer::draw::{horizontal_skip, put_cell};
 use crate::composer::graphemes::{cells_between, list};
 use crate::theme::roles;
@@ -16,6 +17,7 @@ use crate::widgets::{DrawContext, fill_cells, put_text};
 
 const WAITING_BUTTON: &str = " Connecting\u{2026} ";
 const HINT: &str = "Tab next   Shift+Tab back   Space or arrows change a choice   F10 connect   Esc close";
+const MENU_HINT: &str = "Up and Down choose   type letters to jump   Enter pick   Esc close the list";
 
 /// Draws the whole screen: the form fills it.
 pub fn draw_setup(frame: &mut Frame, ctx: &DrawContext<'_>, area: Rect, form: &SetupForm) {
@@ -38,8 +40,13 @@ pub fn draw_setup(frame: &mut Frame, ctx: &DrawContext<'_>, area: Rect, form: &S
     draw_note(frame, ctx, rects.note, form.provider_note);
     draw_notice(frame, ctx, rects.notice, form);
     let hint = Rect::new(rects.hint.x, rects.hint.y, rects.hint.width, 1);
-    put_text(frame, hint, hint.x, hint.y, HINT, ctx.fg(roles::LIST_HINT_LABEL));
+    let text = if form.provider_menu.is_some() { MENU_HINT } else { HINT };
+    put_text(frame, hint, hint.x, hint.y, text, ctx.fg(roles::LIST_HINT_LABEL));
     frame.cursor = cursor_request(&rects, form);
+    if let Some(menu) = &form.provider_menu {
+        draw_provider_menu(frame, ctx, rects.menu, menu);
+        frame.cursor = None;
+    }
 }
 
 fn draw_field(frame: &mut Frame, ctx: &DrawContext<'_>, rects: &SetupRects, form: &SetupForm, field: SetupField) {
@@ -66,6 +73,7 @@ fn choice_text(form: &SetupForm, field: SetupField) -> String {
     match field {
         SetupField::ImapSecurity => format!("< {} >", form.imap_security.label()),
         SetupField::SmtpSecurity => format!("< {} >", form.smtp_security.label()),
+        SetupField::Provider => format!("< {} >", form.provider.label()),
         SetupField::SignIn => format!("< {} >", form.signin.label()),
         _ if form.allow_changes => "Yes: mail can be changed and sent".to_string(),
         _ => "No: read-only, nothing is changed or sent".to_string(),

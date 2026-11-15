@@ -151,6 +151,11 @@ impl AppView {
             } => {
                 if form.link.is_some() {
                     link_panel_input::click(grid, pos.col, pos.row)
+                } else if form.provider_menu.is_some() {
+                    match layout(area_of(grid), form.signin) {
+                        Some(rects) => form.menu_click(&rects, pos.col, pos.row),
+                        None => Outcome::Ignored,
+                    }
                 } else {
                     let area = area_of(grid);
                     match layout(area, form.signin).and_then(|rects| rects.field_at(pos.col, pos.row)) {

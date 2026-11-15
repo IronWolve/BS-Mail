@@ -5,7 +5,7 @@
 
 use super::ascii_domain::ascii_domain;
 use super::fields::Security;
-use super::simple_providers::find;
+use super::simple_providers::{find, find_named, names};
 
 /// What a provider needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,6 +40,42 @@ pub fn preset_for(email: &str) -> Option<Preset> {
     }
     let domain = ascii_domain(&domain)?;
     Some(known(&domain).unwrap_or_else(|| generic(&domain)))
+}
+
+/// The three providers with a preset of their own, by the names the provider
+/// list shows.
+const GOOGLE_NAME: &str = "Gmail (Google)";
+const MICROSOFT_NAME: &str = "Outlook / Hotmail (Microsoft)";
+const PROTON_NAME: &str = "Proton Mail (needs its Bridge program)";
+
+/// The preset of a provider chosen from the list by name, whatever the
+/// address looks like: a mailbox under the owner's own domain is the usual
+/// reason to choose.
+pub fn preset_named(name: &str) -> Option<Preset> {
+    match name {
+        GOOGLE_NAME => Some(with_browser_sign_in()),
+        MICROSOFT_NAME => Some(browser_only()),
+        PROTON_NAME => Some(local_bridge()),
+        _ => find_named(name).map(|entry| hosts(entry.imap, entry.smtp, entry.smtp_port, entry.smtp_security, entry.note)),
+    }
+}
+
+/// The names the provider list offers, each once, in alphabetical order.
+pub fn provider_names() -> Vec<&'static str> {
+    let mut all = vec![GOOGLE_NAME, MICROSOFT_NAME, PROTON_NAME];
+    all.extend(names());
+    all.sort_by_key(|name| name.to_lowercase());
+    all
+}
+
+/// The usual `imap.` and `smtp.` names for the domain of `email`, for a
+/// provider that is none of the listed ones; no guess without a usable domain.
+pub fn generic_preset_for(email: &str) -> Option<Preset> {
+    let domain = email.rsplit_once('@')?.1.trim().to_lowercase();
+    if domain.is_empty() || domain.contains(char::is_whitespace) {
+        return None;
+    }
+    Some(generic(&ascii_domain(&domain)?))
 }
 
 fn hosts(imap: &str, smtp: &str, smtp_port: u16, smtp_security: Security, note: &'static str) -> Preset {

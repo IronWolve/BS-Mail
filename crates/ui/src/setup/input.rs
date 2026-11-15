@@ -37,6 +37,12 @@ pub fn handle_key(form: &mut SetupForm, key: &KeyEvent) -> Outcome {
     if form.link.is_some() {
         return link_panel_input::key(key);
     }
+    if form.provider_menu.is_some() {
+        return match key.key {
+            LogicalKey::Named(named) => form.menu_key(named),
+            LogicalKey::Char(_) => Outcome::Ignored,
+        };
+    }
     if let LogicalKey::Named(NamedKey::Escape) = key.key {
         return escape(form);
     }
@@ -47,6 +53,10 @@ pub fn handle_key(form: &mut SetupForm, key: &KeyEvent) -> Outcome {
         LogicalKey::Named(NamedKey::Function(10)) => Outcome::Submit,
         LogicalKey::Named(NamedKey::Enter) if held.ctrl => Outcome::Submit,
         LogicalKey::Named(NamedKey::Enter) if form.focus == SetupField::Save => Outcome::Submit,
+        LogicalKey::Named(NamedKey::Enter) if form.focus == SetupField::Provider => {
+            form.open_provider_menu();
+            Outcome::Changed
+        }
         LogicalKey::Named(named) => named_key(form, named, held.shift, held.ctrl),
         LogicalKey::Char(ch) if held.ctrl => shortcut(form, ch, held.shift),
         LogicalKey::Char(_) => Outcome::Ignored,
@@ -57,6 +67,9 @@ pub fn handle_key(form: &mut SetupForm, key: &KeyEvent) -> Outcome {
 pub fn handle_text(form: &mut SetupForm, text: &str) -> Outcome {
     if form.link.is_some() {
         return link_panel_input::text(text);
+    }
+    if form.provider_menu.is_some() {
+        return form.menu_text(text);
     }
     if form.waiting {
         return Outcome::Ignored;
@@ -94,6 +107,12 @@ pub fn click(form: &mut SetupForm, field: SetupField) -> Outcome {
         return Outcome::Submit;
     }
     let was_focused = form.focus == field;
+    if field == SetupField::Provider {
+        // Opening the list changes nothing yet, so the first click opens it.
+        form.move_focus(field);
+        form.open_provider_menu();
+        return Outcome::Changed;
+    }
     form.move_focus(field);
     // A box ticks at the first click. A choice among several words changes
     // only when its row already has focus: the first click just goes there,

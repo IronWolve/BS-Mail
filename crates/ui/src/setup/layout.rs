@@ -4,13 +4,15 @@
 use surface::Rect;
 
 use super::fields::{SetupField, SignIn};
+use super::provider_menu::VISIBLE_ROWS;
 
 /// Cells the labels take, including the gap before the field.
 pub const LABEL_CELLS: u16 = 20;
 /// Widest the form grows.
 pub const MAX_WIDTH: u16 = 84;
 /// Rows the form needs when it is longest (signing in through the browser):
-/// title, intro, four blocks of fields, button, notes, and the key hint.
+/// title, intro, four blocks of fields, button, notes, and the key hint. The
+/// provider list opens over the rows under the provider row.
 pub const FORM_ROWS: u16 = 24;
 /// Narrowest it works in.
 pub const FORM_COLS: u16 = 56;
@@ -28,7 +30,10 @@ pub struct SetupRects {
     pub intro: Rect,
     /// The input area of each field, in `SetupField::ALL` order. A row that is
     /// not shown has an empty rectangle.
-    pub fields: [Rect; 15],
+    pub fields: [Rect; 16],
+    /// The provider list when it is open: under the provider row, over the
+    /// rows below it. Empty when the window leaves no room for it.
+    pub menu: Rect,
     pub note: Rect,
     pub notice: Rect,
     pub hint: Rect,
@@ -70,20 +75,21 @@ pub fn layout(area: Rect, signin: SignIn) -> Option<SetupRects> {
     let field = |offset: u16| Rect::new(x + LABEL_CELLS, top + offset, field_width, 1);
     let host = |offset: u16| Rect::new(x + LABEL_CELLS, top + offset, field_width - PORT_LABEL_CELLS - PORT_CELLS - 1, 1);
     let port = |offset: u16| Rect::new(x + width - PORT_CELLS, top + offset, PORT_CELLS, 1);
-    let mut fields = [Rect::default(); 15];
+    let mut fields = [Rect::default(); 16];
     let mut put = |which: SetupField, rect: Rect| fields[which.index()] = rect;
     put(SetupField::Email, field(3));
-    put(SetupField::SignIn, field(4));
+    put(SetupField::Provider, field(4));
+    put(SetupField::SignIn, field(5));
     // The last row of the block that depends on the way of signing in.
     let last = match signin {
         SignIn::Password => {
-            put(SetupField::Password, field(5));
-            5
+            put(SetupField::Password, field(6));
+            6
         }
         SignIn::Browser => {
-            put(SetupField::ClientId, field(5));
-            put(SetupField::ClientSecret, field(6));
-            6
+            put(SetupField::ClientId, field(6));
+            put(SetupField::ClientSecret, field(7));
+            7
         }
     };
     put(SetupField::Name, field(last + 1));
@@ -95,13 +101,16 @@ pub fn layout(area: Rect, signin: SignIn) -> Option<SetupRects> {
     put(SetupField::SmtpSecurity, field(last + 6));
     put(SetupField::Username, field(last + 8));
     put(SetupField::AllowChanges, field(last + 9));
-    put(SetupField::Save, Rect::new(x + LABEL_CELLS, top + last + 12, button_cells(), 1));
+    put(SetupField::Save, Rect::new(x + LABEL_CELLS, top + last + 11, button_cells(), 1));
+    let menu_top = top + 5;
+    let room = (area.bottom() - 1).saturating_sub(menu_top);
     Some(SetupRects {
         title: row(0),
         intro: row(1),
         fields,
-        note: Rect::new(x, top + last + 14, width, 2),
-        notice: row(last + 16),
+        menu: Rect::new(x + LABEL_CELLS, menu_top, field_width, VISIBLE_ROWS.min(room)),
+        note: Rect::new(x, top + last + 13, width, 2),
+        notice: row(last + 15),
         hint: hint_row(area),
     })
 }
