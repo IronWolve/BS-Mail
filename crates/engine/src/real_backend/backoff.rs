@@ -40,6 +40,16 @@ impl Backoff {
     pub fn reset(&mut self) {
         self.next = self.start;
     }
+
+    /// Notes that a session that `lasted` this long has ended. One that
+    /// lasted `stable` starts the waits over, unless it ended on a copy the
+    /// mailbox keeps cutting off (`cut_off`): that session did not work, it
+    /// only took its time, and the waits must keep growing.
+    pub fn session_ended(&mut self, lasted: Duration, stable: Duration, cut_off: bool) {
+        if lasted >= stable && !cut_off {
+            self.reset();
+        }
+    }
 }
 
 /// `delay` made between three quarters and one and a quarter of itself, by a

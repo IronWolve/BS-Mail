@@ -13,6 +13,7 @@
 //! ready before the message bytes go out.
 
 use std::borrow::Cow;
+use std::time::Duration;
 
 use async_imap::error::Error as ImapError;
 use async_imap::imap_proto::{AttributeValue, RequestId, Response, Status};
@@ -26,6 +27,11 @@ use super::session::ImapSession;
 use super::stream::MailStream;
 use super::timeouts::bounded;
 use super::write_command::{Needs, SentFolder, WriteCommand};
+
+/// How much of a message is written under one command limit. The limit is for
+/// each stretch, not for the whole message: a long message on a slow link is
+/// not given up on while it is going through, a server that stops reading is.
+const WRITE_STRETCH: usize = 64 * 1024;
 
 /// One `* n FETCH` line that came back with a STORE answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -76,18 +82,7 @@ impl ImapSession {
         let line = WriteCommand::Append { target, size: message.len() }.line()?;
         let limit = self.limits.command;
         let session = &mut self.inner;
-        let result = bounded(limit, async {
-            let tag = session.run_command(&line).await?;
-            if read_to(session, &tag, true).await? == Reached::Done {
-                return Ok(());
-            }
-            let stream = session.get_mut();
-            stream.write_all(message).await.map_err(ImapError::Io)?;
-            stream.write_all(b"\r\n").await.map_err(ImapError::Io)?;
-            stream.flush().await.map_err(ImapError::Io)?;
-            read_to(session, &tag, false).await.map(|_| ())
-        })
-        .await;
+        let result = send_literal(session, &line, message, limit).await;
         self.settle(result)
     }
 
@@ -117,6 +112,31 @@ impl ImapSession {
         .await;
         self.settle(result)
     }
+}
+
+/// Runs the APPEND: the command line, the server's go-ahead, the message and
+/// the answer. Each step has `limit` to itself, and the message is written a
+/// stretch at a time with the limit on each stretch (see `WRITE_STRETCH`).
+async fn send_literal(
+    session: &mut async_imap::Session<MailStream>,
+    line: &str,
+    message: &[u8],
+    limit: Duration,
+) -> Result<(), SessionError> {
+    let tag = bounded(limit, session.run_command(line)).await?;
+    if bounded(limit, read_to(session, &tag, true)).await? == Reached::Done {
+        return Ok(());
+    }
+    let stream = session.get_mut();
+    for stretch in message.chunks(WRITE_STRETCH) {
+        bounded(limit, async { stream.write_all(stretch).await.map_err(ImapError::Io) }).await?;
+    }
+    bounded(limit, async {
+        stream.write_all(b"\r\n").await.map_err(ImapError::Io)?;
+        stream.flush().await.map_err(ImapError::Io)
+    })
+    .await?;
+    bounded(limit, read_to(session, &tag, false)).await.map(|_| ())
 }
 
 /// The tagged status as a result: only OK is success.

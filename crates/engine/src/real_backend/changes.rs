@@ -5,7 +5,8 @@
 //! the one the ids were issued under, the change is sent, and only then are
 //! events produced, from what the server confirmed. A refusal or a lost
 //! connection becomes a failure notice and nothing is changed locally.
-//! Nothing is kept to try again later.
+//! Nothing is kept to try again later. A connection lost partway says which
+//! steps the server had finished (see `change_lost`).
 
 use model::{Command, Event, Flags, FolderId, MessageId};
 
@@ -16,11 +17,6 @@ use crate::session_state::Validity;
 
 /// Why a change did not go through because a folder is not what it was.
 const FOLDER_CHANGED: &str = "the folder changed on the server, so nothing was done; refreshing";
-
-/// Why a change that was cut off by a dropped connection may or may not have
-/// been applied.
-const CONNECTION_LOST: &str = "the connection was lost, so the change may not have been \
-     applied; the folder is read again once it is back";
 
 /// What a change did so far, to be reported once it has finished.
 #[derive(Debug, Default)]
@@ -38,6 +34,12 @@ pub(super) struct Tally {
 }
 
 impl Tally {
+    /// True when the server is known to have taken part of the change: a
+    /// flag it confirmed, or messages moved or removed.
+    pub(super) fn landed(&self) -> bool {
+        self.relocated || !self.updates.is_empty()
+    }
+
     pub(super) fn touch(&mut self, folder: FolderId) {
         if !self.touched.contains(&folder) {
             self.touched.push(folder);
@@ -108,23 +110,25 @@ impl Worker {
             self.sink.send(self.sink.failure(operation, READ_ONLY_REASON));
             return Ok(());
         }
+        let mut tally = Tally::default();
         let done = match command {
             Command::SetFlags { messages, change } => {
-                self.set_flags(session, &messages, change).await
+                self.set_flags(session, &messages, change, &mut tally).await
             }
-            Command::Move { messages, to } => self.move_messages(session, &messages, to).await,
-            Command::Delete { messages } => self.delete_messages(session, &messages).await,
+            Command::Move { messages, to } => self.move_messages(session, &messages, to, &mut tally).await,
+            Command::Delete { messages } => self.delete_messages(session, &messages, &mut tally).await,
             _ => return Ok(()),
         };
         let finished = match done {
-            Ok(tally) => self.finish_change(session, operation, tally).await,
+            Ok(()) => match self.finish_change(session, operation, &mut tally).await {
+                Err(error) if error.is_lost() => Err(self.lost_after_change(operation, tally, error)),
+                other => other,
+            },
+            Err(error) if error.is_lost() => Err(self.lost_during_change(operation, tally, error)),
             Err(error) => Err(error),
         };
         match finished {
-            Err(error) if error.is_lost() => {
-                self.sink.send(self.sink.failure(operation, CONNECTION_LOST));
-                Err(error)
-            }
+            Err(error) if error.is_lost() => Err(error),
             Err(error) => {
                 self.sink.send(self.sink.failure(operation, error.text()));
                 Ok(())
@@ -144,7 +148,10 @@ impl Worker {
         let info = session.select_for_write(path).await?;
         match self.state.check_validity(folder, info.uid_validity) {
             Validity::Same => Ok(()),
-            Validity::Changed | Validity::Unknown => Err(OpenError::Stale),
+            Validity::Changed | Validity::Unknown => {
+                self.poll.forget_flags(folder);
+                Err(OpenError::Stale)
+            }
         }
     }
 
@@ -153,28 +160,34 @@ impl Worker {
         &mut self,
         session: &mut ImapSession,
         operation: &str,
-        mut tally: Tally,
+        tally: &mut Tally,
     ) -> Result<(), SessionError> {
         session.leave_write().await?;
-        if !tally.updates.is_empty() {
-            let updates = std::mem::take(&mut tally.updates);
-            // Its own changes are not something that happened elsewhere.
-            for (id, flags) in &updates {
-                if let Some((folder, uid)) = self.state.message_key(*id) {
-                    self.poll.note_flags(folder, [(uid.0, *flags)]);
-                }
-            }
-            self.sink.send(Event::FlagsChanged { updates });
-        }
+        self.send_flag_updates(tally);
         if tally.stale {
-            self.resync(session, operation, &mut tally).await?;
+            self.resync(session, operation, tally).await?;
         } else if !tally.touched.is_empty() {
-            self.report_counts(session, operation, &mut tally).await?;
+            self.report_counts(session, operation, tally).await?;
         }
         for notice in std::mem::take(&mut tally.notices) {
             self.sink.send(self.sink.failure(operation, notice));
         }
         Ok(())
+    }
+
+    /// Tells the screen the flags the server confirmed.
+    pub(super) fn send_flag_updates(&mut self, tally: &mut Tally) {
+        if tally.updates.is_empty() {
+            return;
+        }
+        let updates = std::mem::take(&mut tally.updates);
+        // Its own changes are not something that happened elsewhere.
+        for (id, flags) in &updates {
+            if let Some((folder, uid)) = self.state.message_key(*id) {
+                self.poll.note_flags(folder, [(uid.0, *flags)]);
+            }
+        }
+        self.sink.send(Event::FlagsChanged { updates });
     }
 
     /// Reads the folder list and the open folder again, as a sync does.

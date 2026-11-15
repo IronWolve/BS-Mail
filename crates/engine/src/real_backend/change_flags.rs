@@ -17,14 +17,14 @@ impl Worker {
         session: &mut ImapSession,
         messages: &[MessageId],
         change: FlagChange,
-    ) -> Result<Tally, SessionError> {
+        tally: &mut Tally,
+    ) -> Result<(), SessionError> {
         let plan = plan_flags(change);
-        let mut tally = Tally::default();
         if plan.deleted_ignored {
             tally.notice(DELETED_NOT_HERE);
         }
         if plan.is_empty() {
-            return Ok(tally);
+            return Ok(());
         }
         let resolved = resolve(&self.state, messages);
         tally.unknown(&resolved.unknown);
@@ -33,9 +33,9 @@ impl Worker {
                 tally.open_failed(error)?;
                 continue;
             }
-            self.store_group(session, group, &plan, &mut tally).await?;
+            self.store_group(session, group, &plan, tally).await?;
         }
-        Ok(tally)
+        Ok(())
     }
 
     /// Changes the flags of one folder's messages, a command's worth at a

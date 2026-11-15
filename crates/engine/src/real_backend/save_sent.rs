@@ -12,7 +12,13 @@
 //! connection is down, or when it is lost during the save, the copy waits and
 //! is saved after the reconnect; a copy left by a run that ended first is
 //! found again at the next start. A server that refuses the copy keeps it on
-//! disk for the next start rather than trying again and again.
+//! disk for the next start rather than trying again and again. A copy that
+//! is held in memory only has no next start to wait for: it is written to disk
+//! if that works by then, and otherwise waits for the next reconnect.
+//!
+//! The save of a copy has its own long limit (see `append_sent`): a copy on
+//! a slow link is not given up on while it is going through. A copy that
+//! keeps cutting the session off does not make the reconnect waits start over.
 
 use std::path::PathBuf;
 
@@ -72,10 +78,12 @@ impl Worker {
                      out to have it already",
                 ));
                 self.unsaved.push(SentCopy { uncertain: true, ..copy });
+                // The reconnect must not count this session as one that worked.
+                self.copy_cut_off = true;
                 Err(error)
             }
             Err(error) => {
-                let kept = if copy.file.is_some() { "; it is kept, and the next start tries again" } else { "" };
+                let kept = self.keep_refused(copy);
                 let reason = format!(
                     "the message was sent, but its copy could not be saved in {}: {}{kept}",
                     folder.name,
@@ -85,6 +93,22 @@ impl Worker {
                 Ok(())
             }
         }
+    }
+
+    /// The server refused the copy. One on disk stays there for the next
+    /// start. One held in memory only is written to disk now when that works;
+    /// when it does not, it is put back to wait for the next reconnect, so it
+    /// is not dropped while the program is still running. Returns what the
+    /// notice says about where the copy is.
+    fn keep_refused(&mut self, mut copy: SentCopy) -> &'static str {
+        if copy.file.is_none() {
+            copy.file = self.queue.store(&copy.bytes);
+        }
+        if copy.file.is_some() {
+            return "; it is kept, and the next start tries again";
+        }
+        self.unsaved.push(copy);
+        "; it is held in memory and tried again after the next reconnect, unless the program is closed first"
     }
 
     /// Whether the Sent folder already holds this copy, by its Message-ID.
@@ -189,3 +213,6 @@ fn drop_file(copy: &SentCopy) {
         forget(file);
     }
 }
+
+#[cfg(test)]
+include!("save_sent.tests.rs");

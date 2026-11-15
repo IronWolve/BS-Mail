@@ -29,13 +29,13 @@ impl Worker {
         session: &mut ImapSession,
         messages: &[MessageId],
         to: FolderId,
-    ) -> Result<Tally, SessionError> {
-        let mut tally = Tally::default();
+        tally: &mut Tally,
+    ) -> Result<(), SessionError> {
         let (folder, path) = match destination(&self.state, to) {
             Ok(found) => found,
             Err(reason) => {
                 tally.notice(reason);
-                return Ok(tally);
+                return Ok(());
             }
         };
         let how = move_how(session.caps());
@@ -47,9 +47,9 @@ impl Worker {
                 continue;
             }
             let action = Action::MoveTo { folder, path: path.clone(), how };
-            self.relocate_group(session, group, &action, &mut tally).await?;
+            self.relocate_group(session, group, &action, tally).await?;
         }
-        Ok(tally)
+        Ok(())
     }
 
     /// Deletes the messages: into the Trash folder, or for good from it.
@@ -57,8 +57,8 @@ impl Worker {
         &mut self,
         session: &mut ImapSession,
         messages: &[MessageId],
-    ) -> Result<Tally, SessionError> {
-        let mut tally = Tally::default();
+        tally: &mut Tally,
+    ) -> Result<(), SessionError> {
         let resolved = resolve(&self.state, messages);
         tally.unknown(&resolved.unknown);
         for group in &resolved.groups {
@@ -70,9 +70,9 @@ impl Worker {
                 DeletePlan::Forever => Action::Forever,
                 DeletePlan::ToTrash { trash, path, how } => Action::MoveTo { folder: trash, path, how },
             };
-            self.relocate_group(session, group, &action, &mut tally).await?;
+            self.relocate_group(session, group, &action, tally).await?;
         }
-        Ok(tally)
+        Ok(())
     }
 
     /// Carries the action out for one folder's messages, a command's worth at
@@ -103,6 +103,14 @@ impl Worker {
                 Err(failure) => failure,
             };
             if failure.error.is_lost() {
+                if failure.changed {
+                    // The server already holds a copy or a deleted mark that
+                    // the sequence did not finish with: say so, and void the
+                    // ids so nothing is repeated from a stale list.
+                    ids.iter().for_each(|id| self.state.forget_message(*id));
+                    self.note_relocated(group.folder, action, tally);
+                    tally.notice(failure.error.text());
+                }
                 return Err(failure.error);
             }
             tally.notice(failure.error.text());
