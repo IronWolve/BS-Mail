@@ -16,7 +16,8 @@ const MAX_CLIENT_TEXT: usize = 512;
 
 const NO_BROWSER_FOR_PROVIDER: &str = "signing in through the browser is built in for some providers only; for this \
      one, set the oauth keys in the account file by hand (see docs/oauth-setup.md)";
-const NO_CLIENT_ID: &str = "type the client id from your provider's developer console (see docs/oauth-setup.md)";
+const NO_CLIENT_ID: &str =
+    "type the client id: this program's own ID from Google or Microsoft, made once (see docs/oauth-setup.md)";
 
 impl SetupForm {
     /// The id the account gets: the one being edited, or one made from the

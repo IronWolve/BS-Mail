@@ -173,8 +173,8 @@ impl SetupField {
     /// What an empty text row says it wants, drawn dimly until it has focus.
     pub fn placeholder(self) -> &'static str {
         match self {
-            Self::ClientId => "needed once: from your provider's developer console",
-            Self::ClientSecret => "only if the console gave one",
+            Self::ClientId => "this program's own ID from Google or Microsoft, made once",
+            Self::ClientSecret => "only if Google or Microsoft gave you one",
             _ => "",
         }
     }

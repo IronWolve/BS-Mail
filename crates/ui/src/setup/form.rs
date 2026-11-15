@@ -14,6 +14,10 @@ use super::local_host::is_local_host;
 use super::providers::{Preset, preset_for};
 use super::saved_client::SavedClient;
 
+const NO_BROWSER_SIGN_IN: &str =
+    "This provider has no sign-in through the browser for mail programs: use a password, or an app password where it offers them.";
+const NO_ADDRESS_YET: &str = "Type your email address first: whether the browser can be used depends on your provider.";
+
 #[derive(Clone)]
 pub struct SetupForm {
     pub email: EditorBuffer,
@@ -209,6 +213,11 @@ impl SetupForm {
         if !self.signin_touched {
             let browser = preset.as_ref().is_some_and(|preset| preset.browser_first);
             self.signin = if browser { SignIn::Browser } else { SignIn::Password };
+        } else if self.signin == SignIn::Browser && self.oauth_provider.is_none() && self.edit_id.is_none() {
+            // The address changed to one with no browser sign-in: a new
+            // account cannot stay on a way in that does not exist for it.
+            self.signin = SignIn::Password;
+            self.info = Some(NO_BROWSER_SIGN_IN.to_string());
         }
         if !self.servers_touched {
             // An address with no known provider must not keep the servers of
@@ -302,11 +311,27 @@ impl SetupForm {
                 let local = is_local_host(self.smtp_host.text().trim());
                 self.smtp_security = self.smtp_security.step(forward, local);
             }
-            SetupField::SignIn => self.signin = self.signin.other(),
+            SetupField::SignIn => {
+                if self.signin.other() == SignIn::Browser && self.oauth_provider.is_none() {
+                    self.notice = Some(self.no_browser_here().to_string());
+                    return;
+                }
+                self.signin = self.signin.other();
+            }
             SetupField::AllowChanges => self.allow_changes = !self.allow_changes,
             _ => return,
         }
         self.note_edit();
+    }
+
+    /// Why the browser cannot be chosen: the provider has no browser sign-in
+    /// the program knows, or there is no address yet to tell.
+    fn no_browser_here(&self) -> &'static str {
+        if self.email.text().trim().is_empty() {
+            NO_ADDRESS_YET
+        } else {
+            NO_BROWSER_SIGN_IN
+        }
     }
 }
 
