@@ -85,9 +85,23 @@ pub fn list_region(rect: Rect, spec: &ColumnSpec, widths: &ListWidths) -> ListRe
     }
 }
 
-/// The reader's rows: title, rule, `header_rows` header lines, a rule, and
-/// the body below. With no header lines there is no second rule.
+/// Body rows a short reader keeps before it shows more header lines.
+pub const MIN_BODY_ROWS: u16 = 3;
+
+/// How many of `header_rows` header lines a reader `height` rows high shows:
+/// all of them when the body keeps `MIN_BODY_ROWS`, else only the lines that
+/// leave them. The title and its rule take two rows and the rule under the
+/// headers one, so a pane that shows any headers always has a body row.
+fn headers_that_fit(height: u16, header_rows: u16) -> u16 {
+    let spare = height.saturating_sub(2 + MIN_BODY_ROWS);
+    header_rows.min(spare.saturating_sub(1))
+}
+
+/// The reader's rows: title, rule, the header lines, a rule, and the body
+/// below. With no header lines there is no second rule. A short pane shows
+/// fewer header lines so the body is never squeezed out.
 pub fn reader_region(rect: Rect, header_rows: u16) -> ReaderRegion {
+    let header_rows = headers_that_fit(rect.height, header_rows);
     let text = inset_h(rect, 1);
     let top = rect.y;
     let headers_y = top.saturating_add(2);

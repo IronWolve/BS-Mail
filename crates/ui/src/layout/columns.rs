@@ -1,6 +1,8 @@
 //! Widths and positions of the message list's columns. The flex column takes
 //! what the fixed columns leave; when it would fall under its minimum, fixed
-//! columns give up width in the order of plan 4.4.
+//! columns give up width in the order of plan 4.4, and then, on a list too
+//! narrow even for that, drop out one by one so the flex column (the
+//! subject) keeps its minimum and no column lies outside the list.
 
 use model::config::ListWidths;
 
@@ -122,6 +124,19 @@ pub fn gutter_between(left: ColumnId, right: ColumnId) -> u16 {
     }
 }
 
+/// What drops out, in this order, when the plan 4.4 steps were not enough:
+/// the date, the star, the sender, the flag, and any other column. Never the
+/// flex column, so the subject keeps its room.
+const LAST_RESORT: [ColumnId; 7] = [
+    ColumnId::Date,
+    ColumnId::Star,
+    ColumnId::From,
+    ColumnId::Flag,
+    ColumnId::Num,
+    ColumnId::Size,
+    ColumnId::Subject,
+];
+
 /// Working set while columns give up width.
 struct Cols {
     items: Vec<(ColumnId, u16)>,
@@ -163,6 +178,13 @@ impl Cols {
         self.items.retain(|(item, _)| *item != id);
     }
 
+    /// Drops `id` unless it is the flex column.
+    fn hide_unless_flex(&mut self, id: ColumnId) {
+        if id != self.flex {
+            self.hide(id);
+        }
+    }
+
     fn shorten_date(&mut self) {
         if let Some(w) = self.width_of(ColumnId::Date) {
             *w = (*w).min(DATE_SHORT_WIDTH);
@@ -197,27 +219,43 @@ pub fn layout_columns(spec: &ColumnSpec, widths: &ListWidths, x: u16, width: u16
     if deficit(&cols) > 0 {
         cols.shorten_date();
     }
+    if cols.items.iter().any(|(id, _)| *id == cols.flex) {
+        for id in LAST_RESORT {
+            if deficit(&cols) <= 0 {
+                break;
+            }
+            cols.hide_unless_flex(id);
+        }
+    }
     place(&cols, x, width)
 }
 
 fn place(cols: &Cols, x: u16, width: u16) -> ColumnLayout {
     let flex = cols.flex_width(width).max(0) as u16;
+    let end = x.saturating_add(width);
     let mut at = x;
     let mut slots = Vec::with_capacity(cols.items.len());
     for (index, (id, fixed)) in cols.items.iter().enumerate() {
-        let slot_width = if *id == cols.flex { flex } else { *fixed };
-        if slot_width > 0 {
-            slots.push(ColumnSlot {
-                id: *id,
-                x: at,
-                width: slot_width,
-            });
-            let gutter = cols
-                .items
-                .get(index + 1)
-                .map_or(0, |(next, _)| gutter_between(*id, *next));
-            at = at.saturating_add(slot_width).saturating_add(gutter);
+        let wanted = if *id == cols.flex { flex } else { *fixed };
+        if wanted == 0 {
+            continue;
         }
+        // A column never runs past the right edge of the list: the last one
+        // that fits is narrowed to the cells left, and none follow it.
+        let slot_width = wanted.min(end.saturating_sub(at));
+        if slot_width == 0 {
+            break;
+        }
+        slots.push(ColumnSlot {
+            id: *id,
+            x: at,
+            width: slot_width,
+        });
+        let gutter = cols
+            .items
+            .get(index + 1)
+            .map_or(0, |(next, _)| gutter_between(*id, *next));
+        at = at.saturating_add(slot_width).saturating_add(gutter);
     }
     ColumnLayout {
         slots,

@@ -233,8 +233,9 @@ impl AppView {
             account_rows: count(self.mail.accounts.len()),
             status_lines: count(StatusLine::list_from_names(&self.config.sidebar.status_lines).len()),
         };
-        let options = LayoutOptions::from_config(&self.config, content)
+        let mut options = LayoutOptions::from_config(&self.config, content)
             .fit_to_host(&self.capabilities.effects);
+        options.reader_full = self.focus == Focus::Reader;
         compute_layout(&self.prefs, &options, GridSize::new(cols, rows))
     }
 
@@ -282,7 +283,7 @@ impl AppView {
             draw_search_bar(&mut frame, &ctx, area, bar);
         }
         if self.overlays.open == Some(OverlayKind::Help) {
-            draw_help(&mut frame, &ctx, area);
+            draw_help(&mut frame, &ctx, area, &self.capabilities, self.overlays.help_scroll);
         }
         frame
     }

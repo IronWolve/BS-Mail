@@ -127,15 +127,24 @@ fn place_panes(
             .push(LineSpec::vertical(LineKind::Frame, col, top_line, bottom_line)),
         None => {}
     }
+    if split.reader.is_none() && options.reader_full {
+        // No room beside the list: the message covers it.
+        place_reader(layout, split.list, options);
+        return;
+    }
     let list = list_region(split.list, &options.columns, &prefs.widths);
     layout.lines.extend(list.rule.map(LineSpec::rule_in));
     layout.list = Some(list);
     if let Some(rect) = split.reader {
-        let reader = reader_region(rect, options.reader_header_rows);
-        layout.lines.extend(reader.rule.map(LineSpec::rule_in));
-        layout.lines.extend(reader.header_rule.map(LineSpec::rule_in));
-        layout.reader = Some(reader);
+        place_reader(layout, rect, options);
     }
+}
+
+fn place_reader(layout: &mut Layout, rect: Rect, options: &LayoutOptions) {
+    let reader = reader_region(rect, options.reader_header_rows);
+    layout.lines.extend(reader.rule.map(LineSpec::rule_in));
+    layout.lines.extend(reader.header_rule.map(LineSpec::rule_in));
+    layout.reader = Some(reader);
 }
 
 #[cfg(test)]
