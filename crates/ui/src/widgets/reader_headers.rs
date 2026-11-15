@@ -38,11 +38,21 @@ fn header_line(ctx: &DrawContext<'_>, name: &str, envelope: &Envelope) -> Option
 /// because the message's own date is ahead of it.
 const DATE_AHEAD_NOTE: &str = " (when it arrived; the message's own date is later)";
 
-/// The date in the sender's own zone, in the configured pattern.
+/// The date in this machine's time zone, in the configured pattern. When the
+/// sender wrote it in another zone, that zone is named beside it, so both
+/// readings are there. A date that is the server's receive time has no sender
+/// zone to name.
 fn date_text(ctx: &DrawContext<'_>, envelope: &Envelope) -> String {
-    let time = CivilTime::from_unix(envelope.date.unix, envelope.date.offset_minutes);
+    let time = CivilTime::from_unix(envelope.date.unix, ctx.now.offset_minutes);
     let text = format_pattern(&ctx.config.reader.date_format, &time);
-    if envelope.date_ahead { format!("{text}{DATE_AHEAD_NOTE}") } else { text }
+    if envelope.date_ahead {
+        return format!("{text}{DATE_AHEAD_NOTE}");
+    }
+    if envelope.date.offset_minutes == ctx.now.offset_minutes {
+        return text;
+    }
+    let zone = format_pattern("%z", &CivilTime::from_unix(envelope.date.unix, envelope.date.offset_minutes));
+    format!("{text} (sender's zone {zone})")
 }
 
 /// Draws the configured header lines of `envelope` into `rect`, top down.
