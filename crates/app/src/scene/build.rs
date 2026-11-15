@@ -59,7 +59,9 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
     if let Some(live) = &scene.live {
         scene.view.set_accounts(live.summaries());
     }
-    if options.setup || source.starts_empty() {
+    // With no account the program starts on the empty screen, which says where
+    // to add one; the form opens only when `--setup` asks for it.
+    if options.setup {
         scene.view.open_setup();
     }
     Ok(scene)
