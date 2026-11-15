@@ -15,11 +15,11 @@ border     = "#2fd9dc"   # frame lines and rules
 text       = "#f4f8fc"   # normal text
 text_dim   = "#9ba8ba"   # hollow circles, placeholders, quotes
 green      = "#3fe56a"   # unread dot, online, checks, gauge fill
-green_hi   = "#35f070"   # banner name, start color
+green_hi   = "#35f070"   # banner name, start color, the selector bar
 lime       = "#66e655"   # titles and slashes
 mint       = "#30f092"   # banner name, end color
 cyan       = "#3ee6e8"   # addresses, host, key hints, inline tokens, labels
-cyan_hi    = "#02d3f7"   # selected folder bar
+cyan_hi    = "#02d3f7"   # not used by the default roles; the selector bar was this until 2026-11-15
 ice        = "#8ff2ec"   # outline icons
 blue       = "#4d9fff"   # not used by the default roles; free for overrides
 blue_sel   = "#00227a"   # selected message row; dark enough that red, orange and green text reads on it (4.5:1)
@@ -64,7 +64,7 @@ on_accent  = "#04121c"   # dark text on cyan and keycap blocks
 "sidebar.item"           = { fg = "text" }
 "sidebar.count"          = { fg = "text" }
 "sidebar.chevron"        = { fg = "text" }
-"sidebar.selected"       = { fg = "on_accent", bg = "cyan_hi", bold = true }
+"sidebar.selected"       = { fg = "on_accent", bg = "green_hi", bold = true }
 "sidebar.hover"          = { bg = "bg_raised" }
 "sidebar.account"        = { fg = "text" }
 "sidebar.account.active" = { fg = "cyan", bold = true }
@@ -150,7 +150,7 @@ on_accent  = "#04121c"   # dark text on cyan and keycap blocks
 "scrollbar.thumb"        = { fg = "cyan" }
 "scrollbar.track"        = { fg = "text_dim" }
 "menu.base"              = { fg = "text", bg = "bg_raised" }
-"menu.selected"          = { fg = "on_accent", bg = "cyan_hi" }
+"menu.selected"          = { fg = "on_accent", bg = "green_hi" }
 "menu.border"            = { fg = "border" }
 
 # Used only in terminal mode on 16-color terminals; ignored by the window.
