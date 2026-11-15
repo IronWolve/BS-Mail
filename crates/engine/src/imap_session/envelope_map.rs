@@ -19,14 +19,32 @@ pub struct FetchedRow<'a> {
     pub has_attachments: bool,
 }
 
+/// How far past the server's receive time a `Date` header may be before it is
+/// not believed: a message cannot be written after it arrived, and a day
+/// leaves room for a sender's clock and zone being wrong.
+const MAX_DATE_LEAD_SECS: i64 = 24 * 60 * 60;
+
+/// The date to show, and whether it is the server's receive time because the
+/// header's date was ahead of it by more than a day.
+fn shown_date(header: Option<MailDate>, arrival: Option<MailDate>) -> (MailDate, bool) {
+    match (header, arrival) {
+        (Some(header), Some(arrival)) if header.unix > arrival.unix + MAX_DATE_LEAD_SECS => (arrival, true),
+        (Some(header), _) => (header, false),
+        (None, arrival) => (arrival.unwrap_or_default(), false),
+    }
+}
+
 /// The list row for a message. The date is the Date header when it parses
-/// (it keeps the sender's zone), else the server's receive time.
+/// (it keeps the sender's zone), else the server's receive time; a header
+/// more than a day ahead of the receive time is not believed (`date_ahead`).
+/// The list is ordered by arrival, never by this date.
 pub fn build_envelope(id: MessageId, folder: FolderId, row: &FetchedRow<'_>) -> Envelope {
     let (flags, tags) = map_flags(&row.flags);
     let wire = row.envelope;
     let header_date = wire
         .and_then(|e| e.date.as_deref())
         .and_then(parse_date_header);
+    let (date, date_ahead) = shown_date(header_date, row.internal_date);
     Envelope {
         id,
         folder,
@@ -39,7 +57,8 @@ pub fn build_envelope(id: MessageId, folder: FolderId, row: &FetchedRow<'_>) -> 
             .and_then(|e| e.subject.as_deref())
             .map(decode_text)
             .unwrap_or_default(),
-        date: header_date.or(row.internal_date).unwrap_or_default(),
+        date,
+        date_ahead,
         size: u64::from(row.size),
         has_attachments: row.has_attachments,
         tags,

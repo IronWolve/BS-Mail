@@ -25,6 +25,10 @@ pub struct Envelope {
     pub cc: Vec<Address>,
     pub subject: String,
     pub date: MailDate,
+    /// True when `date` is the time the server received the message because
+    /// the message's own `Date` is more than a day later than that, which no
+    /// message can truthfully say of itself.
+    pub date_ahead: bool,
     /// Size in bytes.
     pub size: u64,
     pub has_attachments: bool,

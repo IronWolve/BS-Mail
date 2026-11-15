@@ -87,6 +87,7 @@ roles! {
     LIST_FLAG_ALERT = "list.flag.alert";
     LIST_STAR = "list.star";
     LIST_DATE_RECENT = "list.date.recent";
+    LIST_DATE_AHEAD = "list.date.ahead";
     LIST_DATE = "list.date";
     LIST_SIZE = "list.size";
     SUBJECT_TAG_DEFAULT = "subject.tag.default";

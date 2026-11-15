@@ -105,6 +105,7 @@ on_accent  = "#04121c"   # dark text on cyan and keycap blocks
 "list.flag.alert"        = { fg = "yellow", bold = true }
 "list.star"              = { fg = "yellow" }
 "list.date.recent"       = { fg = "text" }
+"list.date.ahead"        = { fg = "yellow" }
 "list.date"              = { fg = "text" }
 "list.size"              = { fg = "text" }
 "subject.tag.default"    = { fg = "cyan" }

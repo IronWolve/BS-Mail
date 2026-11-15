@@ -34,10 +34,15 @@ fn header_line(ctx: &DrawContext<'_>, name: &str, envelope: &Envelope) -> Option
     (!value.trim().is_empty()).then_some(HeaderLine { label, value, role })
 }
 
+/// What the reader says after a date that is the server's receive time
+/// because the message's own date is ahead of it.
+const DATE_AHEAD_NOTE: &str = " (when it arrived; the message's own date is later)";
+
 /// The date in the sender's own zone, in the configured pattern.
 fn date_text(ctx: &DrawContext<'_>, envelope: &Envelope) -> String {
     let time = CivilTime::from_unix(envelope.date.unix, envelope.date.offset_minutes);
-    format_pattern(&ctx.config.reader.date_format, &time)
+    let text = format_pattern(&ctx.config.reader.date_format, &time);
+    if envelope.date_ahead { format!("{text}{DATE_AHEAD_NOTE}") } else { text }
 }
 
 /// Draws the configured header lines of `envelope` into `rect`, top down.

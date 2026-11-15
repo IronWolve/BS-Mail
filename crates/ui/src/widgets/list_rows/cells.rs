@@ -100,7 +100,9 @@ fn draw_date(
 ) {
     let format = DateFormat::from_config(&ctx.config.list);
     let text = format_list_date(row.envelope.date, row.now, &format, row.short_date);
-    let role = if is_recent(row.envelope.date, row.now) {
+    let role = if row.envelope.date_ahead {
+        roles::LIST_DATE_AHEAD
+    } else if is_recent(row.envelope.date, row.now) {
         roles::LIST_DATE_RECENT
     } else {
         roles::LIST_DATE

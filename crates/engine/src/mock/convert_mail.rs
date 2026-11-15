@@ -150,6 +150,7 @@ fn envelope_from_row(
         cc: address_list(&row.cc, &at("cc"))?,
         subject: row.subject.clone(),
         date: mail_date(&row.date, &at("date"))?,
+        date_ahead: false,
         size: row.size,
         has_attachments: row.attachments,
         tags: row.tags.clone(),
