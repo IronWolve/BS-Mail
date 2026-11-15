@@ -107,7 +107,7 @@ impl Default for ListConfig {
             flex_column: "subject".to_string(),
             from_format: FromStyle::NameAddress,
             date_format: DateStyle::Relative,
-            date_fixed: "%Y-%m-%d %H:%M".to_string(),
+            date_fixed: "%y-%m-%d %H:%M".to_string(),
             date_today: "Today %H:%M".to_string(),
             date_yesterday: "Yesterday %H:%M".to_string(),
             date_older: "%b %d %H:%M".to_string(),
