@@ -14,6 +14,7 @@ use model::config::font::{FONT_SIZE_MAX, FONT_SIZE_MIN, LINE_SPACING_MAX, LINE_S
 use ui::theme::{DEFAULT_THEME_NAME, Theme, builtin_theme_text, default_theme, load_theme_file};
 
 use crate::errors::AppError;
+use crate::unused_settings;
 
 pub const CONFIG_NAME: &str = "config.toml";
 pub const THEMES_DIR: &str = "themes";
@@ -44,6 +45,8 @@ pub fn load(dir: Option<&Path>) -> Result<Loaded, AppError> {
     };
     clamp(&mut config, &mut problems);
     let theme = pick_theme(&config.appearance.theme, dir, &mut problems)?;
+    // Last, so a problem that changed a value is the one the footer shows.
+    problems.extend(unused_settings::note(&config));
     Ok(Loaded { config, theme, problems, file_problem })
 }
 
@@ -74,10 +77,12 @@ fn clamp(config: &mut Config, problems: &mut Vec<String>) {
         problems.push(format!("font.size {} is out of range, using {size}", config.font.size));
         config.font.size = size;
     }
-    let spacing = config.font.line_spacing.clamp(LINE_SPACING_MIN, LINE_SPACING_MAX);
-    let spacing = if spacing.is_nan() { 1.0 } else { spacing };
-    if (spacing - config.font.line_spacing).abs() > f32::EPSILON {
-        problems.push(format!("font.line_spacing {} is out of range, using {spacing}", config.font.line_spacing));
+    let given = config.font.line_spacing;
+    // The file can say `nan`; it is no number, so no comparison with it holds
+    // and it has to be caught before the one that checks for a change.
+    let spacing = if given.is_nan() { 1.0 } else { given.clamp(LINE_SPACING_MIN, LINE_SPACING_MAX) };
+    if given.is_nan() || (spacing - given).abs() > f32::EPSILON {
+        problems.push(format!("font.line_spacing {given} is out of range, using {spacing}"));
         config.font.line_spacing = spacing;
     }
     let weight = config.appearance.line_weight.clamp(1, 4);

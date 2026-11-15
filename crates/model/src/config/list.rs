@@ -92,10 +92,14 @@ pub struct ListConfig {
     pub date_short: String,
     pub size_format: SizeStyle,
     pub show_hints: bool,
+    /// Conversations. Not built yet: the list is flat, one row per message,
+    /// so this is false until grouping exists and `true` changes nothing.
     pub threaded: bool,
     // Tables come last so the settings serialize with plain values first.
     /// Subject tag to theme role name.
     pub subject_tags: BTreeMap<String, String>,
+    /// Not built yet: the list is in arrival order, newest first, which the
+    /// default describes; another value is accepted and changes nothing.
     pub default_sort: SortSetting,
     pub widths: ListWidths,
 }
@@ -114,7 +118,7 @@ impl Default for ListConfig {
             date_short: "%m-%d %H:%M".to_string(),
             size_format: SizeStyle::Short,
             show_hints: true,
-            threaded: true,
+            threaded: false,
             subject_tags: default_subject_tags(),
             default_sort: SortSetting::default(),
             widths: ListWidths::default(),
@@ -129,3 +133,6 @@ fn default_subject_tags() -> BTreeMap<String, String> {
         ("ALERT".to_string(), "subject.tag.alert".to_string()),
     ])
 }
+
+#[cfg(test)]
+include!("list.tests.rs");

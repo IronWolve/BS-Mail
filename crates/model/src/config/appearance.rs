@@ -58,6 +58,7 @@ pub struct AppearanceConfig {
     /// Rounded corner radius, in cell widths.
     pub corner_radius: f32,
     pub border: BorderStyle,
+    /// Not built yet: the key is accepted and both values draw the same frames.
     pub pane_borders: PaneBorders,
     pub density: Density,
     pub gauge: GaugeStyle,

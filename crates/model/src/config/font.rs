@@ -11,7 +11,8 @@ pub const LINE_SPACING_MAX: f32 = 1.6;
 #[serde(default)]
 pub struct FontConfig {
     /// Empty means the embedded default; else a name in the data directory's
-    /// fonts folder or an absolute path.
+    /// fonts folder or an absolute path. Not built yet: the key is accepted
+    /// and the embedded font is always used.
     pub file: String,
     /// Points, from `FONT_SIZE_MIN` to `FONT_SIZE_MAX`.
     pub size: u8,

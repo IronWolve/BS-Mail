@@ -31,6 +31,7 @@ mod stats;
 mod theme_list;
 mod ticker;
 mod tty_run;
+mod unused_settings;
 mod window_run;
 
 use std::process::ExitCode;
