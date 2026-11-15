@@ -45,7 +45,7 @@ impl AppView {
     /// selected one.
     pub(crate) fn start_compose(&mut self, kind: ComposeKind) {
         if self.mail.changes_refused {
-            self.mail.error = Some(READ_ONLY_NOTE.to_string());
+            self.mail.set_note(Some(READ_ONLY_NOTE.to_string()));
             return;
         }
         let Some((account, from, own)) = self.selected_account().map(|account| {
@@ -65,7 +65,7 @@ impl AppView {
                 Ok(found) => found,
                 Err(NoDraft::NothingSelected) => return,
                 Err(NoDraft::BodyNotHere) => {
-                    self.mail.error = Some(BODY_NOT_HERE_NOTE.to_string());
+                    self.mail.set_note(Some(BODY_NOT_HERE_NOTE.to_string()));
                     return;
                 }
             },

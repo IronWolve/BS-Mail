@@ -54,12 +54,7 @@ impl AppView {
         if place.has_children && place.expanded {
             self.set_expanded(place.id, false);
         } else if let Some(parent) = place.parent {
-            self.selection.folder = Some(parent);
-            self.selection.message = None;
-            self.selection.message_index = 0;
-            self.search = None;
-            self.scroll.list = 0;
-            self.scroll.reader = 0;
+            self.change_folder(parent);
         }
     }
 }

@@ -197,7 +197,7 @@ impl AppView {
             "help" => self.act(Action::Help, grid),
             "options" => self.act(Action::Options, grid),
             "quit" => self.quit_requested = true,
-            other => self.mail.error = Some(format!("{other} is not built yet")),
+            other => self.mail.set_note(Some(format!("{other} is not built yet"))),
         }
     }
 
@@ -249,7 +249,7 @@ impl AppView {
 
     /// The page of the selected folder, or `None` while another folder's page
     /// is still on screen.
-    fn shown_page(&self) -> Option<&ListPage> {
+    pub(crate) fn shown_page(&self) -> Option<&ListPage> {
         let folder = self.selection.folder?;
         self.mail.page.as_ref().filter(|page| page.folder == folder)
     }
@@ -272,19 +272,14 @@ impl AppView {
             .unwrap_or(0);
         let next = step(action, current, rows.len(), usize::from(height));
         let chosen = rows[next].folder.id;
-        if self.selection.folder != Some(chosen) {
-            self.selection.folder = Some(chosen);
-            self.selection.message = None;
-            self.selection.message_index = 0;
-            self.search = None;
-            self.scroll.list = 0;
-            self.scroll.reader = 0;
-        }
         let spacing = layout.sidebar.as_ref().map(|sidebar| sidebar.spacing);
-        if let Some(spacing) = spacing {
+        let first = spacing.map(|spacing| {
             let offsets = row_offsets(&rows, spacing);
-            self.scroll.folders =
-                folders_first(&rows, &offsets, self.selection.folder, self.scroll.folders, height);
+            folders_first(&rows, &offsets, Some(chosen), self.scroll.folders, height)
+        });
+        self.change_folder(chosen);
+        if let Some(first) = first {
+            self.scroll.folders = first;
         }
     }
 
@@ -294,14 +289,7 @@ impl AppView {
             return;
         };
         let chosen = row.folder.id;
-        if self.selection.folder != Some(chosen) {
-            self.selection.folder = Some(chosen);
-            self.selection.message = None;
-            self.selection.message_index = 0;
-            self.search = None;
-            self.scroll.list = 0;
-            self.scroll.reader = 0;
-        }
+        self.change_folder(chosen);
     }
 
     fn move_message(&mut self, action: Action, layout: &Layout) {
@@ -335,12 +323,13 @@ impl AppView {
         let Some(reader) = &layout.reader else {
             return;
         };
-        let Some(lines) = self.reader_lines() else {
+        let Some(content) = self.reader_content() else {
             return;
         };
         let ctx = DrawContext::new(&self.theme, &self.icons, &self.config, self.now);
         let view = BodyView {
-            lines: &lines,
+            lead: &content.lead,
+            lines: content.body,
             first: 0,
             app_name: &self.identity.name,
             rules: HighlightRules::default(),

@@ -11,6 +11,7 @@ pub mod delete_prompt;
 pub mod dispatch;
 pub mod drag;
 pub mod dragging;
+pub mod folder_change;
 pub mod hidden;
 pub mod hit;
 pub mod marks;

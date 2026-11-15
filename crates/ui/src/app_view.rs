@@ -17,7 +17,6 @@ use crate::delete_prompt::draw::draw_delete_prompt;
 use crate::move_picker::MovePicker;
 use crate::options::OptionsState;
 use crate::options::draw::draw_options;
-use crate::options::empty_hint::draw_no_account_hint;
 use crate::options::host::OptionsHost;
 use crate::search::ActiveSearch;
 use crate::setup::SetupForm;
@@ -26,22 +25,18 @@ use crate::search::draw::draw_search_bar;
 use crate::move_picker::draw::draw_picker;
 use crate::composer::draw::draw_composer;
 use crate::input::{CommandQueue, Drag};
-use crate::input::viewport::list_first;
 use crate::layout::{
-    FolderSpacing, GridSize, Layout, LayoutOptions, LayoutPrefs, ListRegion, MIN_COLS, MIN_ROWS,
-    ReaderRegion, SectionKind, SidebarContent, compute_layout,
+    FolderSpacing, GridSize, Layout, LayoutOptions, LayoutPrefs, MIN_COLS, MIN_ROWS, SectionKind,
+    SidebarContent, compute_layout,
 };
 use crate::theme::{Theme, roles};
 use crate::view_state::{
-    Focus, ListPage, MailSnapshot, OverlayKind, Overlays, ScrollState, Selection,
+    Focus, MailSnapshot, OverlayKind, Overlays, ScrollState, Selection,
 };
 use crate::widgets::{
-    BodyView, DrawContext, FooterData, HighlightRules, ListRowsView,
-    ReaderTitleData, StatusLine, StripData, content_rows,
-    draw_account_strip, draw_banner, draw_chrome_lines, draw_footer,
-    draw_help, draw_key_bar, mark_focused, draw_list_header, draw_list_rows, draw_list_title, draw_reader_body,
-    draw_reader_headers, draw_reader_title, fill_cells,
-    put_text, visible_rows,
+    DrawContext, FooterData, StatusLine, StripData, content_rows, draw_account_strip, draw_banner,
+    draw_chrome_lines, draw_footer, draw_help, draw_key_bar, fill_cells, mark_focused, put_text,
+    visible_rows,
 };
 
 pub struct AppView {
@@ -179,7 +174,17 @@ impl AppView {
         if matches!(event, Event::EnvelopePage { offset: 0, .. }) {
             self.queue.first_page_arrived();
         }
+        let (folder, message) = (self.selection.folder, self.selection.message);
         self.mail.apply(event, &mut self.selection);
+        // A folder list that no longer has the open folder moves the
+        // selection to another one: nothing of the old folder stays shown.
+        if folder.is_some() && self.selection.folder != folder {
+            self.forget_folder_view();
+        }
+        // Another message is read from the top.
+        if self.selection.message != message {
+            self.scroll.reader = 0;
+        }
         self.prune_marks();
     }
 
@@ -324,62 +329,6 @@ impl AppView {
                 error: self.mail.error.as_deref().or(self.config_problem.as_deref()),
             };
             draw_footer(frame, ctx, rect, &data);
-        }
-    }
-
-    /// The envelope of the selected message, from the loaded page.
-    fn selected_envelope(&self) -> Option<&model::Envelope> {
-        self.mail.page.as_ref()?.envelopes.get(self.selection.message_index)
-    }
-
-    fn draw_list(&self, frame: &mut Frame, ctx: &DrawContext<'_>, list: &ListRegion) {
-        let mailbox = self.list_summary();
-        draw_list_title(frame, ctx, list.title, mailbox.as_ref());
-        draw_list_header(frame, ctx, list.header, &list.columns);
-        if self.options_host.has_no_account() {
-            draw_no_account_hint(frame, ctx, list.rows);
-            return;
-        }
-        let Some(page) = &self.mail.page else {
-            return;
-        };
-        let visible = usize::from(list.rows.height);
-        let selected = self.selection.message_index;
-        let view = ListRowsView {
-            envelopes: &page.envelopes,
-            columns: &list.columns,
-            selected: Some(selected),
-            offset: page.offset,
-            first: list_first(self.scroll.list, selected, visible, page.envelopes.len()),
-            now: self.now,
-        };
-        draw_list_rows(frame, ctx, list.rows, &view);
-        self.show_marks(frame, list, view.first, &page.envelopes);
-    }
-
-    fn reader_title_data<'a>(&'a self, page: &'a ListPage) -> Option<ReaderTitleData<'a>> {
-        let envelope = page.envelopes.get(self.selection.message_index)?;
-        let unread = self.list_summary().map_or(0, |mailbox| mailbox.unread);
-        Some(ReaderTitleData {
-            subject: &envelope.subject,
-            position: u64::from(page.offset) + self.selection.message_index as u64 + 1,
-            total: u64::from(page.total),
-            unread,
-        })
-    }
-
-    fn draw_reader(&self, frame: &mut Frame, ctx: &DrawContext<'_>, reader: &ReaderRegion) {
-        let title = self.mail.page.as_ref().and_then(|page| self.reader_title_data(page));
-        draw_reader_title(frame, ctx, reader.title, title.as_ref());
-        draw_reader_headers(frame, ctx, reader.headers, self.selected_envelope());
-        if let Some(lines) = self.reader_lines() {
-            let view = BodyView {
-                lines: &lines,
-                first: self.scroll.reader,
-                app_name: &self.identity.name,
-                rules: HighlightRules::default(),
-            };
-            draw_reader_body(frame, ctx, reader.body, &view);
         }
     }
 }

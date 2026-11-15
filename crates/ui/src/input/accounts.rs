@@ -44,7 +44,8 @@ impl AppView {
         self.mail.folders.clear();
         self.mail.page = None;
         self.mail.body = None;
-        self.mail.error = None;
+        self.mail.set_note(None);
+        self.mail.relocated.clear();
         self.mail.status = SyncStatus::default();
         self.mail.changes_refused = false;
         self.mail.expanded_by_user.clear();
