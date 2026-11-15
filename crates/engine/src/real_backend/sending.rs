@@ -3,9 +3,11 @@
 //! The message is checked first, with no network at all. A reply names the
 //! `Message-ID` and `References` of its original, which were kept when the
 //! original was opened; only for an original that was not opened lately, and
-//! only while the mailbox connection is up, are they read from the server. A
-//! reply whose original cannot be found goes out without them. The send
-//! itself then runs on a task of its own, with its own connection.
+//! only while the mailbox connection is up, are they read from the server.
+//! When the server cannot give them, the ids the list showed for the original
+//! stand in (see `reply_lookup`). A reply whose original cannot be found at
+//! all goes out without them, and a notice named `reply thread` says so. The
+//! send itself then runs on a task of its own, with its own connection.
 //!
 //! Exactly one event answers a send: `MessageSent` when the server's final
 //! answer to DATA was a success, or a failure notice named `send`. A send is
@@ -18,6 +20,7 @@ use model::{Event, MessageId, OutgoingMessage};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::in_flight::InFlight;
+use super::reply_lookup::{LOST, Lookup, OFFLINE};
 use super::save_sent::SentCopy;
 use super::retry_ids::RetryIds;
 use super::sent_queue::SentQueue;
@@ -28,9 +31,7 @@ use super::worker::Worker;
 use crate::account_smtp::{SmtpAuth, SmtpSettings};
 use crate::imap_session::{ImapSession, SessionError};
 use crate::oauth::{HttpLimits, TokenSource};
-use crate::send::{
-    Checked, Prepared, ReplyIds, Sender, SmtpError, SmtpTimeouts, check, now_unix, submit,
-};
+use crate::send::{Checked, Prepared, Sender, SmtpError, SmtpTimeouts, check, now_unix, submit};
 
 /// What a send task needs, all of it owned.
 struct SendJob {
@@ -79,23 +80,27 @@ impl Worker {
             return Ok(());
         };
         let mut lost = None;
-        let mut ids = None;
+        let mut lookup = Lookup::default();
         if let Some(original) = message.in_reply_to {
-            match self.reply_ids(session, original).await {
-                Ok(found) => ids = found,
-                Err(error) if error.is_lost() => lost = Some(error),
-                Err(_) => {}
-            }
+            lookup = match self.reply_ids(session, original).await {
+                Ok(found) => found,
+                Err(error) => {
+                    // The connection failed while asking: what the list showed
+                    // is the next best thing, and the loss is still handed on.
+                    lost = Some(error).filter(SessionError::is_lost);
+                    self.listed_lookup(original, LOST)
+                }
+            };
         }
-        self.launch(checked, ids.as_ref(), message.in_reply_to);
+        self.launch(checked, &lookup, message.in_reply_to);
         lost.map_or(Ok(()), Err)
     }
 
     /// Serves a Send while the mailbox connection is down.
     pub(super) fn send_offline(&self, message: OutgoingMessage) {
         if let Some(checked) = self.accept(&message) {
-            let ids = message.in_reply_to.and_then(|original| self.threads.get(original)).flatten();
-            self.launch(checked, ids.as_ref(), message.in_reply_to);
+            let lookup = message.in_reply_to.map(|original| self.known_ids(original, OFFLINE)).unwrap_or_default();
+            self.launch(checked, &lookup, message.in_reply_to);
         }
     }
 
@@ -123,11 +128,13 @@ impl Worker {
         }
     }
 
-    /// Dates and numbers the message and starts the task that sends it.
-    fn launch(&self, checked: Checked, ids: Option<&ReplyIds>, original: Option<MessageId>) {
+    /// Dates and numbers the message and starts the task that sends it. A
+    /// reply that goes out without thread headers, because its original could
+    /// not be read, says so in a notice of its own.
+    fn launch(&self, checked: Checked, lookup: &Lookup, original: Option<MessageId>) {
         let key = checked.fingerprint();
         let earlier = self.retry_ids.earlier(key);
-        let prepared = match checked.finish_as(ids, now_unix(), earlier) {
+        let prepared = match checked.finish_as(lookup.ids.as_ref(), now_unix(), earlier) {
             Ok(prepared) => prepared,
             Err(refusal) => {
                 self.sink.send(failure(&self.sink, refusal.reason()));
@@ -135,6 +142,12 @@ impl Worker {
             }
         };
         self.retry_ids.begin(key, prepared.message_id());
+        if let Some(why) = lookup.missing.filter(|_| original.is_some()) {
+            self.sink.send(self.sink.failure("reply thread", format!(
+                "this reply goes out without In-Reply-To and References, so its recipients may see \
+                 it as a new conversation: {why}"
+            )));
+        }
         let tokens = match self.config.smtp.auth {
             SmtpAuth::OAuth2 => TokenSource::with_limits(&self.config, HttpLimits::within(self.timing.smtp.connect)),
             SmtpAuth::Password => None,

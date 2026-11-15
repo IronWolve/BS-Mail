@@ -23,6 +23,9 @@ pub(super) struct PollState {
     /// last look found. Another program can change a flag without changing
     /// any count STATUS reports, so the flags are asked for and compared.
     flags: HashMap<FolderId, HashMap<u32, Flags>>,
+    /// Where the slow sweep over each folder's older messages stopped: the
+    /// lowest UID asked about in the last look.
+    sweeps: HashMap<FolderId, u32>,
 }
 
 impl PollState {
@@ -40,12 +43,32 @@ impl PollState {
         self.flags.entry(folder).or_default().extend(rows);
     }
 
-    /// The UIDs whose flags are looked at: the newest `most` known in the
-    /// folder.
-    pub(super) fn flag_uids(&self, folder: FolderId, most: usize) -> Vec<u32> {
+    /// Forgets the flags known for a folder whose UIDs are void because its
+    /// UIDVALIDITY changed: they belong to messages that are no longer there.
+    pub(super) fn forget_flags(&mut self, folder: FolderId) {
+        self.flags.remove(&folder);
+        self.sweeps.remove(&folder);
+    }
+
+    /// The UIDs whose flags are looked at: the newest `newest` known in the
+    /// folder, and the next `older` of the rest. The older ones are taken a
+    /// slice at a time, newest first, and start over from the top after the
+    /// oldest, so every message the screen holds is looked at in turn while
+    /// no single look asks about more than `newest + older`.
+    pub(super) fn flag_uids(&mut self, folder: FolderId, newest: usize, older: usize) -> Vec<u32> {
         let mut uids: Vec<u32> = self.flags.get(&folder).map(|known| known.keys().copied().collect()).unwrap_or_default();
         uids.sort_unstable_by(|a, b| b.cmp(a));
-        uids.truncate(most);
+        let rest = uids.split_off(newest.min(uids.len()));
+        if rest.is_empty() {
+            self.sweeps.remove(&folder);
+            return uids;
+        }
+        let from = self.sweeps.get(&folder).and_then(|low| rest.iter().position(|uid| uid < low)).unwrap_or(0);
+        let slice: Vec<u32> = rest[from..].iter().copied().take(older).collect();
+        if let Some(lowest) = slice.last() {
+            self.sweeps.insert(folder, *lowest);
+        }
+        uids.extend(slice);
         uids
     }
 

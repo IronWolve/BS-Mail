@@ -18,5 +18,5 @@ mod word;
 
 pub use date::now_unix;
 pub use message::{Checked, Prepared, Sender, check};
-pub use reply_ids::{ReplyIds, parse_threading_headers};
+pub use reply_ids::{ReplyIds, ids_from_envelope, parse_threading_headers};
 pub use smtp::{SmtpError, SmtpTimeouts, submit};

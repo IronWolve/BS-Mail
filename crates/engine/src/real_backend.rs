@@ -34,6 +34,7 @@
 mod answered;
 mod backoff;
 mod change_flags;
+mod change_lost;
 mod change_relocate;
 mod change_rules;
 mod changes;
@@ -42,6 +43,7 @@ mod host_info;
 mod in_flight;
 mod inbox;
 mod lifecycle;
+mod listed_ids;
 mod offline;
 mod online;
 mod poll;

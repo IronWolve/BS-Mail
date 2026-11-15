@@ -81,6 +81,15 @@ pub fn parse_threading_headers(raw: &[u8]) -> Option<ReplyIds> {
     message_id.map(|message_id| ReplyIds { message_id, references }.compact())
 }
 
+/// The ids a list row's envelope gives: the message's own `Message-ID`, and
+/// its `In-Reply-To` standing in for the `References` an envelope does not
+/// carry. `None` when there is no usable `Message-ID`.
+pub fn ids_from_envelope(message_id: Option<&[u8]>, in_reply_to: Option<&[u8]>) -> Option<ReplyIds> {
+    let own = ids_in(&String::from_utf8_lossy(message_id?)).into_iter().next()?;
+    let references = in_reply_to.map(|raw| ids_in(&String::from_utf8_lossy(raw))).unwrap_or_default();
+    Some(ReplyIds { message_id: own, references }.compact())
+}
+
 /// The top of a message: everything before the first blank line, and never
 /// more than `MAX_HEADER_BYTES`.
 fn header_part(raw: &[u8]) -> &[u8] {

@@ -10,6 +10,7 @@ use super::backoff::Backoff;
 use super::lifecycle::{announce, changes_allowed, connection};
 use super::in_flight::SendsInFlight;
 use super::inbox::Inbox;
+use super::listed_ids::ListedIds;
 use super::online::Served;
 use super::poll_state::PollState;
 use super::retry_ids::RetryIds;
@@ -58,6 +59,8 @@ pub(super) struct Worker {
     pub(super) retry_ids: RetryIds,
     /// The thread ids of the messages opened lately, for replies to them.
     pub(super) threads: ThreadCache,
+    /// The thread ids the lists showed, for a reply to any other message.
+    pub(super) listed: ListedIds,
     /// Originals of replies the server accepted, reported by the send tasks.
     pub(super) answers: Inbox<MessageId>,
     /// Originals still to be marked as answered, waiting for the mailbox.
@@ -66,6 +69,8 @@ pub(super) struct Worker {
     pub(super) sends: SendsInFlight,
     /// The person was told, in this run, that no Sent folder is recognized.
     pub(super) no_sent_told: bool,
+    /// The session just ended on the save of a sent copy that was cut off.
+    pub(super) copy_cut_off: bool,
 }
 
 /// How a pause between connection attempts ended.
@@ -99,10 +104,12 @@ impl Worker {
             queue,
             retry_ids: RetryIds::default(),
             threads: ThreadCache::default(),
+            listed: ListedIds::default(),
             answers: Inbox::new(),
             answered_waiting: Vec::new(),
             sends,
             no_sent_told: false,
+            copy_cut_off: false,
         }
     }
 
@@ -131,9 +138,8 @@ impl Worker {
                         Served::Lost => {
                             // Signing in is not enough: a server that accepts the
                             // sign-in and then drops the session is still failing.
-                            if began.elapsed() >= self.timing.stable_after {
-                                backoff.reset();
-                            }
+                            let cut_off = std::mem::take(&mut self.copy_cut_off);
+                            backoff.session_ended(began.elapsed(), self.timing.stable_after, cut_off);
                             Some(backoff.next_wait())
                         }
                     }
@@ -204,3 +210,6 @@ impl Worker {
         }
     }
 }
+
+#[cfg(test)]
+include!("worker.tests.rs");

@@ -168,7 +168,7 @@ impl Worker {
                 return Ok(());
             }
         };
-        self.state.note_validity(target.id, info.uid_validity);
+        self.note_validity(target.id, info.uid_validity);
         tally.opened += 1;
         if info.exists == 0 {
             return Ok(());

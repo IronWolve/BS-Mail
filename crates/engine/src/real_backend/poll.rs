@@ -7,7 +7,9 @@
 //! A look that finds nothing changed sends nothing at all. Counts do not say
 //! when another program stars or answers a message, so a look that sees no
 //! change in them also asks for the flags of the newest messages the screen
-//! knows in the open folder and sends the ones that differ.
+//! knows in the open folder, and of the next slice of the older mail loaded
+//! below them (every look takes the next slice, so all the loaded rows come
+//! round), and sends the ones that differ.
 //!
 //! Every fifth look also reads the counts of the whole folder list again,
 //! quietly: it sends the list only if something in it differs.
@@ -21,6 +23,7 @@ use std::time::Duration;
 
 use model::{Event, FolderId, FolderRole, SyncState, Uid};
 
+use super::handlers::FOLDER_REBUILT;
 use super::lifecycle::{now_unix, progress};
 use super::worker::Worker;
 use crate::imap_session::{ImapSession, SessionError, UidSet};
@@ -28,6 +31,12 @@ use crate::imap_session::{ImapSession, SessionError, UidSet};
 /// How many of the newest messages of the open folder have their flags looked
 /// at in each check.
 const FLAG_LOOK_ROWS: usize = 100;
+
+/// How many more, taken from the older mail loaded below the newest ones, are
+/// looked at in each check. Every look takes the next slice of them, so all
+/// the loaded rows come round without any one look growing past
+/// `FLAG_LOOK_ROWS + FLAG_SWEEP_ROWS` messages.
+const FLAG_SWEEP_ROWS: usize = 100;
 
 /// What one look found.
 #[derive(Debug, Default)]
@@ -109,12 +118,13 @@ impl Worker {
         Ok(found)
     }
 
-    /// Asks for the flags of the newest messages known in the open folder and
-    /// says which differ from what was known: another program may have
-    /// starred or answered them. A refusal, or a folder that was rebuilt in
-    /// the meantime, gives no events.
+    /// Asks for the flags of the newest messages known in the open folder,
+    /// and of a slice of the older ones loaded below them, and says which
+    /// differ from what was known: another program may have starred or
+    /// answered them. A refusal gives no events. A folder that was rebuilt in
+    /// the meantime gives its newest page again, with fresh ids.
     async fn look_at_flags(&mut self, session: &mut ImapSession, folder: FolderId) -> Result<Vec<Event>, SessionError> {
-        let asked = self.poll.flag_uids(folder, FLAG_LOOK_ROWS);
+        let asked = self.poll.flag_uids(folder, FLAG_LOOK_ROWS, FLAG_SWEEP_ROWS);
         let Some(set) = UidSet::new(asked.iter().copied()) else {
             return Ok(Vec::new());
         };
@@ -126,8 +136,8 @@ impl Worker {
             Err(error) if error.is_lost() => return Err(error),
             Err(_) => return Ok(Vec::new()),
         };
-        if reopened.is_some_and(|info| self.state.note_validity(folder, info.uid_validity)) {
-            return Ok(Vec::new());
+        if reopened.is_some_and(|info| self.note_validity(folder, info.uid_validity)) {
+            return self.replace_page(session, folder, &path, "check for new mail").await;
         }
         let rows = match session.read_flags(&set).await {
             Ok(rows) => rows,
@@ -140,6 +150,24 @@ impl Worker {
         }
         let updates = changed.into_iter().map(|(uid, flags)| (self.state.message_id(folder, Uid(uid)), flags)).collect();
         Ok(vec![Event::FlagsChanged { updates }])
+    }
+
+    /// The open folder was rebuilt on the server, so every id the screen holds
+    /// for it is void. Its newest page is read again, which hands out fresh
+    /// ids and replaces the list. When that is refused the person is told to
+    /// refresh, since nothing else would say so, under the name `operation`.
+    pub(super) async fn replace_page(
+        &mut self,
+        session: &mut ImapSession,
+        folder: FolderId,
+        path: &str,
+        operation: &str,
+    ) -> Result<Vec<Event>, SessionError> {
+        match self.read_first_page(session, folder, path).await {
+            Ok(events) => Ok(events),
+            Err(error) if error.is_lost() => Err(error),
+            Err(_) => Ok(vec![self.sink.failure(operation, FOLDER_REBUILT)]),
+        }
     }
 
     /// The newest page of the open folder, as a sync reads it. A refusal
@@ -170,3 +198,6 @@ impl Worker {
         Ok(true)
     }
 }
+
+#[cfg(test)]
+include!("poll.tests.rs");
