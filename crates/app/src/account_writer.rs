@@ -4,19 +4,21 @@
 //! The text goes into a new file beside the target first. An old file is
 //! kept as one backup, `.bak`, with its passwords and secrets left out: a
 //! backup is for getting the settings back, and an old password, often reused
-//! elsewhere, must not stay on disk for ever. Each save replaces the backup of
-//! the one before. Only then does the new file take the target's place, in one
-//! rename, so a crash leaves the old file or the new one and never half of
-//! either.
+//! elsewhere, must not stay on disk for ever. The old text is read as TOML and
+//! every entry whose key names a password or a secret is removed at any depth,
+//! however it is written (quoted key, value over several lines); a file that
+//! is not TOML cannot be redacted with certainty, so no backup is kept of it.
+//! Each save replaces the backup of the one before. Only then does the new
+//! file take the target's place, in one rename, so a crash leaves the old file
+//! or the new one and never half of either.
 
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use crate::private_dirs;
+use toml_edit::{DocumentMut, Item, TableLike, Value};
 
-/// The keys of the account file that hold a secret.
-const SECRET_KEYS: [&str; 3] = ["password", "smtp_password", "oauth_client_secret"];
+use crate::private_dirs;
 
 /// What saving did.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -75,9 +77,13 @@ fn keep_old(target: &Path, dir: &Path, name: &str) -> Result<Option<PathBuf>, St
         return Ok(None);
     }
     let old = fs::read_to_string(target).map_err(|error| failed(target, "read the old file to keep a copy of", &error))?;
+    let Some(kept) = without_secrets(&old) else {
+        // Not TOML, so what is a secret in it cannot be told: no copy.
+        return Ok(None);
+    };
     let backup = dir.join(format!("{name}.bak"));
     let fresh = dir.join(format!("{name}.bak.new"));
-    write_private(&fresh, &without_secrets(&old))?;
+    write_private(&fresh, &kept)?;
     fs::rename(&fresh, &backup).map_err(|error| {
         let _ = fs::remove_file(&fresh);
         failed(&backup, "keep the old file as", &error)
@@ -85,17 +91,42 @@ fn keep_old(target: &Path, dir: &Path, name: &str) -> Result<Option<PathBuf>, St
     Ok(Some(backup))
 }
 
-/// The text without the lines that hold a secret: a password, an app
-/// password or a client secret, and any comment that mentions one.
-fn without_secrets(text: &str) -> String {
-    text.split_inclusive('\n')
-        .filter(|line| {
-            let key = line.split('=').next().unwrap_or("").trim();
-            let comment = line.trim_start().starts_with('#');
-            let mentions = |word: &str| line.to_ascii_lowercase().contains(word);
-            !SECRET_KEYS.contains(&key) && !(comment && (mentions("password") || mentions("secret")))
-        })
-        .collect()
+/// The text without the entries that hold a secret (a password, an app
+/// password, a client secret: any key that names one, at any depth) and
+/// without any comment that mentions one; `None` when the text is not TOML.
+fn without_secrets(text: &str) -> Option<String> {
+    let mut document: DocumentMut = text.parse().ok()?;
+    strip_secrets(document.as_table_mut());
+    let redacted: String = document
+        .to_string()
+        .split_inclusive('\n')
+        .filter(|line| !(line.trim_start().starts_with('#') && mentions_a_secret(line)))
+        .collect();
+    Some(redacted)
+}
+
+/// Removes the entries of `table` that hold a secret, and looks inside the
+/// others.
+fn strip_secrets(table: &mut dyn TableLike) {
+    let keys: Vec<String> = table.iter().map(|(key, _)| key.to_owned()).collect();
+    for key in keys {
+        if mentions_a_secret(&key) {
+            table.remove(&key);
+            continue;
+        }
+        match table.get_mut(&key) {
+            Some(Item::Table(inner)) => strip_secrets(inner),
+            Some(Item::Value(Value::InlineTable(inner))) => strip_secrets(inner),
+            Some(Item::ArrayOfTables(tables)) => tables.iter_mut().for_each(|inner| strip_secrets(inner)),
+            _ => {}
+        }
+    }
+}
+
+/// Whether `text` names a password or a secret, in any letter case.
+fn mentions_a_secret(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    lower.contains("password") || lower.contains("secret")
 }
 
 fn failed(path: &Path, what: &str, error: &std::io::Error) -> String {
