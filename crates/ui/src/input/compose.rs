@@ -24,6 +24,19 @@ pub enum ComposeKind {
     Forward,
 }
 
+/// What the footer says when the message to answer has not arrived yet: its
+/// Reply-To and its text come with its body, and a reply made without them
+/// could go to the wrong address.
+const BODY_NOT_HERE_NOTE: &str = "this message has not finished loading, so it cannot be answered or forwarded yet; try again in a moment";
+
+/// Why no draft could be made from the selected message.
+enum NoDraft {
+    /// No message is selected.
+    NothingSelected,
+    /// Its body, which holds the Reply-To and the text, has not arrived.
+    BodyNotHere,
+}
+
 /// What the footer says when the account does not allow sending.
 const READ_ONLY_NOTE: &str = "this account is read-only: set read_only = false in its file to send mail";
 
@@ -49,21 +62,33 @@ impl AppView {
         let (draft, reply_to) = match kind {
             ComposeKind::New => (Draft::default(), None),
             other => match self.draft_from_selected(other, &own) {
-                Some(found) => found,
-                None => return,
+                Ok(found) => found,
+                Err(NoDraft::NothingSelected) => return,
+                Err(NoDraft::BodyNotHere) => {
+                    self.mail.error = Some(BODY_NOT_HERE_NOTE.to_string());
+                    return;
+                }
             },
         };
         self.composer = Some(ComposeForm::from_draft(account, from, &draft, reply_to));
     }
 
-    /// The reply or forward of the selected message, with its id.
-    fn draft_from_selected(&self, kind: ComposeKind, own: &str) -> Option<(Draft, Option<model::MessageId>)> {
-        let folder = self.selection.folder?;
-        let page = self.mail.page.as_ref().filter(|page| page.folder == folder)?;
-        let envelope = page.envelopes.get(self.selection.message_index)?;
-        let body = self.mail.body.as_ref().filter(|(id, _)| *id == envelope.id).map(|(_, body)| body);
-        let text = body.map(body_text).unwrap_or_default();
-        let reply_to = body.map(|body| body.reply_to.clone()).unwrap_or_default();
+    /// The reply or forward of the selected message, with its id. Only once
+    /// its body is here: without it the draft would have no Reply-To and no
+    /// quoted text.
+    fn draft_from_selected(&self, kind: ComposeKind, own: &str) -> Result<(Draft, Option<model::MessageId>), NoDraft> {
+        let folder = self.selection.folder.ok_or(NoDraft::NothingSelected)?;
+        let page = self.mail.page.as_ref().filter(|page| page.folder == folder).ok_or(NoDraft::NothingSelected)?;
+        let envelope = page.envelopes.get(self.selection.message_index).ok_or(NoDraft::NothingSelected)?;
+        let body = self
+            .mail
+            .body
+            .as_ref()
+            .filter(|(id, _)| *id == envelope.id)
+            .map(|(_, body)| body)
+            .ok_or(NoDraft::BodyNotHere)?;
+        let text = body_text(body);
+        let reply_to = body.reply_to.clone();
         let time = CivilTime::from_unix(envelope.date.unix, envelope.date.offset_minutes);
         let original = Original {
             envelope,
@@ -71,11 +96,18 @@ impl AppView {
             date: format_pattern(&self.config.reader.date_format, &time),
             reply_to,
         };
-        Some(match kind {
+        Ok(match kind {
             ComposeKind::Forward => (forward(&original), None),
             ComposeKind::ReplyAll => (reply(&original, own, true), Some(envelope.id)),
             _ => (reply(&original, own, false), Some(envelope.id)),
         })
+    }
+
+    /// Whether the program may close now. A message with text in it, or one
+    /// being sent, asks first: the first ask only says what closing costs,
+    /// and the second goes ahead.
+    pub fn may_close(&mut self) -> bool {
+        self.composer.as_mut().is_none_or(|form| form.may_close_program())
     }
 
     /// Input while the composer is open. Returns whether the screen changed.

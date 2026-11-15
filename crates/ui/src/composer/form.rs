@@ -50,6 +50,14 @@ pub enum Progress {
     Sending,
 }
 
+/// What the form says the first time the program is asked to close on a
+/// message with text in it.
+const CLOSE_WITH_TEXT: &str = "this message has text in it and is not saved: close the window again to discard it and quit";
+
+/// What it says while the message is being handed to the server.
+const CLOSE_WHILE_SENDING: &str = "this message is being sent: close the window again to quit anyway; \
+     the program waits a few seconds for the server's answer, and the message may still go out";
+
 #[derive(Debug, Clone)]
 pub struct ComposeForm {
     pub account: AccountId,
@@ -71,6 +79,9 @@ pub struct ComposeForm {
     pub copied: Option<String>,
     /// Escape was pressed on a message with text in it; once more discards.
     pub discard_armed: bool,
+    /// The window was asked to close on a message that is not safe to lose;
+    /// once more closes it.
+    pub close_armed: bool,
     /// The first screen line of the body shown.
     pub body_scroll: usize,
     /// The text the form started with, to tell whether anything was written.
@@ -103,6 +114,7 @@ impl ComposeForm {
             clipboard: String::new(),
             copied: None,
             discard_armed: false,
+            close_armed: false,
             body_scroll: 0,
             started_with: String::new(),
         };
@@ -141,6 +153,22 @@ impl ComposeForm {
     /// Whether anything was written beyond what the form started with.
     pub fn is_dirty(&self) -> bool {
         self.fingerprint() != self.started_with
+    }
+
+    /// The window or program is being closed. True when it may go ahead: the
+    /// message holds nothing, or the user was told what closing costs and
+    /// asked again. Otherwise the first ask only says so, in the form.
+    pub fn may_close_program(&mut self) -> bool {
+        let (at_risk, note) = match self.progress {
+            Progress::Writing => (self.is_dirty(), CLOSE_WITH_TEXT),
+            Progress::Sending => (true, CLOSE_WHILE_SENDING),
+        };
+        if !at_risk || self.close_armed {
+            return true;
+        }
+        self.close_armed = true;
+        self.notice = Some(note.to_string());
+        false
     }
 
     /// The message these fields make, or what is wrong with them.

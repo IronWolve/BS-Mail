@@ -235,7 +235,14 @@ impl EventSink for Screen {
                 host.request_redraw();
                 return Flow::Continue;
             }
-            InputEvent::CloseRequested => return Flow::Quit,
+            InputEvent::CloseRequested => {
+                if self.view.may_close() {
+                    return Flow::Quit;
+                }
+                // A message with text in it, or on its way, asked first.
+                host.request_redraw();
+                return Flow::Continue;
+            }
             // While text is being typed every letter is for the text.
             InputEvent::Key(key) if closes(key) && !self.view.takes_text() => return Flow::Quit,
             InputEvent::PointerMoved { pos, .. } => {

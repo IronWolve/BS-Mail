@@ -46,6 +46,7 @@ pub fn handle_key(form: &mut ComposeForm, key: &KeyEvent, pane: Pane) -> Outcome
     if outcome == Outcome::Changed {
         form.notice = None;
         form.discard_armed = false;
+        form.close_armed = false;
         keep_cursor_in_view(form, pane);
     }
     outcome
@@ -61,6 +62,7 @@ pub fn handle_text(form: &mut ComposeForm, text: &str, pane: Pane) -> Outcome {
     }
     form.notice = None;
     form.discard_armed = false;
+    form.close_armed = false;
     keep_cursor_in_view(form, pane);
     Outcome::Changed
 }
