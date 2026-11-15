@@ -226,11 +226,15 @@ impl MockBackend {
         if !self.data.accounts.iter().any(|entry| &entry.id == account) {
             return vec![self.failure("search", format!("unknown account: {}", account.0))];
         }
+        let plan = match search::plan(query, &self.data.folders) {
+            Ok(plan) => plan,
+            Err(sentence) => return vec![self.failure("search", sentence)],
+        };
         let envelopes: Vec<Envelope> = if *account == self.data.account {
             self.data
                 .messages
                 .iter()
-                .filter(|envelope| search::matches(envelope, query))
+                .filter(|envelope| plan.matches(envelope))
                 .cloned()
                 .collect()
         } else {
