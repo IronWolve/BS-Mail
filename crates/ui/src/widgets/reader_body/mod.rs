@@ -6,4 +6,4 @@ mod cache;
 pub mod draw;
 pub mod wrap;
 
-pub use draw::{BodyView, draw_reader_body, visual_len};
+pub use draw::{BodyView, body_link_at, draw_reader_body, visual_len};

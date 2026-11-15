@@ -4,11 +4,11 @@
 use model::{BodyRole, StyledLine, StyledSpan};
 use surface::{Frame, Rect};
 
-use super::cache::{self, Wrapped, fingerprint};
-use super::wrap::{Piece, wrap_line};
+use super::cache::{self, Wrapped, WrappedBody, fingerprint};
+use super::wrap::wrap_line_linked;
 use crate::theme::roles;
 use crate::widgets::body_highlight::{HighlightRules, highlight_line};
-use crate::widgets::cell_text::put_text;
+use crate::widgets::cell_text::{cells, put_text};
 use crate::widgets::scrollbar::draw_scrollbar;
 use crate::widgets::DrawContext;
 
@@ -17,6 +17,19 @@ const TEXT_AT: u16 = 1;
 /// Cells the text keeps free: the blank on the left and the scrollbar's
 /// column on the right.
 const SIDE_CELLS: u16 = 2;
+
+/// The rules left on when the body is not highlighted: only the addresses.
+const LINKS_ONLY: HighlightRules = HighlightRules {
+    bullets: false,
+    lead: false,
+    tokens: false,
+    versions: false,
+    paths: false,
+    signature: false,
+    quote: false,
+    links: true,
+    name: false,
+};
 
 /// What to draw: the lines, where they are scrolled to and the name to
 /// highlight.
@@ -74,22 +87,47 @@ fn wrapped(ctx: &DrawContext<'_>, rect: Rect, view: &BodyView<'_>) -> Wrapped {
     made
 }
 
-fn wrap_all(view: &BodyView<'_>, width: u16, highlight: bool) -> Vec<Vec<Piece>> {
-    let mut visual = Vec::new();
+fn wrap_all(view: &BodyView<'_>, width: u16, highlight: bool) -> WrappedBody {
+    let mut rows = Vec::new();
+    let mut links = Vec::new();
     for line in view.lead.iter().chain(view.lines) {
         let spans: Vec<StyledSpan> = if highlight {
             highlight_line(line, &view.rules, view.app_name)
         } else {
-            line.spans.clone()
+            // Web addresses stay marked (and so clickable) with the other
+            // colouring off: nothing else is.
+            highlight_line(line, &LINKS_ONLY, view.app_name)
         };
-        visual.extend(wrap_line(&spans, width));
+        rows.extend(wrap_line_linked(&spans, width, &mut links));
     }
-    visual
+    WrappedBody { rows, links }
 }
 
 /// How many visual lines the body wraps to, which is the most it can scroll.
 pub fn visual_len(ctx: &DrawContext<'_>, rect: Rect, view: &BodyView<'_>) -> usize {
     wrapped(ctx, rect, view).len()
+}
+
+/// The web address under the cell `col`, `row` of the body drawn in `rect`
+/// with `view`, whole even when it is cut over several lines.
+pub fn body_link_at(ctx: &DrawContext<'_>, rect: Rect, view: &BodyView<'_>, col: u16, row: u16) -> Option<String> {
+    if rect.is_empty() || row < rect.y || row >= rect.bottom() {
+        return None;
+    }
+    let body = wrapped(ctx, rect, view);
+    let first = view.first.min(body.len().saturating_sub(usize::from(rect.height)));
+    let pieces = body.rows.get(first + usize::from(row - rect.y))?;
+    let text_x = rect.x.saturating_add(TEXT_AT);
+    let clip_right = text_x.saturating_add(wrap_width(ctx, rect));
+    let mut x = text_x;
+    for piece in pieces {
+        let end = x.saturating_add(cells(&piece.text));
+        if col >= x && col < end.min(clip_right) {
+            return piece.link.and_then(|index| body.links.get(index)).cloned();
+        }
+        x = end;
+    }
+    None
 }
 
 /// Draws the body into `rect` (the reader's text width, below the headers).
@@ -107,7 +145,7 @@ pub fn draw_reader_body(
     let first = view.first.min(visual.len().saturating_sub(visible));
     let text_x = rect.x.saturating_add(TEXT_AT);
     let text_clip = Rect::new(text_x, rect.y, wrap_width(ctx, rect), rect.height);
-    for (line, pieces) in visual.iter().skip(first).take(visible).enumerate() {
+    for (line, pieces) in visual.rows.iter().skip(first).take(visible).enumerate() {
         let y = rect.y.saturating_add(u16::try_from(line).unwrap_or(u16::MAX));
         let mut x = text_x;
         for piece in pieces {

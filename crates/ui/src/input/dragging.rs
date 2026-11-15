@@ -55,7 +55,8 @@ impl AppView {
         if let Some(drag) = divider_at(&layout, col, row) {
             return drag.shape();
         }
-        if self.account_row_switches(&layout, col, row) { PointerShape::Hand } else { PointerShape::Arrow }
+        let on_link = self.mail_is_free() && self.link_under(&layout, col, row).is_some();
+        if on_link || self.account_row_switches(&layout, col, row) { PointerShape::Hand } else { PointerShape::Arrow }
     }
 
     /// Whether a click here would switch to another account: on a row of the

@@ -18,8 +18,21 @@ use model::StyledLine;
 use super::wrap::Piece;
 use crate::widgets::body_highlight::HighlightRules;
 
-/// The wrapped lines of one body.
-pub(super) type Wrapped = Rc<Vec<Vec<Piece>>>;
+/// The wrapped lines of one body and the web addresses in it.
+pub(super) struct WrappedBody {
+    pub rows: Vec<Vec<Piece>>,
+    /// The addresses, which the pieces' `link` indexes point into.
+    pub links: Vec<String>,
+}
+
+impl WrappedBody {
+    /// How many visual lines the body has.
+    pub fn len(&self) -> usize {
+        self.rows.len()
+    }
+}
+
+pub(super) type Wrapped = Rc<WrappedBody>;
 
 thread_local! {
     static LAST: RefCell<Option<(u64, Wrapped)>> = const { RefCell::new(None) };

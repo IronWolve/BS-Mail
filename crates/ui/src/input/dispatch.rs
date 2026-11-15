@@ -63,6 +63,9 @@ impl AppView {
                 }
                 self.click(pos.col, pos.row, grid)
             }
+            InputEvent::Button { button: PointerButton::Right, state: ButtonState::Pressed, pos, .. } => {
+                self.copy_link_at(pos.col, pos.row, grid)
+            }
             InputEvent::Button {
                 button: PointerButton::Left,
                 state: ButtonState::Released,
@@ -184,7 +187,7 @@ impl AppView {
             Hit::Account(index) => return self.click_account(index),
             Hit::Sidebar => self.focus = Focus::Sidebar,
             Hit::ListChrome => self.focus = Focus::List,
-            Hit::Reader => self.focus = Focus::Reader,
+            Hit::Reader => self.click_reader(&layout, col, row),
             Hit::KeyBar(action) => self.press_button(action, grid),
             Hit::Nothing => return false,
         }

@@ -12,13 +12,18 @@ use crate::widgets::cell_text::cells;
 pub struct Piece {
     pub text: String,
     pub role: BodyRole,
+    /// Which web address of the body this is a part of (an index into the
+    /// addresses `wrap_line_linked` collected), when it is part of one. An
+    /// address cut over two lines is two pieces with the same index.
+    pub link: Option<usize>,
 }
 
-/// One grapheme with its width and role.
+/// One grapheme with its width, role and link.
 struct Cell {
     symbol: String,
     width: u16,
     role: BodyRole,
+    link: Option<usize>,
 }
 
 impl Cell {
@@ -39,12 +44,27 @@ fn continues(base: &str, mark: &str) -> bool {
     both.graphemes(true).count() == 1
 }
 
-fn flatten(spans: &[StyledSpan]) -> Vec<Cell> {
+/// The cells of the spans. A run of neighbouring spans in the link role is one
+/// address: its text is added to `links` and its cells carry the index.
+fn flatten(spans: &[StyledSpan], links: &mut Vec<String>) -> Vec<Cell> {
     let mut out: Vec<Cell> = Vec::new();
     // The last grapheme was kept, so a mark that opens the next span has a
     // character to belong to.
     let mut open = false;
+    let mut current: Option<usize> = None;
     for span in spans {
+        let link = if span.role == BodyRole::Link {
+            let index = current.unwrap_or_else(|| {
+                links.push(String::new());
+                links.len() - 1
+            });
+            links[index].extend(span.text.chars().filter(|ch| !ch.is_control()));
+            current = Some(index);
+            current
+        } else {
+            current = None;
+            None
+        };
         let text = span.text.replace('\t', TAB);
         for (index, grapheme) in text.graphemes(true).enumerate() {
             let width = cells(grapheme);
@@ -71,6 +91,7 @@ fn flatten(spans: &[StyledSpan]) -> Vec<Cell> {
                 symbol: grapheme.to_string(),
                 width,
                 role: span.role,
+                link,
             });
         }
     }
@@ -106,10 +127,11 @@ fn pieces(cells: &[Cell]) -> Vec<Piece> {
     let mut out: Vec<Piece> = Vec::new();
     for cell in cells {
         match out.last_mut() {
-            Some(last) if last.role == cell.role => last.text.push_str(&cell.symbol),
+            Some(last) if last.role == cell.role && last.link == cell.link => last.text.push_str(&cell.symbol),
             _ => out.push(Piece {
                 text: cell.symbol.clone(),
                 role: cell.role,
+                link: cell.link,
             }),
         }
     }
@@ -119,10 +141,17 @@ fn pieces(cells: &[Cell]) -> Vec<Piece> {
 /// The line as wrapped pieces, one `Vec` per visual line. An empty line gives
 /// one empty visual line; a zero width gives none.
 pub fn wrap_line(spans: &[StyledSpan], width: u16) -> Vec<Vec<Piece>> {
+    wrap_line_linked(spans, width, &mut Vec::new())
+}
+
+/// The same, and each web address in the line is added to `links` (its
+/// pieces carry its index there), so a click on any part of an address cut
+/// over several lines finds the whole of it.
+pub fn wrap_line_linked(spans: &[StyledSpan], width: u16, links: &mut Vec<String>) -> Vec<Vec<Piece>> {
     if width == 0 {
         return Vec::new();
     }
-    let all = flatten(spans);
+    let all = flatten(spans, links);
     if all.is_empty() {
         return vec![Vec::new()];
     }

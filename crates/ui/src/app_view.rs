@@ -65,6 +65,11 @@ pub struct AppView {
     pub(crate) composer: Option<ComposeForm>,
     /// The user clicked Quit; the program closes it, the screen cannot.
     pub(crate) quit_requested: bool,
+    /// Web addresses the user clicked, for the program to open in a browser.
+    pub(crate) link_requests: Vec<String>,
+    /// A web address the user copied with the right button, for the host to
+    /// put on the clipboard.
+    pub(crate) copied_link: Option<String>,
     /// The letter of a command key just pressed, whose text is still to come:
     /// a window and a terminal both report a printable key as the key and
     /// then the text it types, and the text of a key that did something is
@@ -123,6 +128,8 @@ impl AppView {
             drag: None,
             composer: None,
             quit_requested: false,
+            link_requests: Vec::new(),
+            copied_link: None,
             paired_text: None,
             marked: BTreeSet::new(),
             picker: None,

@@ -10,6 +10,7 @@ use ui::layout::{MIN_COLS, MIN_ROWS};
 
 use crate::cli::{Options, SizeChoice, window_grid};
 use crate::errors::AppError;
+use crate::link_opener::SystemOpener;
 use crate::identity::display_name;
 use crate::screen::Screen;
 use crate::paths::data_dir;
@@ -43,7 +44,8 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
     let effects = scene.view.render(cols, rows).effects.len();
     let mut screen = Screen::new(scene.view, scene.backend, (cols, rows), scene.fixed_now)
         .with_accounts(scene.live.clone())
-        .with_settings(scene.settings.clone());
+        .with_settings(scene.settings.clone())
+        .with_link_opener(Box::new(SystemOpener::new()));
     if let Some(dir) = data_dir {
         screen = remember(screen, dir, remember_size, remembered);
     }

@@ -15,11 +15,14 @@ use ui::AppView;
 use crate::accounts::Live;
 use crate::clock::system_now;
 use crate::errors::AppError;
+use crate::link_opener::{LinkOpener, NoOpener};
 use crate::options_flow::{self, Opened, Settings, is_setting};
 use crate::pump::pump;
 use crate::setup_flow::SetupFlow;
 use crate::state_file::{self, State};
 use crate::ticker::Ticker;
+
+mod links;
 
 /// How many times mail is moved again after the accounts changed, at most.
 const ROUNDS: usize = 3;
@@ -53,6 +56,8 @@ pub struct Screen {
     live: Option<Live>,
     /// What answers the Options screen's requests about settings.
     settings: Settings,
+    /// What opens a web address the user clicked in a message.
+    links: Box<dyn LinkOpener>,
 }
 
 impl Screen {
@@ -79,7 +84,15 @@ impl Screen {
             setup: None,
             live: None,
             settings: Settings::default(),
+            links: Box::new(NoOpener),
         }
+    }
+
+    /// Lets a click on a web address in a message open it with `opener`. A
+    /// screen that is given none opens nothing.
+    pub fn with_link_opener(mut self, opener: Box<dyn LinkOpener>) -> Self {
+        self.links = opener;
+        self
     }
 
     /// Lets the Options screen change and reload the settings `settings`
@@ -181,6 +194,7 @@ impl Screen {
             self.answer_options(actions, host);
         }
         changed |= self.setup_step();
+        changed |= self.link_steps();
         changed
     }
 

@@ -15,6 +15,7 @@ pub mod folder_change;
 pub mod help_scroll;
 pub mod hidden;
 pub mod hit;
+pub mod links;
 pub mod marks;
 pub mod movement;
 pub mod options;

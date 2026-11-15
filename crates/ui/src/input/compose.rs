@@ -166,6 +166,9 @@ impl AppView {
         if let Some(link) = self.setup.as_mut().and_then(|form| form.copied.take()) {
             return Some(link);
         }
+        if let Some(link) = self.copied_link.take() {
+            return Some(link);
+        }
         self.composer.as_mut()?.copied.take()
     }
 

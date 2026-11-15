@@ -47,7 +47,7 @@ pub use key_bar::{button_at, draw_key_bar};
 pub use list_header::{column_align, column_label, draw_list_header};
 pub use list_rows::{ListRowsView, draw_list_rows};
 pub use list_title::draw_list_title;
-pub use reader_body::{BodyView, draw_reader_body, visual_len};
+pub use reader_body::{BodyView, body_link_at, draw_reader_body, visual_len};
 pub use reader_headers::draw_reader_headers;
 pub use reader_title::{ReaderTitleData, draw_reader_title};
 pub use scrollbar::draw_scrollbar;

@@ -32,6 +32,18 @@ pub trait LinkOpener {
     fn poll(&mut self) -> Option<Result<(), String>>;
 }
 
+/// Opens nothing: for a screen that must never start a browser by itself, as
+/// every test's is.
+pub struct NoOpener;
+
+impl LinkOpener for NoOpener {
+    fn open(&mut self, _url: &str) {}
+
+    fn poll(&mut self) -> Option<Result<(), String>> {
+        None
+    }
+}
+
 /// One way of asking the system to open a link.
 #[derive(Debug, Clone)]
 pub struct Launcher {
