@@ -41,6 +41,12 @@ pub struct SmtpSettings {
     /// A password sign-in, or a token sign-in for an OAuth2 account that sets
     /// no `smtp_password`.
     pub auth: SmtpAuth,
+    /// The file sets a sending sign-in of its own (`smtp_username` or
+    /// `smtp_password`), or the account signs in with a token. A server that
+    /// then offers no sign-in is a mistake (a wrong port, say), so the send
+    /// stops. Off: the mailbox sign-in only stands in, and a server that
+    /// offers none (a relay that knows this machine) is used as it is.
+    pub sign_in_set: bool,
     pub trust: Trust,
     /// Append what was sent to the Sent folder. On unless set.
     pub save_sent: bool,
@@ -83,6 +89,7 @@ impl SmtpSettings {
         mailbox_oauth: bool,
     ) -> Self {
         let auth = if mailbox_oauth && raw.password.is_none() { SmtpAuth::OAuth2 } else { SmtpAuth::Password };
+        let sign_in_set = auth == SmtpAuth::OAuth2 || raw.username.is_some() || raw.password.is_some();
         let security = raw.security.unwrap_or(Security::Starttls);
         let default_port = match security {
             Security::Starttls => 587,
@@ -98,6 +105,7 @@ impl SmtpSettings {
                 .password
                 .map_or_else(|| mailbox_password.clone(), Secret::new),
             auth,
+            sign_in_set,
             trust: raw.trust.unwrap_or_default(),
             save_sent: raw.save_sent.unwrap_or(true),
         }

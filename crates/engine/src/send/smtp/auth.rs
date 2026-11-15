@@ -6,7 +6,7 @@
 use super::error::{SmtpError, Step};
 use super::link::Link;
 use super::caps::ServerCaps;
-use crate::account_config::Security;
+use crate::account_config::{Security, is_loopback_host};
 use crate::account_smtp::{SmtpAuth, SmtpSettings};
 use crate::oauth::{TokenError, TokenSource, xoauth2_blob};
 use crate::scrub::plain_blob;
@@ -14,7 +14,11 @@ use crate::send::base64;
 
 impl Link {
     /// Signs in when the server asks for it. A server that offers no sign-in
-    /// at all (a trusted relay) is used as it is.
+    /// at all (a relay that knows this machine) is used as it is, unless the
+    /// account is set to sign in there: then the send stops before any
+    /// address is given, since the sign-in the account asked for cannot be
+    /// made, and a loopback server (a local bridge or mail system) is the
+    /// only exception.
     pub async fn sign_in(
         &mut self,
         settings: &SmtpSettings,
@@ -22,6 +26,11 @@ impl Link {
         tokens: Option<&TokenSource>,
     ) -> Result<(), SmtpError> {
         if caps.auth.is_empty() {
+            let local = settings.host.as_deref().is_some_and(is_loopback_host);
+            if settings.sign_in_set && !local {
+                return Err(SmtpError::SignInNotOffered(settings.port));
+            }
+            self.unsigned = true;
             return Ok(());
         }
         let oauth = settings.auth == SmtpAuth::OAuth2;
@@ -84,9 +93,11 @@ impl Link {
             Ok(Err(TokenError::Transient(text))) => return Err(SmtpError::TokenUnavailable(text)),
             Err(_) => return Err(SmtpError::TokenUnavailable("getting the access token took too long".to_owned())),
         };
-        // Whatever the server says back must not repeat the token.
+        // Whatever the server says back must not repeat the token, or the
+        // sign-in line that holds it, which is the blob.
         self.secrets.push(token.expose().to_owned());
         let blob = xoauth2_blob(&settings.username, token.expose()).map_err(SmtpError::SignInEnded)?;
+        self.secrets.push(blob.clone());
         let reply = self.ask(&format!("AUTH XOAUTH2 {blob}"), Step::SignIn).await?;
         let last = if reply.code == 334 { self.ask("", Step::SignIn).await? } else { reply };
         if last.code == 235 { Ok(()) } else { Err(SmtpError::OAuthRefused(self.said(&last))) }
@@ -96,3 +107,6 @@ impl Link {
         if reply.code == 235 { Ok(()) } else { Err(SmtpError::SignInRefused(self.said(reply))) }
     }
 }
+
+#[cfg(test)]
+include!("auth.tests.rs");

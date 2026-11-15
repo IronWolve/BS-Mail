@@ -20,6 +20,10 @@ const GOODBYE_WAIT: Duration = Duration::from_millis(1500);
 /// How long a goodbye that nobody needs to hear answered may be written.
 const FAREWELL_WAIT: Duration = Duration::from_millis(300);
 
+/// Added to what the server said when it refuses a send that was made without
+/// a sign-in, because none was offered.
+const NO_SIGN_IN_NOTE: &str = "the server offered no sign-in, so none was used";
+
 /// Whether the message has begun to go out. Shared with the caller, which
 /// needs it to say what a timeout of the whole send means.
 #[derive(Debug, Clone, Default)]
@@ -49,6 +53,9 @@ pub struct Link {
     /// The password, and whatever else was sent that is a secret, kept only
     /// to remove it from anything the server says.
     pub(super) secrets: Vec<String>,
+    /// The server offered no sign-in and none was made. Anything it refuses
+    /// afterwards says so, since a refusal for want of a sign-in does not.
+    pub(super) unsigned: bool,
 }
 
 impl Link {
@@ -59,6 +66,7 @@ impl Link {
             progress,
             secure: opened.secure,
             secrets: vec![settings.password.expose().to_owned()],
+            unsigned: false,
         }
     }
 
@@ -73,7 +81,8 @@ impl Link {
     }
 
     pub(super) fn said(&self, reply: &Reply) -> Said {
-        Said::of(reply, &self.secrets)
+        let said = Said::of(reply, &self.secrets);
+        if self.unsigned { said.noting(NO_SIGN_IN_NOTE) } else { said }
     }
 
     /// Sends one command line and reads its answer.
@@ -116,9 +125,9 @@ impl Link {
         if reply.code != 220 {
             return Err(SmtpError::StartTlsMissing);
         }
-        let Self { wire, limits, progress, secrets, .. } = self;
+        let Self { wire, limits, progress, secrets, unsigned, .. } = self;
         let wire = connect::start_tls(settings, host, wire, limits.connect).await?;
-        Ok(Self { wire, limits, progress, secure: true, secrets })
+        Ok(Self { wire, limits, progress, secure: true, secrets, unsigned })
     }
 
     /// Says goodbye and waits a moment for the answer; never fails. For a

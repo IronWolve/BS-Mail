@@ -61,6 +61,12 @@ impl Said {
         Self { code: reply.code, text: text.trim().to_owned() }
     }
 
+    /// The same answer with a note after the server's words.
+    pub fn noting(mut self, note: &str) -> Self {
+        self.text = if self.text.is_empty() { note.to_owned() } else { format!("{}; {note}", self.text) };
+        self
+    }
+
     /// True for a 4xx answer: the server says to try again later.
     pub fn is_temporary(&self) -> bool {
         self.code / 100 == 4
@@ -93,6 +99,9 @@ pub enum SmtpError {
     Declined(Said),
     SignInRefused(Said),
     SignInUnsupported(Vec<String>),
+    /// The server offers no sign-in, and this account is set to sign in
+    /// there. Holds the port.
+    SignInNotOffered(u16),
     /// The server refused the access token (or its error text was answered
     /// and it then said no).
     OAuthRefused(Said),
@@ -142,6 +151,7 @@ impl SmtpError {
             ),
             Self::SignInRefused(_)
             | Self::SignInUnsupported(_)
+            | Self::SignInNotOffered(_)
             | Self::OAuthRefused(_)
             | Self::SignInEnded(_)
             | Self::TokenUnavailable(_) => self.sign_in_reason(),
@@ -181,6 +191,10 @@ impl SmtpError {
                 "the mail server offers no sign-in method this program supports (it offers: {}); \
                  nothing was sent",
                 offered.join(", ")
+            ),
+            Self::SignInNotOffered(port) => format!(
+                "the mail server on port {port} offers no sign-in, but this account is set to sign in there, \
+                 so nothing was sent; check the port (587 with STARTTLS, 465 with TLS)"
             ),
             Self::OAuthRefused(said) if said.is_temporary() => format!(
                 "the mail server could not check the sign-in just now ({said}); nothing was sent"
