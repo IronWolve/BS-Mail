@@ -3,6 +3,7 @@
 //! form says so, and a domain not listed gets the usual `imap.` and `smtp.`
 //! names.
 
+use super::ascii_domain::ascii_domain;
 use super::fields::Security;
 use super::simple_providers::find;
 
@@ -29,12 +30,15 @@ pub struct Preset {
     pub files_sent_itself: bool,
 }
 
-/// The preset for the domain of `email`, or the generic guess.
+/// The preset for the domain of `email`, or the generic guess. A domain with
+/// letters outside ASCII is guessed under its ASCII name, the only kind a
+/// server name may have; one that has no ASCII name gets no guess.
 pub fn preset_for(email: &str) -> Option<Preset> {
     let domain = email.rsplit_once('@')?.1.trim().to_lowercase();
     if domain.is_empty() || domain.contains(char::is_whitespace) {
         return None;
     }
+    let domain = ascii_domain(&domain)?;
     Some(known(&domain).unwrap_or_else(|| generic(&domain)))
 }
 

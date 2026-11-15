@@ -4,6 +4,7 @@
 
 pub mod account_id;
 pub mod action;
+pub mod ascii_domain;
 pub mod draw;
 pub mod fields;
 pub mod form;
