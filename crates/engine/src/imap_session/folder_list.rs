@@ -1,22 +1,34 @@
 //! Reads the mailbox list: LIST for the names and special-use attributes,
-//! STATUS for each mailbox's unread and total counts.
+//! and each mailbox's unread and total counts. A server that offers
+//! LIST-STATUS (RFC 5819) gives the counts in the same answer; for any other,
+//! or for a mailbox the answer left out, STATUS asks one mailbox at a time.
 
-use async_imap::imap_proto::NameAttribute;
-use async_imap::types::Name;
-use futures_util::TryStreamExt;
+use std::collections::HashMap;
+
+use async_imap::imap_proto::{NameAttribute, StatusAttribute};
+use async_imap::types::{Name, UnsolicitedResponse};
+use futures_util::StreamExt;
 
 use super::error::SessionError;
 use super::raw_folder::RawFolder;
 use super::session::ImapSession;
 use super::timeouts::bounded;
 
+/// Unread and total counts by mailbox name, as LIST-STATUS gave them.
+type Counts = HashMap<String, (u32, u32)>;
+
 impl ImapSession {
     /// Every mailbox with its counts. A mailbox whose STATUS the server
     /// refuses is listed with zero counts; a lost connection is an error.
     pub async fn list_folders(&mut self) -> Result<Vec<RawFolder>, SessionError> {
-        let mut folders = self.list_names().await?;
+        let (mut folders, mut given) = self.list_names().await?;
         for folder in &mut folders {
             if folder.has_attribute("\\noselect") || folder.has_attribute("\\nonexistent") {
+                continue;
+            }
+            if let Some((unread, total)) = given.remove(&folder.path) {
+                folder.unread = unread;
+                folder.total = total;
                 continue;
             }
             match self.status_counts(&folder.path).await {
@@ -31,25 +43,64 @@ impl ImapSession {
         Ok(folders)
     }
 
-    async fn list_names(&mut self) -> Result<Vec<RawFolder>, SessionError> {
-        if self.caps.special_use && self.caps.list_extended {
-            match self.run_list("* RETURN (SPECIAL-USE)").await {
+    /// The names, and the counts the server gave with them, if it did. A
+    /// server that refuses the return options is asked again without them.
+    /// The library ends the answer at the tagged reply without looking at a
+    /// refusal in it, so a refusal reads as a list with no names; a mailbox
+    /// always has at least an Inbox, so an empty answer is taken for one.
+    async fn list_names(&mut self) -> Result<(Vec<RawFolder>, Counts), SessionError> {
+        if let Some(options) = self.return_options() {
+            match self.run_list(&format!("* RETURN ({options})")).await {
                 Err(SessionError::Refused(_)) => {}
+                Ok((names, _)) if names.is_empty() => {}
                 other => return other,
             }
         }
         self.run_list("*").await
     }
 
-    async fn run_list(&mut self, pattern: &str) -> Result<Vec<RawFolder>, SessionError> {
+    /// What to ask LIST to return along with the names, when it can.
+    fn return_options(&self) -> Option<String> {
+        if !self.caps.list_extended {
+            return None;
+        }
+        let mut options = Vec::new();
+        if self.caps.special_use {
+            options.push("SPECIAL-USE");
+        }
+        if self.caps.list_status {
+            options.push("STATUS (MESSAGES UNSEEN)");
+        }
+        (!options.is_empty()).then(|| options.join(" "))
+    }
+
+    /// Runs LIST. The counts of LIST-STATUS come as STATUS answers between
+    /// the names; the library sets them aside in a queue that holds only a
+    /// hundred, so the queue is emptied after every name.
+    async fn run_list(&mut self, pattern: &str) -> Result<(Vec<RawFolder>, Counts), SessionError> {
         let limit = self.limits.command;
         let session = &mut self.inner;
-        let result: Result<Vec<Name>, SessionError> = bounded(limit, async {
-            session.list(Some(""), Some(pattern)).await?.try_collect().await
+        let tray = session.unsolicited_responses.clone();
+        let take = |counts: &mut Counts| {
+            while let Ok(item) = tray.try_recv() {
+                if let Some((name, found)) = counts_of(item) {
+                    counts.insert(name, found);
+                }
+            }
+        };
+        take(&mut Counts::new());
+        let result = bounded(limit, async {
+            let mut stream = session.list(Some(""), Some(pattern)).await?;
+            let (mut names, mut counts) = (Vec::new(), Counts::new());
+            while let Some(name) = stream.next().await {
+                names.push(raw_from_name(&name?));
+                take(&mut counts);
+            }
+            take(&mut counts);
+            Ok((names, counts))
         })
         .await;
-        let names = self.settle(result)?;
-        Ok(names.iter().map(raw_from_name).collect())
+        self.settle(result)
     }
 
     /// Unread and total counts of one mailbox, from STATUS.
@@ -59,6 +110,22 @@ impl ImapSession {
         let found = self.settle(result)?;
         Ok((found.unseen.unwrap_or(0), found.exists))
     }
+}
+
+/// The counts in a STATUS answer, with the name of the mailbox they are for.
+fn counts_of(item: UnsolicitedResponse) -> Option<(String, (u32, u32))> {
+    let UnsolicitedResponse::Status { mailbox, attributes } = item else {
+        return None;
+    };
+    let (mut unread, mut total) = (None, None);
+    for attribute in attributes {
+        match attribute {
+            StatusAttribute::Unseen(n) => unread = Some(n),
+            StatusAttribute::Messages(n) => total = Some(n),
+            _ => {}
+        }
+    }
+    Some((mailbox, (unread.unwrap_or(0), total?)))
 }
 
 fn raw_from_name(name: &Name) -> RawFolder {

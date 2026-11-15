@@ -14,6 +14,8 @@ pub struct ServerCaps {
     pub special_use: bool,
     /// The LIST command accepts return options (RFC 5258).
     pub list_extended: bool,
+    /// LIST can return each mailbox's counts with its name (RFC 5819).
+    pub list_status: bool,
     /// Mailbox storage figures (RFC 2087).
     pub quota: bool,
     /// The server can push changes while idle (RFC 2177).
@@ -34,6 +36,7 @@ impl ServerCaps {
             match atom.to_ascii_uppercase().as_str() {
                 "SPECIAL-USE" => caps.special_use = true,
                 "LIST-EXTENDED" => caps.list_extended = true,
+                "LIST-STATUS" => caps.list_status = true,
                 "QUOTA" => caps.quota = true,
                 "IDLE" => caps.idle = true,
                 "UIDPLUS" => caps.uidplus = true,
