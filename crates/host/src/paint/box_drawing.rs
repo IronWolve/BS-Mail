@@ -83,6 +83,10 @@ pub fn draw_box(canvas: &mut Canvas, cell: PixelRect, stroke: u32, glyph: BoxGly
         draw_corner_arc(canvas, cell, stroke, glyph, color);
         return;
     }
+    if let Some(corner) = glyph.double_corner() {
+        draw_double_corner(canvas, cell, stroke, corner, color);
+        return;
+    }
     let center_x = cell.x + cell.width as i32 / 2;
     let center_y = cell.y + cell.height as i32 / 2;
     for (offset, thickness) in glyph.left.lines(stroke) {
@@ -104,6 +108,64 @@ pub fn draw_box(canvas: &mut Canvas, cell: PixelRect, stroke: u32, glyph: BoxGly
         let left = center_x + offset - thickness as i32 / 2;
         let top = center_y - thickness as i32 / 2;
         fill_span(canvas, left, top, thickness, (cell.bottom() - top) as u32, color);
+    }
+}
+
+/// A double-line corner: which way its horizontal and its vertical arm go,
+/// as +1 (right, down) or -1 (left, up).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DoubleCorner {
+    across: i32,
+    down: i32,
+}
+
+impl BoxGlyph {
+    /// The corner this glyph is when it is two double arms at a right angle.
+    fn double_corner(&self) -> Option<DoubleCorner> {
+        let is_double = |weight: Weight| weight == Weight::Double;
+        let horizontal = match (self.left, self.right) {
+            (Weight::None, right) if is_double(right) => 1,
+            (left, Weight::None) if is_double(left) => -1,
+            _ => return None,
+        };
+        let vertical = match (self.up, self.down) {
+            (Weight::None, down) if is_double(down) => 1,
+            (up, Weight::None) if is_double(up) => -1,
+            _ => return None,
+        };
+        Some(DoubleCorner { across: horizontal, down: vertical })
+    }
+}
+
+/// A double corner: two lines each way that turn together. Each horizontal
+/// line runs from the cell's edge to the vertical line it turns into, and each
+/// vertical line from its edge to the horizontal line it turns into, so the
+/// outer pair meet in one pixel and the inner pair in another, and neither
+/// pair pokes through the other. The outer horizontal turns into the outer
+/// vertical, whichever corner it is.
+fn draw_double_corner(canvas: &mut Canvas, cell: PixelRect, stroke: u32, corner: DoubleCorner, color: Rgb) {
+    let thickness = stroke;
+    let gap = stroke.max(1) as i32;
+    let center_x = cell.x + cell.width as i32 / 2;
+    let center_y = cell.y + cell.height as i32 / 2;
+    for offset in [-gap, gap] {
+        // The vertical line this horizontal one turns into, and back.
+        let partner = corner.across * corner.down * offset;
+        let top = center_y + offset - thickness as i32 / 2;
+        let left = center_x + partner - thickness as i32 / 2;
+        let (from, to) = if corner.across > 0 { (left, cell.right()) } else { (cell.x, left + thickness as i32) };
+        fill_between(canvas, (from.max(cell.x), to.min(cell.right())), (top, top + thickness as i32), color);
+        let line_left = center_x + offset - thickness as i32 / 2;
+        let turn_top = center_y + corner.across * corner.down * offset - thickness as i32 / 2;
+        let (from, to) = if corner.down > 0 { (turn_top, cell.bottom()) } else { (cell.y, turn_top + thickness as i32) };
+        fill_between(canvas, (line_left, line_left + thickness as i32), (from.max(cell.y), to.min(cell.bottom())), color);
+    }
+}
+
+/// The pixels from `x.0` up to `x.1` and from `y.0` up to `y.1`, if any.
+fn fill_between(canvas: &mut Canvas, x: (i32, i32), y: (i32, i32), color: Rgb) {
+    if x.1 > x.0 && y.1 > y.0 {
+        canvas.fill(x.0, y.0, (x.1 - x.0) as u32, (y.1 - y.0) as u32, color);
     }
 }
 
