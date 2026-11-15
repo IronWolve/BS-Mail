@@ -17,9 +17,9 @@ use crate::view_state::{Focus, ListPage, OverlayKind};
 use crate::widgets::{BodyView, DrawContext, HighlightRules, row_offsets, visible_rows, visual_len};
 
 impl AppView {
-    /// Reacts to one input event on a `cols` x `rows` grid. Returns whether
-    /// anything on screen may have changed, so the host knows to redraw.
-    pub fn handle_input(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
+    /// Reacts to one input event on a `cols` x `rows` grid, once the text a
+    /// command key brought with it has been set aside (see `paired_text`).
+    pub(crate) fn dispatch_input(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
         if self.setup.is_some() {
             return self.setup_input(event, grid);
         }

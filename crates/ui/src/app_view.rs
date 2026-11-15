@@ -70,6 +70,11 @@ pub struct AppView {
     pub(crate) composer: Option<ComposeForm>,
     /// The user clicked Quit; the program closes it, the screen cannot.
     pub(crate) quit_requested: bool,
+    /// The letter of a command key just pressed, whose text is still to come:
+    /// a window and a terminal both report a printable key as the key and
+    /// then the text it types, and the text of a key that did something is
+    /// not for whatever that opened.
+    pub(crate) paired_text: Option<char>,
     /// Messages marked with Space, which the change keys then act on together.
     pub(crate) marked: BTreeSet<MessageId>,
     /// The folder picker, while one is open to move messages.
@@ -123,6 +128,7 @@ impl AppView {
             drag: None,
             composer: None,
             quit_requested: false,
+            paired_text: None,
             marked: BTreeSet::new(),
             picker: None,
             delete_prompt: None,

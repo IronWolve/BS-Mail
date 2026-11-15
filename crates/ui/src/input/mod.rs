@@ -16,6 +16,7 @@ pub mod marks;
 pub mod movement;
 pub mod options;
 pub mod options_press;
+pub mod paired_text;
 pub mod picker;
 pub mod search;
 pub mod setup;
