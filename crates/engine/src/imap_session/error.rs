@@ -188,7 +188,15 @@ fn describe_certificate(problem: &rustls::CertificateError) -> String {
         C::NotValidForName | C::NotValidForNameContext { .. } => {
             "it is for a different host name".to_owned()
         }
-        other => format!("{other:?}"),
+        C::Revoked => "it has been revoked".to_owned(),
+        C::BadEncoding => "it is not a valid certificate".to_owned(),
+        C::BadSignature | C::UnsupportedSignatureAlgorithmContext { .. } => {
+            "its signature could not be checked".to_owned()
+        }
+        C::InvalidPurpose => "it is not meant for this kind of connection".to_owned(),
+        // Anything else, and anything a later version of the library adds:
+        // a fixed sentence, never the library's debug text.
+        _ => "it could not be verified".to_owned(),
     }
 }
 

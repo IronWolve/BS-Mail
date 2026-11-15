@@ -12,7 +12,7 @@ use tokio_rustls::TlsConnector;
 
 use super::error::SmtpError;
 use super::timeouts::SmtpTimeouts;
-use super::wire::Wire;
+use super::wire::{Wire, WireError};
 use crate::account_config::{Security, Trust};
 use crate::account_smtp::SmtpSettings;
 use crate::imap_session::{ConnectError, MailStream, classify_tls, client_config};
@@ -55,9 +55,19 @@ pub async fn start_tls(
 ) -> Result<Wire, SmtpError> {
     let tcp = wire
         .into_socket()
-        .map_err(|error| SmtpError::TlsFailed(format!("{error:?}")))?;
+        .map_err(|error| SmtpError::TlsFailed(wire_words(error)))?;
     let stream = upgrade(settings, host.trim_matches(['[', ']']), tcp, limit).await?;
     Ok(Wire::new(stream))
+}
+
+/// A connection that could not be taken over for the secure handshake, in
+/// words, not as the debug form of the error.
+fn wire_words(error: WireError) -> String {
+    match error {
+        WireError::Unreadable(text) | WireError::Io(text) => text,
+        WireError::Closed => "the server closed the connection".to_owned(),
+        WireError::TimedOut => "the server stopped answering".to_owned(),
+    }
 }
 
 async fn tcp_connect(
