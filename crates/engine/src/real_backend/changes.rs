@@ -158,6 +158,12 @@ impl Worker {
         session.leave_write().await?;
         if !tally.updates.is_empty() {
             let updates = std::mem::take(&mut tally.updates);
+            // Its own changes are not something that happened elsewhere.
+            for (id, flags) in &updates {
+                if let Some((folder, uid)) = self.state.message_key(*id) {
+                    self.poll.note_flags(folder, [(uid.0, *flags)]);
+                }
+            }
             self.sink.send(Event::FlagsChanged { updates });
         }
         if tally.stale {

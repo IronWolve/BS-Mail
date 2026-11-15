@@ -4,7 +4,10 @@
 //! from the last look it sends what a sync of the open folder sends: the
 //! folder list with fresh counts, the newest page with the same ids for the
 //! messages already known, and the sync status with the number of arrivals.
-//! A look that finds nothing changed sends nothing at all.
+//! A look that finds nothing changed sends nothing at all. Counts do not say
+//! when another program stars or answers a message, so a look that sees no
+//! change in them also asks for the flags of the newest messages the screen
+//! knows in the open folder and sends the ones that differ.
 //!
 //! Every fifth look also reads the counts of the whole folder list again,
 //! quietly: it sends the list only if something in it differs.
@@ -16,11 +19,15 @@
 
 use std::time::Duration;
 
-use model::{Event, FolderId, FolderRole, SyncState};
+use model::{Event, FolderId, FolderRole, SyncState, Uid};
 
 use super::lifecycle::{now_unix, progress};
 use super::worker::Worker;
-use crate::imap_session::{ImapSession, SessionError};
+use crate::imap_session::{ImapSession, SessionError, UidSet};
+
+/// How many of the newest messages of the open folder have their flags looked
+/// at in each check.
+const FLAG_LOOK_ROWS: usize = 100;
 
 /// What one look found.
 #[derive(Debug, Default)]
@@ -64,6 +71,8 @@ impl Worker {
         }
         if found.changed.contains(&open) && !self.search_shown {
             events.extend(self.refreshed_page(session, open).await?);
+        } else if !self.search_shown {
+            events.extend(self.look_at_flags(session, open).await?);
         }
         if !events.is_empty() {
             self.poll.add_arrived(found.arrived);
@@ -98,6 +107,39 @@ impl Worker {
             }
         }
         Ok(found)
+    }
+
+    /// Asks for the flags of the newest messages known in the open folder and
+    /// says which differ from what was known: another program may have
+    /// starred or answered them. A refusal, or a folder that was rebuilt in
+    /// the meantime, gives no events.
+    async fn look_at_flags(&mut self, session: &mut ImapSession, folder: FolderId) -> Result<Vec<Event>, SessionError> {
+        let asked = self.poll.flag_uids(folder, FLAG_LOOK_ROWS);
+        let Some(set) = UidSet::new(asked.iter().copied()) else {
+            return Ok(Vec::new());
+        };
+        let Some(path) = self.state.folder_path(folder).map(str::to_owned) else {
+            return Ok(Vec::new());
+        };
+        let reopened = match session.ensure_examined(&path).await {
+            Ok(reopened) => reopened,
+            Err(error) if error.is_lost() => return Err(error),
+            Err(_) => return Ok(Vec::new()),
+        };
+        if reopened.is_some_and(|info| self.state.note_validity(folder, info.uid_validity)) {
+            return Ok(Vec::new());
+        }
+        let rows = match session.read_flags(&set).await {
+            Ok(rows) => rows,
+            Err(error) if error.is_lost() => return Err(error),
+            Err(_) => return Ok(Vec::new()),
+        };
+        let changed = self.poll.changed_flags(folder, &asked, rows);
+        if changed.is_empty() {
+            return Ok(Vec::new());
+        }
+        let updates = changed.into_iter().map(|(uid, flags)| (self.state.message_id(folder, Uid(uid)), flags)).collect();
+        Ok(vec![Event::FlagsChanged { updates }])
     }
 
     /// The newest page of the open folder, as a sync reads it. A refusal

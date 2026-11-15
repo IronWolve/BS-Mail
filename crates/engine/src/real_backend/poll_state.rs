@@ -3,6 +3,8 @@
 
 use std::collections::HashMap;
 
+use model::{Flags, FolderId};
+
 use crate::imap_session::StatusCounts;
 
 /// Every this many checks, the counts of the whole folder list are read
@@ -16,6 +18,11 @@ pub(super) struct PollState {
     known: HashMap<String, StatusCounts>,
     checks: u32,
     arrived: u32,
+    /// The flags last known for the messages of each folder that was shown,
+    /// by UID: what a page said, what the program itself changed, what the
+    /// last look found. Another program can change a flag without changing
+    /// any count STATUS reports, so the flags are asked for and compared.
+    flags: HashMap<FolderId, HashMap<u32, Flags>>,
 }
 
 impl PollState {
@@ -24,6 +31,42 @@ impl PollState {
     pub(super) fn next_check(&mut self) -> bool {
         self.checks += 1;
         self.checks % FULL_REFRESH_EVERY == 0
+    }
+
+    /// Takes in the flags of messages the screen was just given (a page) or
+    /// that the program itself changed, so they are not mistaken later for a
+    /// change made elsewhere.
+    pub(super) fn note_flags(&mut self, folder: FolderId, rows: impl IntoIterator<Item = (u32, Flags)>) {
+        self.flags.entry(folder).or_default().extend(rows);
+    }
+
+    /// The UIDs whose flags are looked at: the newest `most` known in the
+    /// folder.
+    pub(super) fn flag_uids(&self, folder: FolderId, most: usize) -> Vec<u32> {
+        let mut uids: Vec<u32> = self.flags.get(&folder).map(|known| known.keys().copied().collect()).unwrap_or_default();
+        uids.sort_unstable_by(|a, b| b.cmp(a));
+        uids.truncate(most);
+        uids
+    }
+
+    /// Compares what the server says now (`now`, for the UIDs asked about)
+    /// with what was known, and keeps the new flags. Returns the messages
+    /// whose flags differ. A message with nothing known before is only
+    /// remembered, and one that is gone from the answer is forgotten.
+    pub(super) fn changed_flags(&mut self, folder: FolderId, asked: &[u32], now: Vec<(u32, Flags)>) -> Vec<(u32, Flags)> {
+        let known = self.flags.entry(folder).or_default();
+        let present: Vec<u32> = now.iter().map(|(uid, _)| *uid).collect();
+        known.retain(|uid, _| !asked.contains(uid) || present.contains(uid));
+        let mut changed = Vec::new();
+        for (uid, flags) in now {
+            if let Some(before) = known.insert(uid, flags)
+                && before != flags
+            {
+                changed.push((uid, flags));
+            }
+        }
+        changed.sort_by_key(|(uid, _)| *uid);
+        changed
     }
 
     /// Messages that arrived since the program started.

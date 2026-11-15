@@ -226,13 +226,16 @@ impl Worker {
     }
 
     fn envelopes_of(&mut self, folder: FolderId, fetched: &[Fetch]) -> Vec<Envelope> {
-        fetched
+        let envelopes: Vec<Envelope> = fetched
             .iter()
             .filter_map(fetched_row)
             .map(|row| {
                 let id = self.state.message_id(folder, model::Uid(row.uid));
                 build_envelope(id, folder, &row)
             })
-            .collect()
+            .collect();
+        // What the screen now holds is what a later look compares with.
+        self.poll.note_flags(folder, envelopes.iter().map(|envelope| (envelope.uid.0, envelope.flags)));
+        envelopes
     }
 }
