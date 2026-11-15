@@ -100,6 +100,10 @@ impl AppView {
             return;
         }
         self.clear_marks();
+        // The hits are not the folder's own list: drop them, so the folder's
+        // newest page replaces them instead of being merged with them (which
+        // would keep hits from other folders under this folder's name).
+        self.mail.page = None;
         if let Some(folder) = self.selection.folder {
             self.queue.push(Command::OpenFolder { folder });
         }
