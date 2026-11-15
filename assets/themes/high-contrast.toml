@@ -1,0 +1,59 @@
+# The high-contrast theme: pure black and white with two accents, yellow and
+# cyan. It inherits the default theme and replaces its palette, so every role
+# keeps its meaning; every text color is at least 7:1 against its background
+# (a test checks it). With only two accents, danger is also underlined, so it
+# never rests on color alone.
+
+name = "high-contrast"
+inherits = "neon-night"
+
+[palette]
+bg         = "#000000"
+bg_raised  = "#262626"   # menus, dialogs, hover row
+border     = "#ffffff"
+text       = "#ffffff"
+text_dim   = "#c8c8c8"
+green      = "#ffff00"
+green_hi   = "#ffff00"
+lime       = "#ffff00"
+mint       = "#ffff00"
+cyan       = "#00ffff"
+cyan_hi    = "#00ffff"
+ice        = "#00ffff"
+blue       = "#00ffff"
+blue_sel   = "#0000c0"   # selected message row: white, yellow and cyan all read on it
+keycap     = "#00ffff"
+yellow     = "#ffff00"
+lemon      = "#ffff00"
+orange     = "#ffff00"
+red        = "#ffff00"
+magenta    = "#00ffff"
+on_accent  = "#000000"
+
+[roles]
+"footer.error"           = { underline = true }
+"strip.offline"          = { underline = true }
+"subject.warning"        = { underline = true }
+"subject.tag.alert"      = { underline = true }
+
+[ansi16]
+bg        = "black"
+bg_raised = "black"
+text      = "bright-white"
+text_dim  = "white"
+border    = "bright-white"
+green     = "bright-yellow"
+green_hi  = "bright-yellow"
+lime      = "bright-yellow"
+mint      = "bright-yellow"
+cyan      = "bright-cyan"
+cyan_hi   = "bright-cyan"
+ice       = "bright-cyan"
+blue_sel  = "blue"
+keycap    = "bright-cyan"
+yellow    = "bright-yellow"
+lemon     = "bright-yellow"
+orange    = "bright-yellow"
+red       = "bright-yellow"
+magenta   = "bright-cyan"
+on_accent = "black"
