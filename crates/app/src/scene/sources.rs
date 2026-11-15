@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use engine::{AccountConfig, Member, MockBackend, MultiBackend, RealBackend};
 use model::AccountId;
+use model::config::WindowConfig;
 use ui::AppView;
 
 use crate::accounts::{Live, Place, Scan, members_of, reason_of};
@@ -25,6 +26,7 @@ pub(super) fn mock(mut view: AppView, base: Base, path: &Path) -> Result<Scene, 
         messages: backend.fixture().messages.len(),
         fixed_now: Some(backend.now()),
         font: (12, 1.0),
+        window: WindowConfig::default(),
         backend: Box::new(backend),
         source: path.to_path_buf(),
         label: "mock data",
@@ -70,6 +72,7 @@ fn real(mut view: AppView, base: Base, members: Vec<Member>, place: Place, sourc
         messages: 0,
         fixed_now: None,
         font: (12, 1.0),
+        window: WindowConfig::default(),
         backend: Box::new(multi),
         source: source.0,
         label: source.1,

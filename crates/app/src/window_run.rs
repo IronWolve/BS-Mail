@@ -1,8 +1,10 @@
 //! The screen in its own window.
 
+use std::path::PathBuf;
 use std::time::Instant;
 
 use host::{Palette, WindowOptions, run_window};
+use model::config::WindowConfig;
 use surface::Capabilities;
 use ui::layout::{MIN_COLS, MIN_ROWS};
 
@@ -22,13 +24,15 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
     scene.prime();
     let data_dir = data_dir(options.data_dir.as_ref());
     let remembered = data_dir.as_ref().map(|dir| state_file::load(dir));
-    let (cols, rows) = starting_grid(options.size, remembered.as_ref());
+    let remember_size = scene.window.remember_geometry;
+    let (cols, rows) = starting_grid(options.size, remembered.as_ref(), remember_size);
     let window = WindowOptions {
         title: display_name().to_string(),
         cols,
         rows,
         min_cols: MIN_COLS,
         min_rows: MIN_ROWS,
+        maximized: opens_maximized(&scene.window, options.size),
         points: scene.font.0,
         line_spacing: scene.font.1,
         palette: Palette::new(scene.base.0, scene.base.1),
@@ -41,7 +45,7 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         .with_accounts(scene.live.clone())
         .with_settings(scene.settings.clone());
     if let Some(dir) = data_dir {
-        screen = screen.remember_in(dir);
+        screen = remember(screen, dir, remember_size, remembered);
     }
     if options.smoke {
         screen = screen.stop_after(1);
@@ -67,12 +71,30 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
 }
 
 /// The grid the window opens at: one asked for on the command line, else the
-/// one it had when it last closed, else the reference grid.
-fn starting_grid(size: SizeChoice, remembered: Option<&state_file::State>) -> (u16, u16) {
-    match (size, remembered.and_then(|state| state.grid)) {
+/// one it had when it last closed (when the settings remember it), else the
+/// reference grid.
+fn starting_grid(size: SizeChoice, remembered: Option<&state_file::State>, remember: bool) -> (u16, u16) {
+    match (size, remembered.filter(|_| remember).and_then(|state| state.grid)) {
         (SizeChoice::Reference, Some(grid)) => grid,
         _ => window_grid(size),
     }
+}
+
+/// What the window leaves in the data folder: the bar sizes always, and its
+/// own size when the settings remember it. With the size not remembered the
+/// one already in the file is left as it is.
+fn remember(screen: Screen, dir: PathBuf, size: bool, loaded: Option<state_file::State>) -> Screen {
+    if size {
+        screen.remember_in(dir)
+    } else {
+        screen.remember_layout_in(dir, loaded.unwrap_or_default())
+    }
+}
+
+/// Whether the window opens maximized: the settings ask for it and no size
+/// was asked for on the command line, which wins.
+fn opens_maximized(window: &WindowConfig, size: SizeChoice) -> bool {
+    window.start_maximized && matches!(size, SizeChoice::Reference)
 }
 
 #[cfg(test)]

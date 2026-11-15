@@ -5,8 +5,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct WindowConfig {
-    /// Remember size, position, maximized and full-screen state.
+    /// Reopen at the size the window had when it closed. Position, maximized
+    /// and full-screen state are not remembered yet.
     pub remember_geometry: bool,
+    /// Open the window maximized, unless a size was asked for on the command
+    /// line.
     pub start_maximized: bool,
     pub title_shows_folder: bool,
 }

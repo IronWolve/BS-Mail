@@ -32,7 +32,8 @@ pub fn create_window(
 }
 
 /// What the window asks for: title, first size and smallest size, all in
-/// logical pixels so the display's own scaling applies them.
+/// logical pixels so the display's own scaling applies them, and whether it
+/// opens maximized.
 fn attributes(
     event_loop: &ActiveEventLoop,
     options: &WindowOptions,
@@ -45,6 +46,7 @@ fn attributes(
         .with_title(options.title.clone())
         .with_inner_size(LogicalSize::new(width, height))
         .with_min_inner_size(LogicalSize::new(least_width, least_height))
+        .with_maximized(options.maximized)
 }
 
 /// The usable part of the monitor, in logical pixels, when one is known.

@@ -40,6 +40,7 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
         options.points.unwrap_or(loaded.config.font.size),
         options.line_spacing.unwrap_or(loaded.config.font.line_spacing),
     );
+    let window = loaded.config.window.clone();
     let icons = options.icons.unwrap_or_else(|| icon_kind(loaded.config.appearance.icons));
     engine::set_body_preference(loaded.config.reader.prefer);
     let mut view = AppView::new(identity(), loaded.theme, loaded.config, IconSet::new(icons));
@@ -52,6 +53,7 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
     let mut scene = scene_for(&source, view, base, &scanned)?;
     scene.lock = lock;
     scene.font = font;
+    scene.window = window;
     scene.settings = Settings::start(options, data.as_deref(), font, note_is_about_settings);
     scene.view.set_theme_names(scene.settings.theme_names().to_vec());
     if let Some(live) = &scene.live {

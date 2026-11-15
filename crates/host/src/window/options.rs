@@ -15,6 +15,9 @@ pub struct WindowOptions {
     /// The grid below which the window will not shrink.
     pub min_cols: u16,
     pub min_rows: u16,
+    /// Open the window maximized; the grid above is then only the size it
+    /// takes if it is restored.
+    pub maximized: bool,
     /// Text size in points, before the display's scale factor.
     pub points: u8,
     /// Multiplies the row height.
@@ -43,6 +46,7 @@ impl Default for WindowOptions {
             rows: 48,
             min_cols: 40,
             min_rows: 16,
+            maximized: false,
             points: 12,
             line_spacing: 1.0,
             palette: Palette::default(),

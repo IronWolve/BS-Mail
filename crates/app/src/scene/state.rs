@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use model::config::WindowConfig;
 use model::{MailBackend, MailDate};
 use ui::AppView;
 
@@ -42,6 +43,8 @@ pub struct Scene {
     /// Text size in points and row height, from the command line or the
     /// settings.
     pub font: (u8, f32),
+    /// What the settings say about the window's size and start state.
+    pub window: WindowConfig,
     /// What answers the Options screen's requests about settings.
     pub settings: Settings,
     /// The hold on the data folder, kept until the run ends; `None` for mock
