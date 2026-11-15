@@ -1,23 +1,20 @@
 //! Making the window.
 //!
 //! The first size is the reference grid at the current text size, cut to the
-//! monitor's usable area. The title comes from the binary; nothing here knows
+//! monitor's usable area, and so is the smallest size. The title comes from the binary; nothing here knows
 //! the program's name.
 
 use std::sync::Arc;
 
 use surface::HostError;
-use winit::dpi::LogicalSize;
+use winit::dpi::{LogicalSize, PhysicalPosition};
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowAttributes};
 
 use crate::font::CellMetrics;
 
-use super::geometry::{minimum_pixels, window_pixels};
+use super::geometry::{MonitorArea, minimum_pixels, window_pixels};
 use super::options::WindowOptions;
-
-/// How much of the monitor the first window may take.
-const SCREEN_SHARE: f64 = 0.92;
 
 /// Opens the window for `options`, measured with `metrics` at scale factor 1.
 pub fn create_window(
@@ -31,31 +28,44 @@ pub fn create_window(
     Ok(Arc::new(window))
 }
 
-/// What the window asks for: title, first size and smallest size, all in
-/// logical pixels so the display's own scaling applies them, and whether it
-/// opens maximized.
+/// What the window asks for: title, first size, smallest size and place, all
+/// in logical pixels (the place in physical ones) so the display's own scaling
+/// applies them, and whether it opens maximized. Both sizes are cut to the
+/// monitor's usable area, and the window opens centered on it. A window system
+/// that does not let a program place a window ignores the position.
 fn attributes(
     event_loop: &ActiveEventLoop,
     options: &WindowOptions,
     metrics: &CellMetrics,
 ) -> WindowAttributes {
-    let limit = work_area(event_loop);
+    let monitor = monitor_area(event_loop);
+    let limit = monitor.map(|area| area.usable());
     let (width, height) = window_pixels(metrics, options.cols, options.rows, limit);
-    let (least_width, least_height) = minimum_pixels(metrics, options.min_cols, options.min_rows);
-    Window::default_attributes()
+    let (least_width, least_height) = minimum_pixels(metrics, options.min_cols, options.min_rows, limit);
+    let attributes = Window::default_attributes()
         .with_title(options.title.clone())
         .with_inner_size(LogicalSize::new(width, height))
         .with_min_inner_size(LogicalSize::new(least_width, least_height))
-        .with_maximized(options.maximized)
+        .with_maximized(options.maximized);
+    match monitor {
+        Some(area) if !options.maximized => {
+            let (x, y) = area.centered((width, height));
+            attributes.with_position(PhysicalPosition::new(x, y))
+        }
+        _ => attributes,
+    }
 }
 
-/// The usable part of the monitor, in logical pixels, when one is known.
-fn work_area(event_loop: &ActiveEventLoop) -> Option<(u32, u32)> {
+/// The monitor the window opens on, when one is known.
+fn monitor_area(event_loop: &ActiveEventLoop) -> Option<MonitorArea> {
     let monitor = event_loop
         .primary_monitor()
         .or_else(|| event_loop.available_monitors().next())?;
+    let origin = monitor.position();
     let size = monitor.size();
-    let scale = monitor.scale_factor().max(0.1);
-    let logical = |pixels: u32| (f64::from(pixels) / scale * SCREEN_SHARE).max(1.0) as u32;
-    Some((logical(size.width), logical(size.height)))
+    Some(MonitorArea {
+        origin: (origin.x, origin.y),
+        size: (size.width, size.height),
+        scale: monitor.scale_factor(),
+    })
 }
