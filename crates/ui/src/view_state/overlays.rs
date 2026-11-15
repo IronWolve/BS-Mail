@@ -11,6 +11,8 @@ pub enum OverlayKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Overlays {
     pub open: Option<OverlayKind>,
+    /// The first help row shown, when the grid is too short for all of them.
+    pub help_scroll: usize,
 }
 
 impl Overlays {

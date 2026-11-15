@@ -12,6 +12,7 @@ pub mod dispatch;
 pub mod drag;
 pub mod dragging;
 pub mod folder_change;
+pub mod help_scroll;
 pub mod hidden;
 pub mod hit;
 pub mod marks;

@@ -13,6 +13,7 @@ pub mod folder_tree;
 pub mod footer;
 pub mod gauge;
 pub mod help_overlay;
+pub mod help_rows;
 pub mod key_bar;
 pub mod list_header;
 pub mod list_rows;
@@ -41,7 +42,7 @@ pub use folder_tree::{
 };
 pub use footer::{FooterData, draw_footer};
 pub use gauge::draw_gauge;
-pub use help_overlay::draw_help;
+pub use help_overlay::{draw_help, help_capacity, help_max_scroll};
 pub use key_bar::{button_at, draw_key_bar};
 pub use list_header::{column_align, column_label, draw_list_header};
 pub use list_rows::{ListRowsView, draw_list_rows};

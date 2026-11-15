@@ -56,6 +56,9 @@ pub struct Capabilities {
     pub clipboard: ClipboardKind,
     /// The host can change the font size at run time.
     pub font_zoom: bool,
+    /// The host has its own full-screen key (a window does; a terminal is
+    /// what the terminal program makes of it).
+    pub full_screen: bool,
 }
 
 impl Capabilities {
@@ -69,6 +72,7 @@ impl Capabilities {
             pointer_shapes: true,
             clipboard: ClipboardKind::Native,
             font_zoom: true,
+            full_screen: true,
         }
     }
 
@@ -83,6 +87,7 @@ impl Capabilities {
             pointer_shapes: false,
             clipboard: ClipboardKind::Escape,
             font_zoom: false,
+            full_screen: false,
         }
     }
 }

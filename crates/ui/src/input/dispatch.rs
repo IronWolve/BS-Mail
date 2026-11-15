@@ -42,7 +42,7 @@ impl AppView {
             return self.search_input(event);
         }
         if self.overlays.is_open() {
-            return self.input_over_overlay(event);
+            return self.input_over_overlay(event, grid);
         }
         match event {
             InputEvent::Key(key) => match action_for(key) {
@@ -75,8 +75,12 @@ impl AppView {
     }
 
     /// While a screen is open over this one, a key press or a click closes
-    /// it and nothing else reaches the screen underneath.
-    fn input_over_overlay(&mut self, event: &InputEvent) -> bool {
+    /// it and nothing else reaches the screen underneath. Help that is cut
+    /// short on a small grid first takes the keys that scroll it.
+    fn input_over_overlay(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
+        if self.help_scrolls(event, grid) {
+            return true;
+        }
         let closes = matches!(
             event,
             InputEvent::Key(_)
@@ -87,6 +91,7 @@ impl AppView {
         );
         if closes {
             self.overlays.open = None;
+            self.overlays.help_scroll = 0;
         }
         closes
     }
@@ -135,7 +140,10 @@ impl AppView {
             Action::ToggleStar => self.toggle_star(),
             Action::Delete => self.delete_selected(),
             Action::Sync => self.refresh(),
-            Action::Help => self.overlays.open = Some(OverlayKind::Help),
+            Action::Help => {
+                self.overlays.open = Some(OverlayKind::Help);
+                self.overlays.help_scroll = 0;
+            }
             Action::Options => self.open_options(),
             Action::Move => self.start_move(),
             Action::Search => self.start_search(),
