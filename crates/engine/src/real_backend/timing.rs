@@ -85,6 +85,14 @@ impl Timing {
         self
     }
 
+    /// How long the server may send nothing while a message is coming,
+    /// instead of the usual wait, for tests that watch a stalled download.
+    #[cfg(feature = "test-support")]
+    pub const fn with_body_silence(mut self, silence: Duration) -> Self {
+        self.timeouts.body = silence;
+        self
+    }
+
     /// Closing waits this long for a send under way, for tests.
     #[cfg(feature = "test-support")]
     pub const fn with_send_grace(mut self, grace: Duration) -> Self {

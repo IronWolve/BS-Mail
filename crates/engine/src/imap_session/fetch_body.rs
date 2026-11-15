@@ -5,12 +5,16 @@
 //! message can carry attachments of any weight, and the reading pane has no
 //! use for most of them. The server says how large the whole message is, so
 //! the caller can tell when it was cut.
+//!
+//! The wait on the server is judged by progress, not by the clock alone: a
+//! download that keeps arriving is not a lost connection however long a slow
+//! link takes (see `bounded_by_progress`).
 
 use futures_util::TryStreamExt;
 
 use super::error::SessionError;
 use super::session::ImapSession;
-use super::timeouts::bounded;
+use super::timeouts::{BODY_CEILING, bounded_by_progress};
 
 /// The most of one message that is downloaded to read it.
 pub const MAX_BODY_BYTES: u32 = 16 * 1024 * 1024;
@@ -34,10 +38,11 @@ impl ImapSession {
     /// The start of the message with this UID from the open mailbox, or `None`
     /// when the server no longer has it.
     pub async fn fetch_body(&mut self, uid: u32) -> Result<Option<RawMessage>, SessionError> {
-        let limit = self.limits.body;
+        let silence = self.limits.body;
+        let arrived = self.inner.get_ref().read_counter();
         let session = &mut self.inner;
         let query = format!("(UID RFC822.SIZE BODY.PEEK[]<0.{MAX_BODY_BYTES}>)");
-        let result = bounded(limit, async {
+        let result = bounded_by_progress(silence, BODY_CEILING, &arrived, async {
             session.uid_fetch(uid.to_string(), &query).await?.try_collect().await
         })
         .await;

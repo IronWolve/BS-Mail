@@ -5,6 +5,8 @@
 
 use std::io;
 use std::pin::Pin;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::task::{Context, Poll};
 
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
@@ -17,11 +19,29 @@ enum Wire {
     Tls(Box<TlsStream<TcpStream>>),
 }
 
+/// A running total of the bytes read from the server. It can be read while
+/// the stream is busy inside a command, which is how a download that is still
+/// coming is told from one that has stopped.
+#[derive(Debug, Clone, Default)]
+pub struct ReadCounter(Arc<AtomicU64>);
+
+impl ReadCounter {
+    /// Every byte read so far.
+    pub fn total(&self) -> u64 {
+        self.0.load(Ordering::Relaxed)
+    }
+
+    pub(super) fn add(&self, bytes: usize) {
+        self.0.fetch_add(bytes as u64, Ordering::Relaxed);
+    }
+}
+
 /// The wire under an IMAP session.
 #[derive(Debug)]
 pub struct MailStream {
     wire: Wire,
     peer_closed: bool,
+    received: ReadCounter,
 }
 
 impl MailStream {
@@ -29,6 +49,7 @@ impl MailStream {
         Self {
             wire: Wire::Plain(tcp),
             peer_closed: false,
+            received: ReadCounter::default(),
         }
     }
 
@@ -36,6 +57,7 @@ impl MailStream {
         Self {
             wire: Wire::Tls(Box::new(stream)),
             peer_closed: false,
+            received: ReadCounter::default(),
         }
     }
 
@@ -45,6 +67,12 @@ impl MailStream {
             Wire::Plain(tcp) => Some(tcp),
             Wire::Tls(_) => None,
         }
+    }
+
+    /// A handle on the count of bytes read, which stays usable while a
+    /// command holds the stream.
+    pub fn read_counter(&self) -> ReadCounter {
+        self.received.clone()
     }
 
     /// True once a read has found the server's end closed.
@@ -66,8 +94,13 @@ impl AsyncRead for MailStream {
             Wire::Plain(stream) => Pin::new(stream).poll_read(cx, buf),
             Wire::Tls(stream) => Pin::new(stream.as_mut()).poll_read(cx, buf),
         };
-        if matches!(polled, Poll::Ready(Ok(()))) && room && buf.filled().len() == before {
-            this.peer_closed = true;
+        if matches!(polled, Poll::Ready(Ok(()))) {
+            let got = buf.filled().len() - before;
+            if got > 0 {
+                this.received.add(got);
+            } else if room {
+                this.peer_closed = true;
+            }
         }
         polled
     }
