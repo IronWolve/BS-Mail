@@ -359,7 +359,7 @@ impl AppView {
 
     fn reader_title_data<'a>(&'a self, page: &'a ListPage) -> Option<ReaderTitleData<'a>> {
         let envelope = page.envelopes.get(self.selection.message_index)?;
-        let unread = self.mailbox_summary().map_or(0, |mailbox| mailbox.unread);
+        let unread = self.list_summary().map_or(0, |mailbox| mailbox.unread);
         Some(ReaderTitleData {
             subject: &envelope.subject,
             position: u64::from(page.offset) + self.selection.message_index as u64 + 1,

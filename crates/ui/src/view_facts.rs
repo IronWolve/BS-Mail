@@ -45,8 +45,18 @@ impl AppView {
     }
 
     /// What the list's title names: the open mailbox, or the search whose
-    /// results are showing, with how many of them are unread.
+    /// results are showing, with how many of them are unread. While messages
+    /// are marked it also says how many, since the keys that change mail act
+    /// on them and the marks themselves may not fit on a narrow list.
     pub(crate) fn list_summary(&self) -> Option<MailboxSummary> {
+        let mut summary = self.list_summary_without_marks()?;
+        if !self.marked.is_empty() {
+            summary.name = format!("{}, {} marked", summary.name, self.marked.len());
+        }
+        Some(summary)
+    }
+
+    fn list_summary_without_marks(&self) -> Option<MailboxSummary> {
         let Some(search) = &self.search else {
             return self.mailbox_summary();
         };

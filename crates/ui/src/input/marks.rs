@@ -64,12 +64,15 @@ impl AppView {
             .map(|page| page.envelopes.as_slice())
     }
 
-    /// Shows the marked rows: their number cells in reverse.
+    /// Shows the marked rows: their number cells in reverse, or, when the
+    /// number column is not there (a narrow list, or one set up without it),
+    /// the first cell that is.
     pub(crate) fn show_marks(&self, frame: &mut Frame, list: &ListRegion, first: usize, envelopes: &[Envelope]) {
         if self.marked.is_empty() {
             return;
         }
-        let Some(number) = list.columns.slots.iter().find(|slot| slot.id == ColumnId::Num) else {
+        let slots = &list.columns.slots;
+        let Some(number) = slots.iter().find(|slot| slot.id == ColumnId::Num).or_else(|| slots.first()) else {
             return;
         };
         for (line, envelope) in envelopes.iter().skip(first).take(usize::from(list.rows.height)).enumerate() {
