@@ -4,7 +4,7 @@ use model::{
     Account, AccountId, Body, Envelope, Event, Folder, FolderId, MessageId, SyncStatus,
 };
 
-use super::page_merge::{append_older, merge_newest};
+use super::page_merge::{append_older, merge_newest_without};
 use super::selection::Selection;
 
 /// The machine the engine runs on, for the strip's host segment.
@@ -36,6 +36,15 @@ pub struct MailSnapshot {
     pub body: Option<(MessageId, Body)>,
     /// The last failure the backend reported, until something succeeds.
     pub error: Option<String>,
+    /// The account the failure in `error` is about, when the backend said
+    /// which. Only that account getting well, or its own answers, end it; the
+    /// ones of the account on screen leave another account's failure alone.
+    /// `None` for a note of the screen's own.
+    pub error_account: Option<AccountId>,
+    /// Messages the user asked to move or delete, whose rows leave the list
+    /// with the newest page that follows. Older loaded rows the count says
+    /// are gone are taken out by name from this.
+    pub relocated: Vec<MessageId>,
     /// The account does not let the program change mail. A backend that
     /// never says so is taken to allow it.
     pub changes_refused: bool,
@@ -76,23 +85,19 @@ impl MailSnapshot {
             }
             Event::FolderList { account, folders } => {
                 if is_shown(selection, &account) {
-                    self.folders = folders;
-                    for folder in &mut self.folders {
-                        if let Some(open) = self.expanded_by_user.get(&folder.id) {
-                            folder.expanded = *open;
-                        }
-                    }
-                    selection.choose_folder(&self.folders);
+                    self.apply_folders(folders, selection);
                 }
             }
             Event::ConnectionState { account, state } => {
                 if let Some(entry) = self.accounts.iter_mut().find(|a| a.id == account) {
                     entry.state = state;
                 }
-                // Another account coming online says nothing about the failure
-                // shown for the one in view.
-                if state == model::ConnectionState::Online && is_shown(selection, &account) {
-                    self.error = None;
+                // An account coming online ends its own failure, and the one
+                // of the screen's own when it is the account in view; it says
+                // nothing about another account's.
+                let own = is_shown(selection, &account) || self.error_account.as_ref() == Some(&account);
+                if state == model::ConnectionState::Online && own {
+                    self.clear_failure(Some(&account));
                 }
             }
             Event::Quota { account, quota } => {
@@ -111,27 +116,98 @@ impl MailSnapshot {
         }
     }
 
+    /// Whether a page of `folder` is one the screen takes. A page for a folder
+    /// the user has already left is stale. So is a page for a folder this
+    /// account does not have: after a switch of account the folder list is
+    /// empty until the new account's arrives, and a page of the account that
+    /// was left must not be shown meanwhile.
+    pub fn accepts_page(&self, folder: FolderId, selection: &Selection) -> bool {
+        let left = selection.folder.is_some_and(|chosen| chosen != folder);
+        !left && self.folders.iter().any(|known| known.id == folder)
+    }
+
     /// A page of a folder. The newest page read again keeps the older mail
     /// that was loaded below it; any other page replaces what is shown.
     fn apply_page(&mut self, folder: FolderId, offset: u32, total: u32, envelopes: Vec<Envelope>, selection: &mut Selection) {
-        // A page for a folder the user has already left is stale.
-        if selection.folder.is_some_and(|chosen| chosen != folder) {
-            return;
-        }
-        // So is a page for a folder this account does not have: after a switch
-        // of account the folder list is empty until the new account's arrives,
-        // and a page of the account that was left must not be shown meanwhile.
-        if !self.folders.iter().any(|known| known.id == folder) {
+        if !self.accepts_page(folder, selection) {
             return;
         }
         let shown = self.page.take().filter(|page| page.folder == folder && offset == 0);
         let envelopes = match shown {
-            Some(shown) => merge_newest(shown.envelopes, total, envelopes),
-            None => envelopes,
+            Some(shown) => self.merged_with(shown.envelopes, total, envelopes),
+            None => {
+                self.relocated.clear();
+                envelopes
+            }
         };
         selection.page_loaded(folder, &envelopes);
-        self.error = None;
+        self.clear_failure(selection.account.as_ref());
         self.page = Some(ListPage { folder, offset, total, envelopes });
+    }
+
+    /// The newest page put on top of the list that was shown. The messages
+    /// named in `relocated` that are still below the page stay named, for a
+    /// page that does not show the change yet; the others are settled.
+    fn merged_with(&mut self, old: Vec<Envelope>, total: u32, new: Vec<Envelope>) -> Vec<Envelope> {
+        let on_page: Vec<MessageId> = new.iter().map(|envelope| envelope.id).collect();
+        let merged = merge_newest_without(old, total, new, &self.relocated);
+        self.relocated
+            .retain(|id| !on_page.contains(id) && merged.iter().any(|envelope| envelope.id == *id));
+        merged
+    }
+
+    /// The folder tree of the account on screen. A folder that was open and is
+    /// no longer there leaves nothing of its mail behind: the list, the
+    /// message and its body go until the folder the selection moves to has
+    /// its own page.
+    fn apply_folders(&mut self, folders: Vec<Folder>, selection: &mut Selection) {
+        self.folders = folders;
+        for folder in &mut self.folders {
+            if let Some(open) = self.expanded_by_user.get(&folder.id) {
+                folder.expanded = *open;
+            }
+        }
+        let before = selection.folder;
+        selection.choose_folder(&self.folders);
+        if selection.folder != before {
+            self.page = None;
+            self.body = None;
+            self.relocated.clear();
+            selection.message = None;
+            selection.message_index = 0;
+        }
+    }
+
+    /// Records what the user's own screen has to say (a note, a partial
+    /// answer), replacing any failure shown. `None` clears it.
+    pub fn set_note(&mut self, note: Option<String>) {
+        self.error = note;
+        self.error_account = None;
+    }
+
+    /// Ends the failure shown when it is about `account`, or is a note that
+    /// is not about any. `None` is for an answer with no account in view.
+    fn clear_failure(&mut self, account: Option<&AccountId>) {
+        if self.error_account.is_none() || self.error_account.as_ref() == account {
+            self.set_note(None);
+        }
+    }
+
+    /// A failure the backend reported. One of an account that is not on screen
+    /// says which account it is, since the footer holds only one line.
+    fn note_failure(&mut self, account: Option<AccountId>, operation: &str, reason: &str, selection: &Selection) {
+        let text = match account.as_ref().filter(|id| !is_shown(selection, id)) {
+            Some(id) => {
+                let name = self.account(id).map_or(id.0.as_str(), |known| known.name.as_str());
+                format!("{name}: {operation}: {reason}")
+            }
+            None => format!("{operation}: {reason}"),
+        };
+        self.error = Some(text);
+        self.error_account = account;
+        if operation == "move" || operation == "delete" {
+            self.relocated.clear();
+        }
     }
 
     /// A page of older mail. It only means something next to the list it
@@ -145,7 +221,7 @@ impl MailSnapshot {
         }
         page.envelopes = append_older(std::mem::take(&mut page.envelopes), envelopes);
         page.total = total;
-        self.error = None;
+        self.clear_failure(selection.account.as_ref());
     }
 
     fn apply_list_event(&mut self, event: Event, selection: &mut Selection) {
@@ -157,12 +233,12 @@ impl MailSnapshot {
                 self.apply_older(folder, total, envelopes, selection);
             }
             Event::BodyReady { message, body } => {
-                self.error = None;
+                self.clear_failure(selection.account.as_ref());
                 self.body = Some((message, body));
             }
-            Event::OpFailed {
-                operation, reason, ..
-            } => self.error = Some(format!("{operation}: {reason}")),
+            Event::OpFailed { account, operation, reason } => {
+                self.note_failure(account, &operation, &reason, selection);
+            }
             Event::FlagsChanged { updates } => {
                 let Some(page) = self.page.as_mut() else {
                     return;

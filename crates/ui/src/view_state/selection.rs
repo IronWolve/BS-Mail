@@ -46,18 +46,23 @@ impl Selection {
     }
 
     /// A page of `folder` was loaded: that folder is the one shown, and the
-    /// selected message stays if it is on the page, else the first row.
+    /// selected message stays if it is on the page. If it is gone from it, the
+    /// row now at its place is selected (the last one when it was the last), so
+    /// a message removed elsewhere does not throw the reader to the top. With
+    /// no message selected, the first row is.
     pub fn page_loaded(&mut self, folder: FolderId, envelopes: &[Envelope]) {
         self.folder = Some(folder);
         let kept = self
             .message
             .and_then(|id| envelopes.iter().position(|envelope| envelope.id == id));
-        match kept {
-            Some(index) => self.message_index = index,
-            None => {
-                self.message_index = 0;
-                self.message = envelopes.first().map(|envelope| envelope.id);
-            }
+        let index = match (kept, self.message) {
+            (Some(index), _) => index,
+            (None, Some(_)) => self.message_index.min(envelopes.len().saturating_sub(1)),
+            (None, None) => 0,
+        };
+        self.message_index = index;
+        if kept.is_none() {
+            self.message = envelopes.get(index).map(|envelope| envelope.id);
         }
     }
 }
