@@ -166,23 +166,17 @@ fn shortcut(form: &mut SetupForm, ch: char, shift: bool) -> Outcome {
     let Some(buffer) = form.focused_buffer() else {
         return Outcome::Ignored;
     };
+    // Whether the text really changed: an undo with nothing to undo leaves the
+    // field as it was and must not count as the user's own edit, or a guessed
+    // server would stop following the address.
     let edits_text = match ch.to_ascii_lowercase() {
         'a' => {
             buffer.select_all();
             false
         }
-        'z' if shift => {
-            buffer.redo();
-            true
-        }
-        'z' => {
-            buffer.undo();
-            true
-        }
-        'y' => {
-            buffer.redo();
-            true
-        }
+        'z' if shift => buffer.redo(),
+        'z' => buffer.undo(),
+        'y' => buffer.redo(),
         _ => return Outcome::Ignored,
     };
     if edits_text {
