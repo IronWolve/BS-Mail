@@ -52,7 +52,7 @@ impl Worker {
     ) -> Result<(), SessionError> {
         let folder = self.state.folders().iter().find(|f| f.role == FolderRole::Sent).cloned();
         let Some((folder, target)) = folder.and_then(|f| SentFolder::from_folder(&f).map(|t| (f, t))) else {
-            drop_file(&copy);
+            self.no_sent_folder(&copy);
             return Ok(());
         };
         if copy.uncertain && self.sent_already_has(session, &target, &copy).await? {
@@ -141,13 +141,33 @@ impl Worker {
         Ok(())
     }
 
+    /// No folder is known as Sent (a localized name, or one nested under
+    /// another, that the server does not mark): the copy stays on disk, since
+    /// it is the only record of what went out, and the person is told once
+    /// per run which folders were seen and how to stop the copies.
+    fn no_sent_folder(&mut self, copy: &SentCopy) {
+        if std::mem::replace(&mut self.no_sent_told, true) {
+            return;
+        }
+        let seen: Vec<&str> = self.state.folders().iter().map(|folder| folder.name.as_str()).take(10).collect();
+        let kept = if copy.file.is_some() { "its copy is kept on disk" } else { "its copy could not be kept" };
+        self.sink.send(self.sink.failure(
+            OPERATION,
+            format!(
+                "the message was sent, but no Sent folder was recognized (folders seen: {}), so {kept}; \
+                 if the provider files sent mail itself, set save_sent = false in the account file",
+                seen.join(", ")
+            ),
+        ));
+    }
+
     /// The copy cannot be saved yet: the mailbox connection is down. It waits
-    /// for the reconnect. An account known to have no Sent folder has nothing
-    /// to save to and hears nothing.
+    /// for the reconnect. An account known to have no Sent folder keeps the
+    /// copy where it is and says so (see `no_sent_folder`).
     pub(super) fn sent_copy_offline(&mut self, copy: SentCopy) {
         let folders = self.state.folders();
         if !folders.is_empty() && !folders.iter().any(|f| f.role == FolderRole::Sent) {
-            drop_file(&copy);
+            self.no_sent_folder(&copy);
             return;
         }
         let later = if copy.file.is_some() {

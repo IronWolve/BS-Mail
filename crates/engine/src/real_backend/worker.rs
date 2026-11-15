@@ -64,6 +64,8 @@ pub(super) struct Worker {
     pub(super) answered_waiting: Vec<MessageId>,
     /// The sends on their way, which closing waits for.
     pub(super) sends: SendsInFlight,
+    /// The person was told, in this run, that no Sent folder is recognized.
+    pub(super) no_sent_told: bool,
 }
 
 /// How a pause between connection attempts ended.
@@ -100,6 +102,7 @@ impl Worker {
             answers: Inbox::new(),
             answered_waiting: Vec::new(),
             sends,
+            no_sent_told: false,
         }
     }
 
