@@ -4,9 +4,11 @@
 //! began, without it the selection is dropped. Vertical moves follow the
 //! screen's wrapped lines, so they need the width of the pane.
 
+use std::sync::Arc;
+
 use super::editor_buffer::{EditorBuffer, Pos};
 use super::graphemes::{cells_between, count, is_blank, list, width};
-use super::wrap::{VisualLine, visual_index, wrap};
+use super::wrap::{VisualLine, visual_index};
 
 impl EditorBuffer {
     /// Where a move starts from: ends the typing run, and sets or drops the
@@ -94,7 +96,7 @@ impl EditorBuffer {
     /// end, as most editors do.
     pub fn move_vertical(&mut self, down: bool, room: usize, extend: bool) {
         self.start_move(extend);
-        let visual = wrap(&self.lines, room);
+        let visual = self.visual_lines(room);
         let here = visual_index(&visual, self.cursor.line, self.cursor.col);
         let target = if down { here + 1 } else { here.wrapping_sub(1) };
         let Some(piece) = visual.get(target).copied() else {
@@ -109,6 +111,13 @@ impl EditorBuffer {
         let x = self.goal.unwrap_or_else(|| self.cell_in_piece(visual[here]));
         self.cursor = self.position_at(&visual, target, piece, x);
         self.goal = Some(x);
+    }
+
+    /// The screen lines of the text in a pane `room` cells wide. They are
+    /// kept until the text changes or the width does, so a paint and a run of
+    /// vertical steps wrap the text once.
+    pub(super) fn visual_lines(&self, room: usize) -> Arc<[VisualLine]> {
+        self.wrapped.visual(self.revision(), &self.lines, room)
     }
 
     /// The cell column of the cursor within its screen line.
@@ -140,7 +149,7 @@ impl EditorBuffer {
     /// Where the cursor is on screen in a pane `room` cells wide: the screen
     /// line from the top of the text, and the cell within it.
     pub fn cursor_cell(&self, room: usize) -> (usize, usize) {
-        let visual = wrap(&self.lines, room);
+        let visual = self.visual_lines(room);
         let at = visual_index(&visual, self.cursor.line, self.cursor.col);
         (at, self.cell_in_piece(visual[at]))
     }

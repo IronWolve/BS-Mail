@@ -7,6 +7,7 @@
 
 use super::graphemes::{byte_of, count, list};
 use super::history::{History, Kind, Snapshot};
+use super::wrap_cache::WrapCache;
 
 /// A place in the text: the line, and the grapheme within it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
@@ -25,6 +26,10 @@ pub struct EditorBuffer {
     pub(super) goal: Option<usize>,
     pub(super) history: History,
     single_line: bool,
+    /// Counts the changes made to `lines`, so a kept wrapping is known stale.
+    /// Every place that changes `lines` calls `text_changed`.
+    revision: u64,
+    pub(super) wrapped: WrapCache,
 }
 
 impl EditorBuffer {
@@ -47,6 +52,8 @@ impl EditorBuffer {
             goal: None,
             history: History::default(),
             single_line,
+            revision: 0,
+            wrapped: WrapCache::default(),
         };
         buffer.set_text(text);
         buffer
@@ -56,6 +63,7 @@ impl EditorBuffer {
     pub fn set_text(&mut self, text: &str) {
         let text = normalize(text, self.single_line);
         self.lines = text.split('\n').map(str::to_string).collect();
+        self.text_changed();
         let last = self.lines.len() - 1;
         self.cursor = Pos {
             line: last,
@@ -64,6 +72,16 @@ impl EditorBuffer {
         self.anchor = None;
         self.goal = None;
         self.history = History::default();
+    }
+
+    /// Marks the text as changed, which drops any kept wrapping.
+    fn text_changed(&mut self) {
+        self.revision = self.revision.wrapping_add(1);
+    }
+
+    /// The revision of the text, which differs after every change to it.
+    pub(super) fn revision(&self) -> u64 {
+        self.revision
     }
 
     pub fn text(&self) -> String {
@@ -215,6 +233,7 @@ impl EditorBuffer {
 
     fn restore(&mut self, snapshot: Snapshot) -> bool {
         self.lines = snapshot.lines;
+        self.text_changed();
         self.cursor = snapshot.cursor;
         self.anchor = None;
         self.goal = None;
@@ -249,6 +268,7 @@ impl EditorBuffer {
         let head = head_to(&self.lines[from.line], from.col);
         let tail = tail_from(&self.lines[to.line], to.col);
         self.lines.splice(from.line..=to.line, [head + &tail]);
+        self.text_changed();
         self.cursor = from;
         self.anchor = None;
     }
@@ -268,6 +288,7 @@ impl EditorBuffer {
         new_lines[0].insert_str(0, &head);
         new_lines[last].push_str(&tail);
         self.lines.splice(line..=line, new_lines);
+        self.text_changed();
         self.cursor = Pos {
             line: line + last,
             col: end_col,

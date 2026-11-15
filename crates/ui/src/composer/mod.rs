@@ -11,6 +11,7 @@ pub mod history;
 pub mod input;
 pub mod reply;
 pub mod wrap;
+mod wrap_cache;
 
 pub use editor_buffer::{EditorBuffer, Pos};
 pub use form::{ComposeForm, Field, Progress};

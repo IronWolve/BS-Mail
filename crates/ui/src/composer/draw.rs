@@ -7,7 +7,6 @@ use super::editor_buffer::{EditorBuffer, Pos};
 use super::form::{ComposeForm, Field, Progress};
 use super::graphemes::{cells_between, count, list, width};
 use super::input::Pane;
-use super::wrap::wrap;
 use crate::theme::roles;
 use crate::widgets::{DrawContext, fill_cells, put_text};
 
@@ -130,12 +129,18 @@ fn draw_rule(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect) {
 }
 
 fn draw_body(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, form: &ComposeForm) {
-    let visual = wrap(form.body.lines(), usize::from(rect.width));
+    let visual = form.body.visual_lines(usize::from(rect.width));
     let selection = form.body.selection().filter(|_| form.focus == Field::Body);
     let style = ctx.fg(roles::BODY_TEXT);
+    // The pieces of one logical line follow each other, so its graphemes are
+    // listed once, not once per screen row.
+    let mut listed: Option<(usize, Vec<&str>)> = None;
     for (row, piece) in visual.iter().skip(form.body_scroll).take(usize::from(rect.height)).enumerate() {
         let y = rect.y + u16::try_from(row).unwrap_or(u16::MAX);
-        let graphemes = list(&form.body.lines()[piece.line]);
+        if listed.as_ref().is_none_or(|(line, _)| *line != piece.line) {
+            listed = Some((piece.line, list(&form.body.lines()[piece.line])));
+        }
+        let graphemes = listed.as_ref().map_or(&[][..], |(_, graphemes)| graphemes.as_slice());
         let mut x = rect.x;
         for index in piece.start..piece.end {
             let selected = is_selected(selection, Pos { line: piece.line, col: index });

@@ -16,9 +16,17 @@ pub struct VisualLine {
     pub end: usize,
 }
 
+#[cfg(test)]
+thread_local! {
+    /// How many times `wrap` ran on this thread, for tests of the kept wrapping.
+    pub(super) static RUNS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// Cuts every logical line to `width` cells. An empty line is one empty
 /// visual line, so it can hold the cursor.
 pub fn wrap(lines: &[String], width: usize) -> Vec<VisualLine> {
+    #[cfg(test)]
+    RUNS.with(|runs| runs.set(runs.get() + 1));
     let width = width.max(1);
     let mut out = Vec::new();
     for (index, text) in lines.iter().enumerate() {
