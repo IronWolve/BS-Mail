@@ -109,6 +109,16 @@ pub fn window_grid(size: SizeChoice) -> (u16, u16) {
 }
 
 /// Reads the arguments. `--flag value` and `--flag=value` both work.
+/// The folder a flag names. An empty or blank name is refused: taken as a
+/// path it means the folder the program happens to run in, and the accounts,
+/// the lock and the settings would be written there.
+fn folder_value(text: &str, flag: &str) -> Result<PathBuf, String> {
+    if text.trim().is_empty() {
+        return Err(format!("{flag} needs the name of a folder, not an empty value"));
+    }
+    Ok(PathBuf::from(text))
+}
+
 pub fn parse(args: &[String]) -> Result<Options, String> {
     let mut options = Options::default();
     let mut rest = split_pairs(args).into_iter();
@@ -135,7 +145,7 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
             "--mock" => options.mock = Some(PathBuf::from(value(&mut rest, &argument)?)),
             "--setup" => options.setup = true,
             "--account" => options.account = Some(PathBuf::from(value(&mut rest, &argument)?)),
-            "--data-dir" => options.data_dir = Some(PathBuf::from(value(&mut rest, &argument)?)),
+            "--data-dir" => options.data_dir = Some(folder_value(&value(&mut rest, &argument)?, &argument)?),
             "--size" => options.size = parse_size(&value(&mut rest, &argument)?)?,
             "--fit" => options.size = SizeChoice::Fit,
             "--icons" => options.icons = Some(parse_icons(&value(&mut rest, &argument)?)?),
