@@ -7,7 +7,6 @@ use std::path::PathBuf;
 use crate::account_writer::save_account;
 use crate::private_dirs;
 
-use super::merge::carry_over;
 use super::plan::Plan;
 
 /// What saving did.
@@ -22,7 +21,7 @@ pub struct Saved {
 /// keeps the keys of the old file that the form cannot express; adding one
 /// refuses to write over a file that appeared since the plan was made.
 pub fn save(plan: &Plan) -> Result<Saved, String> {
-    let text = if plan.edit { merged(plan) } else { refuse_if_taken(plan)?; plan.text.clone() };
+    let text = if plan.edit { unchanged_since_planned(plan)? } else { refuse_if_taken(plan)?; plan.text.clone() };
     if let Some(folder) = plan.file.parent().filter(|dir| !dir.as_os_str().is_empty()) {
         private_dirs::make(folder).map_err(|error| format!("could not make the folder {}: {error}", folder.display()))?;
     }
@@ -30,11 +29,16 @@ pub fn save(plan: &Plan) -> Result<Saved, String> {
     Ok(Saved { file: plan.file.clone(), kept_old_as: saved.kept_old_as })
 }
 
-fn merged(plan: &Plan) -> String {
-    match fs::read_to_string(&plan.file) {
-        Ok(old) => carry_over(&old, &plan.text),
-        Err(_) => plan.text.clone(),
+/// The text of a changed account. The plan already carries the old file's
+/// keys, since that is the account that was tried; so the old file is read
+/// once more and must still be what it was when the plan was made, or it was
+/// changed by something else in the meantime and what was tried is no longer
+/// what would be saved over it.
+fn unchanged_since_planned(plan: &Plan) -> Result<String, String> {
+    if fs::read_to_string(&plan.file).ok() != plan.old_text {
+        return Err("the account file was changed while this was being tried; try again".to_string());
     }
+    Ok(plan.text.clone())
 }
 
 /// A new account in a folder under the root must find no account file there.

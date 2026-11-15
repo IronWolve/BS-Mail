@@ -5,11 +5,13 @@
 //! different address gets `-2`, `-3`…, and an address that is already set up
 //! is refused, so nothing is tried or written for it.
 
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use engine::AccountConfig;
 
 use super::id::{is_valid_id, unique_id};
+use super::merge::carry_over;
 use super::place::Place;
 use super::reason::reason_of;
 
@@ -33,6 +35,9 @@ pub struct Plan {
     pub new_folder: bool,
     /// A new account under the root: its file must not be there already.
     pub exclusive: bool,
+    /// For a change to an account: the old file's text when the plan was made
+    /// (`None`: there was no file), so saving can refuse if it changed since.
+    pub old_text: Option<String>,
 }
 
 impl std::fmt::Debug for Plan {
@@ -63,15 +68,21 @@ fn in_file(place: &Place, edit: Option<&str>, config: AccountConfig, text: &str)
     let (Some(file), Some(folder)) = (place.file_of(&config.id), place.folder_of(&config.id)) else {
         return Err("there is no place to save this account".to_string());
     };
+    let (config, text, old_text) = if edit.is_some() {
+        with_old_keys(&file, config, text.to_string())?
+    } else {
+        (config, text.to_string(), None)
+    };
     Ok(Plan {
         id: config.id.clone(),
-        text: text.to_string(),
+        text,
         config,
         file,
         folder,
         edit: edit.is_some(),
         new_folder: false,
         exclusive: false,
+        old_text,
     })
 }
 
@@ -104,8 +115,29 @@ fn finish(place: &Place, id: String, config: AccountConfig, text: &str, edit: bo
         return Err(format!("\"{id}\" cannot be the name of an account folder"));
     };
     let (config, text) = if config.id == id { (config, text.to_string()) } else { with_id(&id, text)? };
+    let (config, text, old_text) = if edit { with_old_keys(&file, config, text)? } else { (config, text, None) };
     let new_folder = !folder.exists();
-    Ok(Plan { id, text, config, file, folder, edit, new_folder, exclusive: !edit })
+    Ok(Plan { id, text, config, file, folder, edit, new_folder, exclusive: !edit, old_text })
+}
+
+/// For a change to an account that is already saved: the form's text with the
+/// keys of the old file that the form cannot express carried over (a separate
+/// sending login, how often to look for mail), and the account read from that
+/// text. The account that is tried and installed is then the account that is
+/// saved, not a plainer one that only the next start would correct.
+///
+/// The old file's text is returned too, so that saving can tell whether the
+/// file changed since.
+fn with_old_keys(file: &Path, config: AccountConfig, text: String) -> Result<(AccountConfig, String, Option<String>), String> {
+    let Ok(old) = fs::read_to_string(file) else {
+        return Ok((config, text, None));
+    };
+    let merged = carry_over(&old, &text);
+    if merged == text {
+        return Ok((config, text, Some(old)));
+    }
+    let config = AccountConfig::from_toml_str(&merged).map_err(|error| reason_of(&error))?;
+    Ok((config, merged, Some(old)))
 }
 
 /// The same text and account with a different id.
