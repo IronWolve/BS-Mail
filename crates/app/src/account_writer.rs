@@ -93,16 +93,93 @@ fn keep_old(target: &Path, dir: &Path, name: &str) -> Result<Option<PathBuf>, St
 
 /// The text without the entries that hold a secret (a password, an app
 /// password, a client secret: any key that names one, at any depth) and
-/// without any comment that mentions one; `None` when the text is not TOML.
+/// without any comment that mentions one, whether it has a line of its own or
+/// follows a setting on the same line; `None` when the text is not TOML, or
+/// when what is left is not (nothing is kept that cannot be told to be clean).
 fn without_secrets(text: &str) -> Option<String> {
     let mut document: DocumentMut = text.parse().ok()?;
     strip_secrets(document.as_table_mut());
-    let redacted: String = document
-        .to_string()
+    let redacted: String = without_secret_trailing_comments(&document.to_string())
         .split_inclusive('\n')
         .filter(|line| !(line.trim_start().starts_with('#') && mentions_a_secret(line)))
         .collect();
+    redacted.parse::<DocumentMut>().ok()?;
     Some(redacted)
+}
+
+/// Where the scan of a TOML text is: in plain text, or inside one of the four
+/// kinds of string, where a `#` is text and not a comment.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Scan {
+    Plain,
+    Basic,
+    Literal,
+    MultiBasic,
+    MultiLiteral,
+}
+
+/// `text` without the comments that follow a setting on its line and mention
+/// a password or a secret. Only the comment goes, and the spaces before it;
+/// the setting and the rest of the file stay. A comment on a line of its own
+/// is left for the caller, and a `#` inside a string is never a comment. `text`
+/// is TOML that already parsed.
+fn without_secret_trailing_comments(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = String::with_capacity(text.len());
+    let (mut state, mut at, mut content) = (Scan::Plain, 0, false);
+    while at < chars.len() {
+        let ch = chars[at];
+        let run = chars[at..].iter().take_while(|next| **next == ch).count();
+        match (state, ch) {
+            (Scan::Plain, '#') => {
+                let end = chars[at..].iter().position(|c| *c == '\n' || *c == '\r').map_or(chars.len(), |n| at + n);
+                let comment: String = chars[at..end].iter().collect();
+                if content && mentions_a_secret(&comment) {
+                    out.truncate(out.trim_end_matches([' ', '\t']).len());
+                } else {
+                    out.push_str(&comment);
+                }
+                at = end;
+                continue;
+            }
+            (Scan::Plain, '\n') => content = false,
+            (Scan::Plain, '"' | '\'') => {
+                let multi = run >= 3;
+                state = match (ch, multi) {
+                    ('"', true) => Scan::MultiBasic,
+                    ('"', false) => Scan::Basic,
+                    (_, true) => Scan::MultiLiteral,
+                    _ => Scan::Literal,
+                };
+                let take = if multi { 3 } else { 1 };
+                out.extend(&chars[at..at + take]);
+                (at, content) = (at + take, true);
+                continue;
+            }
+            (Scan::Basic | Scan::MultiBasic, '\\') if at + 1 < chars.len() => {
+                out.extend(&chars[at..at + 2]);
+                at += 2;
+                continue;
+            }
+            (Scan::Basic, '"') | (Scan::Literal, '\'') => state = Scan::Plain,
+            (Scan::MultiBasic, '"') | (Scan::MultiLiteral, '\'') if run >= 3 => {
+                // Up to two quotes may sit just before the closing three.
+                out.extend(&chars[at..at + run]);
+                (state, at, content) = (Scan::Plain, at + run, true);
+                continue;
+            }
+            (Scan::MultiBasic, '"') | (Scan::MultiLiteral, '\'') => {
+                out.extend(&chars[at..at + run]);
+                at += run;
+                continue;
+            }
+            _ => {}
+        }
+        content |= !ch.is_whitespace();
+        out.push(ch);
+        at += 1;
+    }
+    out
 }
 
 /// Removes the entries of `table` that hold a secret, and looks inside the
