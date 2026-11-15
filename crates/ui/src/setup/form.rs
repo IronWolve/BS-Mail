@@ -197,8 +197,13 @@ impl SetupForm {
             let browser = preset.as_ref().is_some_and(|preset| preset.browser_first);
             self.signin = if browser { SignIn::Browser } else { SignIn::Password };
         }
-        if let (Some(preset), false) = (preset, self.servers_touched) {
-            self.fill_servers(&preset);
+        if !self.servers_touched {
+            // An address with no known provider must not keep the servers of
+            // the one the address was before: the password would go there.
+            match preset {
+                Some(preset) => self.fill_servers(&preset),
+                None => self.clear_servers(),
+            }
         }
     }
 
@@ -218,6 +223,17 @@ impl SetupForm {
         if saved.is_some() && self.signin == SignIn::Browser {
             self.info = Some("Signing in uses the client id this program already has for this provider.".to_string());
         }
+    }
+
+    /// The servers of a form nobody has filled: no host, the usual ports.
+    fn clear_servers(&mut self) {
+        self.imap_host.set_text("");
+        self.imap_port.set_text("993");
+        self.imap_security = Security::Implicit;
+        self.smtp_host.set_text("");
+        self.smtp_port.set_text("587");
+        self.smtp_security = Security::Starttls;
+        self.files_sent_itself = false;
     }
 
     fn fill_servers(&mut self, preset: &Preset) {

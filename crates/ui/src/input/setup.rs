@@ -227,6 +227,9 @@ impl AppView {
             self.setup_actions.push(SetupAction::OpenLink(page.to_string()));
             return;
         }
+        // Whatever led here, what follows from the address is worked out from
+        // the address as it is now.
+        form.apply_provider();
         match form.to_account_toml() {
             Err(problem) => form.notice = Some(problem),
             Ok(text) => {

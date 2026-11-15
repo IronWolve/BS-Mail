@@ -166,18 +166,32 @@ fn shortcut(form: &mut SetupForm, ch: char, shift: bool) -> Outcome {
     let Some(buffer) = form.focused_buffer() else {
         return Outcome::Ignored;
     };
-    match ch.to_ascii_lowercase() {
-        'a' => buffer.select_all(),
+    let edits_text = match ch.to_ascii_lowercase() {
+        'a' => {
+            buffer.select_all();
+            false
+        }
         'z' if shift => {
             buffer.redo();
+            true
         }
         'z' => {
             buffer.undo();
+            true
         }
         'y' => {
             buffer.redo();
+            true
         }
         _ => return Outcome::Ignored,
+    };
+    if edits_text {
+        // Undo and redo change the address as typing does, so the servers
+        // and the user name that follow from it are worked out again.
+        form.note_edit();
+        if form.focus == SetupField::Email {
+            form.apply_provider();
+        }
     }
     Outcome::Changed
 }
