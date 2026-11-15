@@ -1,15 +1,43 @@
 //! Header text as people read it: encoded words decoded, addresses joined.
 
+use std::borrow::Cow;
+
 use async_imap::imap_proto::Address as WireAddress;
 use mail_parser::MessageParser;
 use model::Address;
 
 use crate::text_clean::single_line;
 
-/// Text from a header field's bytes. Plain text passes straight through;
+/// Text from an envelope field's bytes. Plain text passes straight through;
 /// anything with an encoded word (`=?charset?B?...?=`) is decoded.
 pub fn decode_text(raw: &[u8]) -> String {
-    single_line(&decode_words(raw))
+    single_line(&decode_words(&unescaped(raw)))
+}
+
+/// The text of an envelope field as the server meant it. The parser hands a
+/// quoted string over with its escapes still in it: a `"` or a `\` in the text
+/// arrives as `\"` or `\\`, so a subject of `Quarterly "figures"` would show
+/// its backslashes. In the payload of a quoted string every `"` and `\` is half
+/// of such a pair, so that is what is undone. Text that cannot be a quoted
+/// string's payload (a bare `"`, or a `\` before anything else) came as a
+/// literal, which has no escapes, and is left as it is.
+pub fn unescaped(raw: &[u8]) -> Cow<'_, [u8]> {
+    if !raw.contains(&b'\\') {
+        return Cow::Borrowed(raw);
+    }
+    let mut out = Vec::with_capacity(raw.len());
+    let mut bytes = raw.iter().copied();
+    while let Some(byte) = bytes.next() {
+        match byte {
+            b'\\' => match bytes.next() {
+                Some(next @ (b'\\' | b'"')) => out.push(next),
+                _ => return Cow::Borrowed(raw),
+            },
+            b'"' => return Cow::Borrowed(raw),
+            other => out.push(other),
+        }
+    }
+    Cow::Owned(out)
 }
 
 fn decode_words(raw: &[u8]) -> String {

@@ -6,7 +6,7 @@ use mail_parser::DateTime;
 use model::{Envelope, FolderId, MailDate, MessageId, ThreadId, Uid};
 
 use super::flag_map::map_flags;
-use super::header_text::{decode_text, map_addresses};
+use super::header_text::{decode_text, map_addresses, unescaped};
 
 /// What one FETCH response says about one message.
 pub struct FetchedRow<'a> {
@@ -65,7 +65,7 @@ pub fn build_envelope(id: MessageId, folder: FolderId, row: &FetchedRow<'_>) -> 
         thread: ThreadId(id.0),
         message_id: wire
             .and_then(|e| e.message_id.as_deref())
-            .map(|raw| String::from_utf8_lossy(raw).trim().to_owned())
+            .map(|raw| String::from_utf8_lossy(&unescaped(raw)).trim().to_owned())
             .filter(|text| !text.is_empty()),
     }
 }
