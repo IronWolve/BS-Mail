@@ -79,36 +79,78 @@ impl Authenticator for OneAnswer {
     }
 }
 
+/// Signs in with the account's access token. When the server refuses a token
+/// that was not just issued (the local clock may be wrong about how long it
+/// has left), one fresh token is asked for and the sign-in is tried once more
+/// on the same connection, before the refusal is called final.
 async fn sign_in_with_token(
     client: Client<MailStream>,
     config: &AccountConfig,
     limit: Duration,
 ) -> Result<Session<MailStream>, ConnectError> {
-    let token = access_token(config, limit).await?;
-    let response = xoauth2_raw(&config.username, token.expose()).map_err(ConnectError::OAuthRefused)?;
+    let Some(source) = TokenSource::with_limits(config, HttpLimits::within(limit)) else {
+        return Err(ConnectError::OAuthRefused("this account is not set up for OAuth2".to_owned()));
+    };
+    let issued = within(limit, source.issue()).await?;
+    let (first, client) = match authenticate(client, config, &issued.token, limit).await {
+        Ok(session) => return Ok(session),
+        Err(Refused { error, client: Some(client) }) if !issued.renewed => (error, client),
+        Err(refused) => return Err(refused.error),
+    };
+    let fresh = within(limit, source.after_refusal(&issued.token)).await?;
+    if fresh == issued.token {
+        return Err(first);
+    }
+    authenticate(client, config, &fresh, limit).await.map_err(|refused| refused.error)
+}
+
+/// A sign-in that failed. The connection comes back when the server refused
+/// the token and is still there to be asked again.
+struct Refused {
+    error: ConnectError,
+    client: Option<Client<MailStream>>,
+}
+
+impl Refused {
+    fn plain(error: ConnectError) -> Self {
+        Self { error, client: None }
+    }
+}
+
+/// One AUTHENTICATE XOAUTH2 with `token`.
+async fn authenticate(
+    client: Client<MailStream>,
+    config: &AccountConfig,
+    token: &model::Secret,
+    limit: Duration,
+) -> Result<Session<MailStream>, Refused> {
+    let response = xoauth2_raw(&config.username, token.expose()).map_err(|text| Refused::plain(ConnectError::OAuthRefused(text)))?;
     // Whatever the server says back must not repeat the token, or the sign-in
     // line that holds it, which is the response in base64.
     let secrets = [token.expose(), response.as_str()];
     let responder = OneAnswer { blob: Some(response.clone().into_bytes()) };
     match tokio::time::timeout(limit, client.authenticate("XOAUTH2", responder)).await {
         Ok(Ok(session)) => Ok(session),
-        Ok(Err((ImapError::No(text) | ImapError::Bad(text), _))) => {
-            Err(ConnectError::OAuthRefused(server_words_without(&text, &secrets)))
+        Ok(Err((ImapError::No(text) | ImapError::Bad(text), client))) => Err(Refused {
+            error: ConnectError::OAuthRefused(server_words_without(&text, &secrets)),
+            client: Some(client),
+        }),
+        Ok(Err((other, _))) => {
+            Err(Refused::plain(ConnectError::Unreachable(server_words_without(&other.to_string(), &secrets))))
         }
-        Ok(Err((other, _))) => Err(ConnectError::Unreachable(server_words_without(&other.to_string(), &secrets))),
-        Err(_) => Err(ConnectError::Unreachable("the login timed out".to_owned())),
+        Err(_) => Err(Refused::plain(ConnectError::Unreachable("the login timed out".to_owned()))),
     }
 }
 
-/// A fresh access token, with the failure sorted into "sign in again" and
-/// "try again later".
-async fn access_token(config: &AccountConfig, limit: Duration) -> Result<model::Secret, ConnectError> {
-    let Some(source) = TokenSource::with_limits(config, HttpLimits::within(limit)) else {
-        return Err(ConnectError::OAuthRefused("this account is not set up for OAuth2".to_owned()));
-    };
-    // The source has its own deadlines; this one covers the file and the lock.
-    match tokio::time::timeout(limit.saturating_mul(2), source.access_token()).await {
-        Ok(Ok(token)) => Ok(token),
+/// A token step, with the failure sorted into "sign in again" and "try again
+/// later". The source has its own deadlines; this one covers the file and the
+/// lock.
+async fn within<T>(
+    limit: Duration,
+    work: impl std::future::Future<Output = Result<T, TokenError>>,
+) -> Result<T, ConnectError> {
+    match tokio::time::timeout(limit.saturating_mul(2), work).await {
+        Ok(Ok(found)) => Ok(found),
         Ok(Err(TokenError::Permanent(text))) => Err(ConnectError::OAuthRefused(text)),
         Ok(Err(TokenError::Transient(text))) => Err(ConnectError::SignInTrouble(text)),
         Err(_) => Err(ConnectError::SignInTrouble("getting the access token took too long".to_owned())),

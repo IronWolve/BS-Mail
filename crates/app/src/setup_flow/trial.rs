@@ -50,6 +50,7 @@ impl SetupFlow {
             }
             Polled::Failed => {
                 self.attempt = None;
+                self.restore_token();
                 true
             }
         }

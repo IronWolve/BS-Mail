@@ -3,6 +3,8 @@
 //! Nothing is sent unless the connection is under TLS, or is the plain
 //! loopback one the account file allows.
 
+use model::Secret;
+
 use super::error::{SmtpError, Step};
 use super::link::Link;
 use super::caps::ServerCaps;
@@ -73,7 +75,9 @@ impl Link {
 
     /// AUTH XOAUTH2 with a fresh access token. A 334 answer is the server's
     /// error text: it is answered with an empty line, and what follows is the
-    /// refusal.
+    /// refusal. A refusal of a token that was not just issued is tried once
+    /// more with a freshly fetched token, since the local clock may be wrong
+    /// about how long the first one had left.
     async fn auth_xoauth2(
         &mut self,
         settings: &SmtpSettings,
@@ -87,12 +91,21 @@ impl Link {
             return Err(SmtpError::SignInEnded("this account has no sign-in token".to_owned()));
         };
         let wait = self.limits.connect.saturating_mul(2);
-        let token = match tokio::time::timeout(wait, tokens.access_token()).await {
-            Ok(Ok(token)) => token,
-            Ok(Err(TokenError::Permanent(text))) => return Err(SmtpError::SignInEnded(text)),
-            Ok(Err(TokenError::Transient(text))) => return Err(SmtpError::TokenUnavailable(text)),
-            Err(_) => return Err(SmtpError::TokenUnavailable("getting the access token took too long".to_owned())),
-        };
+        let issued = token_within(wait, tokens.issue()).await?;
+        match self.xoauth2_with(settings, &issued.token).await {
+            Err(SmtpError::OAuthRefused(said)) if !issued.renewed && !said.is_temporary() => {
+                let fresh = token_within(wait, tokens.after_refusal(&issued.token)).await?;
+                if fresh == issued.token {
+                    return Err(SmtpError::OAuthRefused(said));
+                }
+                self.xoauth2_with(settings, &fresh).await
+            }
+            other => other,
+        }
+    }
+
+    /// One AUTH XOAUTH2 exchange with `token`.
+    async fn xoauth2_with(&mut self, settings: &SmtpSettings, token: &Secret) -> Result<(), SmtpError> {
         // Whatever the server says back must not repeat the token, or the
         // sign-in line that holds it, which is the blob.
         self.secrets.push(token.expose().to_owned());
@@ -105,6 +118,20 @@ impl Link {
 
     fn expect_signed_in(&self, reply: &super::reply::Reply) -> Result<(), SmtpError> {
         if reply.code == 235 { Ok(()) } else { Err(SmtpError::SignInRefused(self.said(reply))) }
+    }
+}
+
+/// A token step with its own deadline, the failure sorted into "the sign-in
+/// has ended" and "no token just now".
+async fn token_within<T>(
+    wait: std::time::Duration,
+    work: impl std::future::Future<Output = Result<T, TokenError>>,
+) -> Result<T, SmtpError> {
+    match tokio::time::timeout(wait, work).await {
+        Ok(Ok(found)) => Ok(found),
+        Ok(Err(TokenError::Permanent(text))) => Err(SmtpError::SignInEnded(text)),
+        Ok(Err(TokenError::Transient(text))) => Err(SmtpError::TokenUnavailable(text)),
+        Err(_) => Err(SmtpError::TokenUnavailable("getting the access token took too long".to_owned())),
     }
 }
 

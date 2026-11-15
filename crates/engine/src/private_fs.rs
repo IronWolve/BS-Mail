@@ -35,3 +35,19 @@ pub(crate) fn write_new(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     file.write_all(bytes)?;
     file.sync_all()
 }
+
+/// Flushes the folder's own entry list, so a file renamed into it a moment
+/// ago is still there after a power loss. Folders cannot be opened for this on
+/// every system; where they cannot, there is nothing to do.
+#[cfg(unix)]
+pub(crate) fn sync_folder(dir: &Path) -> std::io::Result<()> {
+    std::fs::File::open(dir)?.sync_all()
+}
+
+#[cfg(not(unix))]
+pub(crate) fn sync_folder(_dir: &Path) -> std::io::Result<()> {
+    Ok(())
+}
+
+#[cfg(test)]
+include!("private_fs.tests.rs");

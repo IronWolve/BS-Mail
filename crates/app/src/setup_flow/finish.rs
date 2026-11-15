@@ -1,6 +1,6 @@
 //! A signed-in account: save it, join it to the running ones, show it.
 
-use engine::Member;
+use engine::{Member, previous_token};
 use model::{AccountId, Command, MailBackend};
 use ui::AppView;
 
@@ -19,7 +19,12 @@ impl SetupFlow {
             return;
         };
         if let Err(reason) = save(&plan) {
+            self.restore_token();
             return view.setup_failed(&reason);
+        }
+        // The account file is saved: the new sign-in is the account's own.
+        if let Some(file) = self.token.take() {
+            previous_token::discard(&file);
         }
         self.created = None;
         self.remember_client(&plan, view);

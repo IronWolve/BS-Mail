@@ -8,7 +8,7 @@ use ui::theme::Theme;
 use ui::theme::roles;
 use ui::{AppView, OptionsPaths};
 
-use crate::accounts::{Place, Scan, scan};
+use crate::accounts::{Place, Scan, recover, scan};
 use crate::cli::Options;
 use crate::config_io::{self, CONFIG_NAME};
 use crate::data_lock::{self, DataLock, Refused};
@@ -25,7 +25,7 @@ use super::state::Scene;
 pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, AppError> {
     let data = data_dir(options.data_dir.as_ref());
     let root = data.as_deref().map(accounts_dir);
-    let scanned = match (&root, needs_scan(options)) {
+    let mut scanned = match (&root, needs_scan(options)) {
         (Some(root), true) => scan(root),
         _ => Scan::default(),
     };
@@ -33,6 +33,7 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
     // Listing the accounts above only reads; from here on the run may start
     // sign-ins and write, so only one copy at a time gets to.
     let lock = hold_data_folder(&source)?;
+    scanned.problems.extend(put_right_after_a_hard_stop(&source));
     let loaded = config_io::load(data.as_deref())?;
     let base = base_colors(&loaded.theme);
     let font = (
@@ -72,6 +73,17 @@ fn hold_data_folder(source: &Source) -> Result<Option<DataLock>, AppError> {
         Refused::Busy { holder } => AppError::Locked(folder, holder),
         Refused::Unlockable { reason } => AppError::Unlockable(folder, reason),
     })
+}
+
+/// What an earlier run that was stopped in the middle of adding or changing an
+/// account left in the accounts folder, put right before any account starts.
+/// Only a data folder of its own, which this run now holds the lock on, is
+/// touched: a folder named by `--account` is shared with other runs.
+fn put_right_after_a_hard_stop(source: &Source) -> Vec<String> {
+    match source {
+        Source::Accounts(root) | Source::Empty(root) => recover(root),
+        Source::Mock(_) | Source::Account(_) | Source::Setup(_) => Vec::new(),
+    }
 }
 
 fn scene_for(source: &Source, view: AppView, base: Base, scanned: &Scan) -> Result<Scene, AppError> {

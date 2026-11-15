@@ -17,6 +17,7 @@ impl SetupFlow {
         let config = plan.config.clone().with_state_dir(&plan.folder);
         match self.logins.start(&config) {
             Ok(login) => {
+                self.token = plan.token_file();
                 let url = login.url().to_string();
                 view.setup_browser_link(&url);
                 self.opener.open(&url);

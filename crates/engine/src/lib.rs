@@ -21,10 +21,10 @@ mod sign_in_advice;
 mod text_clean;
 
 pub use account_config::{AccountConfig, ConfigError, Security, SmtpAuth, SmtpSettings, Trust};
-pub use account_oauth::{AuthKind, OAuthSettings};
+pub use account_oauth::{AuthKind, OAuthSettings, token_file_in};
 pub use mime_render::{body_preference, set_body_preference};
 pub use mock::{Fixture, FixtureError};
 pub use mock_backend::MockBackend;
 pub use multi_backend::{Member, MembersHandle, MultiBackend};
-pub use oauth::{BrowserSignIn, HttpLimits, SignInLimits, SignInPoll, TokenError, TokenSource};
+pub use oauth::{BrowserSignIn, HttpLimits, SignInLimits, SignInPoll, TokenError, TokenSource, previous_token};
 pub use real_backend::RealBackend;

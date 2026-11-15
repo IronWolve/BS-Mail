@@ -46,6 +46,14 @@ impl std::fmt::Debug for Plan {
     }
 }
 
+impl Plan {
+    /// The token file this account's browser sign-in writes, when it signs in
+    /// that way.
+    pub fn token_file(&self) -> Option<PathBuf> {
+        self.config.clone().with_state_dir(&self.folder).oauth.map(|oauth| oauth.token_file)
+    }
+}
+
 /// Works out the save of `text` into `place`. `edit` is the id of the account
 /// being changed, `None` for a new one. `in_use` are the ids the running
 /// accounts hold, which a new id must not be.

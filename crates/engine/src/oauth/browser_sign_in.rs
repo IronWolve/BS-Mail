@@ -17,7 +17,9 @@ use tokio::sync::watch;
 
 use super::authorize_url::{AuthorizeRequest, build};
 use super::http::HttpLimits;
-use super::loopback_listener::{ListenError, ListenLimits, Redirect, wait_for_redirect};
+use super::loopback_listener::{
+    ListenError, ListenLimits, Redirect, wait_for_redirect, wait_for_redirect_on_both,
+};
 use super::pkce::{Pkce, random_state};
 use super::token_endpoint::exchange_code;
 use super::token_source::store_sign_in;
@@ -75,6 +77,8 @@ impl fmt::Debug for BrowserSignIn {
 struct Job {
     settings: OAuthSettings,
     listener: StdListener,
+    /// The same port on the IPv6 loopback address, for a `localhost` redirect.
+    listener6: Option<StdListener>,
     redirect_uri: String,
     state: String,
     pkce: Pkce,
@@ -98,9 +102,7 @@ impl BrowserSignIn {
                         or given a state folder)"
                 .to_owned());
         }
-        let listener = StdListener::bind(("127.0.0.1", 0))
-            .and_then(|l| l.set_nonblocking(true).map(|()| l))
-            .map_err(|error| format!("cannot listen on this machine for the browser's return: {error}"))?;
+        let (listener, listener6) = bind_loopback(&settings.redirect_host)?;
         let port = listener.local_addr().map_err(|error| error.to_string())?.port();
         // No trailing slash: a registered `http://localhost` is matched on the host
         // only, and an added path can make it mismatch. The browser still comes
@@ -117,7 +119,7 @@ impl BrowserSignIn {
         });
         let (cancel, cancelled) = watch::channel(false);
         let (sender, result) = channel();
-        let job = Job { settings, listener, redirect_uri, state, pkce, limits, cancelled };
+        let job = Job { settings, listener, listener6, redirect_uri, state, pkce, limits, cancelled };
         let thread = std::thread::Builder::new()
             .name("oauth-sign-in".to_owned())
             .spawn(move || run(job, &sender))
@@ -188,6 +190,22 @@ impl Drop for BrowserSignIn {
     }
 }
 
+/// The listener for the browser's return: IPv4 loopback on a port the system
+/// picks. A redirect to `localhost` is also listened for on the same port at
+/// the IPv6 loopback address, because the name may lead there first and a
+/// browser need not fall back to IPv4. That second socket is best effort: a
+/// machine with no IPv6 loopback (or the port taken there) is served on IPv4
+/// alone, as it was before. The IP literal `127.0.0.1` needs only IPv4.
+fn bind_loopback(redirect_host: &str) -> Result<(StdListener, Option<StdListener>), String> {
+    let quiet = |l: StdListener| l.set_nonblocking(true).map(|()| l);
+    let listener = StdListener::bind(("127.0.0.1", 0))
+        .and_then(quiet)
+        .map_err(|error| format!("cannot listen on this machine for the browser's return: {error}"))?;
+    let port = listener.local_addr().map_err(|error| error.to_string())?.port();
+    let second = (redirect_host == "localhost").then(|| StdListener::bind(("::1", port)).and_then(quiet).ok()).flatten();
+    Ok((listener, second))
+}
+
 /// The thread's body: a runtime of its own, the whole flow, one answer.
 fn run(job: Job, answer: &Sender<Result<(), String>>) {
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build();
@@ -203,10 +221,17 @@ fn run(job: Job, answer: &Sender<Result<(), String>>) {
 }
 
 async fn flow(job: Job) -> Result<(), String> {
-    let Job { settings, listener, redirect_uri, state, pkce, limits, mut cancelled } = job;
-    let listener = TcpListener::from_std(listener).map_err(|error| format!("the local listener failed: {error}"))?;
+    let Job { settings, listener, listener6, redirect_uri, state, pkce, limits, mut cancelled } = job;
+    let failed = |error: std::io::Error| format!("the local listener failed: {error}");
+    let listener = TcpListener::from_std(listener).map_err(failed)?;
     let listen = ListenLimits { wait: limits.wait, request: limits.request };
-    let heard = until_cancelled(&mut cancelled, wait_for_redirect(listener, &state, &listen)).await;
+    let heard = match listener6 {
+        Some(second) => {
+            let second = TcpListener::from_std(second).map_err(failed)?;
+            until_cancelled(&mut cancelled, wait_for_redirect_on_both(listener, second, &state, &listen)).await
+        }
+        None => until_cancelled(&mut cancelled, wait_for_redirect(listener, &state, &listen)).await,
+    };
     let code = match heard? {
         Ok(Redirect::Code(code)) => code,
         Ok(Redirect::Denied(words)) => return Err(format!("the provider did not allow the sign-in: {words}")),
@@ -215,7 +240,12 @@ async fn flow(job: Job) -> Result<(), String> {
     };
     let traded = exchange_code(&settings, &code, pkce.verifier(), &redirect_uri, &limits.http);
     let tokens = until_cancelled(&mut cancelled, traded).await?.map_err(|error| error.to_string())?;
-    store_sign_in(&settings, tokens).await.map_err(|error| error.to_string())
+    // The token file may be waiting on the lock of a refresh. Giving up must
+    // not leave this thread to write the file after the caller has cleaned up:
+    // the write itself is one step after the lock is had, so a cancel either
+    // comes first (nothing is written) or finds it done.
+    let stored = until_cancelled(&mut cancelled, store_sign_in(&settings, tokens)).await?;
+    stored.map_err(|error| error.to_string())
 }
 
 /// The work's result, or the cancelled sentence when cancelling comes first.

@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use model::Secret;
 use serde::{Deserialize, Serialize};
 
-use crate::private_fs::{make_folder, write_new};
+use crate::private_fs::{make_folder, sync_folder, write_new};
 use crate::send::random;
 use crate::sign_in_advice::sign_in_again;
 
@@ -84,7 +84,9 @@ fn check_private(_path: &Path, _meta: &std::fs::Metadata) -> Result<(), FileErro
 
 /// Writes `record` to `path`: the folder is made when missing, the text goes
 /// to a new owner-only file beside it, and that file is renamed over `path`.
-/// On any failure the temporary file is removed and `path` is untouched.
+/// On any failure the temporary file is removed and `path` is untouched. After
+/// the rename the folder is flushed too, so a power loss right after a refresh
+/// cannot bring the old file back (the provider may have ended its tokens).
 pub fn write(path: &Path, record: &TokenRecord) -> Result<(), FileError> {
     let fail = |what: &str, error: &dyn std::fmt::Display| {
         FileError::Failed(format!("cannot save the sign-in tokens to {}: {what}: {error}", path.display()))
@@ -105,6 +107,8 @@ pub fn write(path: &Path, record: &TokenRecord) -> Result<(), FileError> {
         let _ = std::fs::remove_file(&temp);
         return Err(fail("writing the file", &error));
     }
+    // The file is in place; a folder that cannot be flushed changes nothing.
+    let _ = sync_folder(dir);
     Ok(())
 }
 

@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use engine::previous_token;
 use model::MailBackend;
 use ui::AppView;
 
@@ -21,6 +22,11 @@ pub struct SetupFlow {
     /// The id of an account folder that this flow's tries made. If nothing is
     /// saved in it, giving up removes it, and nothing else.
     pub(super) created: Option<String>,
+    /// The token file a browser sign-in of this flow may have replaced. A new
+    /// sign-in sets the earlier tokens aside before it writes (see
+    /// `engine::previous_token`); giving up, a refused account or a failed
+    /// save puts them back, and saving the account lets them go.
+    pub(super) token: Option<std::path::PathBuf>,
     pub(super) logins: Box<dyn BrowserLoginStarter>,
     pub(super) opener: Box<dyn LinkOpener>,
     /// The page opened is the provider's registration page, not a sign-in
@@ -45,7 +51,7 @@ impl SetupFlow {
         opener: Box<dyn LinkOpener>,
         backends: Box<dyn BackendStarter>,
     ) -> Self {
-        Self { live, edit, attempt: None, created: None, logins, opener, registering: false, backends }
+        Self { live, edit, attempt: None, created: None, token: None, logins, opener, registering: false, backends }
     }
 
     /// Takes whatever the form has to say and answers it. Returns whether
@@ -63,16 +69,29 @@ impl SetupFlow {
         changed
     }
 
-    /// Gives up: stops whatever is being tried and removes the account folder
-    /// this flow made, if nothing was saved in it.
+    /// Gives up: stops whatever is being tried, puts back the sign-in tokens
+    /// an earlier account had, and removes the account folder this flow made,
+    /// if nothing was saved in it.
     pub fn abandon(&mut self) {
         self.attempt = None;
+        self.restore_token();
         self.remove_created();
     }
 
+    /// Puts the account's earlier sign-in back (or removes the one a try made
+    /// for an account that was never saved), if a try replaced it. The
+    /// attempt, and with it the sign-in's own thread, is gone before this.
+    pub(super) fn restore_token(&mut self) {
+        if let Some(file) = self.token.take() {
+            let _ = previous_token::restore(&file);
+        }
+    }
+
     fn try_account(&mut self, text: &str, view: &mut AppView) {
-        // A new try ends any attempt still going.
+        // A new try ends any attempt still going, and starts from what was
+        // there before the earlier one.
         self.attempt = None;
+        self.restore_token();
         let planned = plan(&self.live.place, self.edit.as_deref(), &self.live.ids_in_use(), text);
         let plan = match planned {
             Ok(plan) => plan,
@@ -112,6 +131,14 @@ impl SetupFlow {
             Place::Root(root) => Some(Path::to_path_buf(root)),
             Place::File(_) => None,
         }
+    }
+}
+
+impl Drop for SetupFlow {
+    /// A form that goes away (the window closed, the program quitting) gives
+    /// the try up the same way Escape does.
+    fn drop(&mut self) {
+        self.abandon();
     }
 }
 

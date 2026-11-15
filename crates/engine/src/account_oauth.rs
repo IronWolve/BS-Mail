@@ -39,7 +39,8 @@ pub enum AuthKind {
 }
 
 /// The redirect host names the program accepts.
-// The listener binds IPv4 loopback only, so an IPv6 name could not be reached.
+// The listener always binds IPv4 loopback. `localhost` is also served on the
+// IPv6 loopback address when there is one; an IPv6 literal is not accepted.
 const REDIRECT_HOSTS: [&str; 2] = ["127.0.0.1", "localhost"];
 
 /// The values as the file spelled them. Its debug output never shows the
