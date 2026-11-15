@@ -141,6 +141,9 @@ impl AppView {
         let Some(form) = self.composer.as_mut() else {
             return;
         };
+        // Pressing Send is something done since the warning about closing, so
+        // the next close asks again.
+        form.close_armed = false;
         match form.to_outgoing() {
             Err(problem) => form.notice = Some(problem),
             Ok(message) => {
@@ -173,6 +176,7 @@ impl AppView {
             Event::MessageSent { .. } => self.composer = None,
             Event::OpFailed { operation, reason, .. } if operation == "send" => {
                 form.progress = Progress::Writing;
+                form.close_armed = false;
                 form.notice = Some(format!("not sent: {reason}"));
             }
             _ => {}
