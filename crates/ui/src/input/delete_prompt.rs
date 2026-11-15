@@ -101,9 +101,9 @@ impl AppView {
     /// Removes the messages and moves the selection to the nearest one that
     /// stays, so the refreshed page keeps the user's place.
     pub(crate) fn send_delete(&mut self, ids: Vec<MessageId>) {
-        let neighbor = self.neighbor_outside(&ids);
-        self.selection.message = neighbor;
+        self.select_neighbor_outside(&ids);
         self.clear_marks();
+        self.mail.relocated.extend(&ids);
         self.queue.push(Command::Delete { messages: ids });
     }
 }

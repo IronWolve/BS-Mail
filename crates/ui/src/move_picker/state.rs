@@ -2,6 +2,7 @@
 //! the folders down, and which one is highlighted.
 
 use model::{Folder, FolderId, FolderRole, MessageId};
+use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MovePicker {
@@ -65,8 +66,12 @@ impl MovePicker {
         self.cursor = 0;
     }
 
+    /// Removes the last character as the user sees it: a letter with its
+    /// accent, or an emoji with its modifier, goes whole.
     pub fn backspace(&mut self) {
-        self.filter.pop();
+        if let Some((start, _)) = self.filter.grapheme_indices(true).next_back() {
+            self.filter.truncate(start);
+        }
         self.cursor = 0;
     }
 }

@@ -20,7 +20,7 @@ impl AppView {
             return;
         }
         if self.mail.changes_refused {
-            self.mail.error = Some(READ_ONLY_NOTE.to_string());
+            self.mail.set_note(Some(READ_ONLY_NOTE.to_string()));
             return;
         }
         let from = self.folder_all_are_in(&targets);
@@ -88,9 +88,9 @@ impl AppView {
             self.picker = Some(picker);
             return;
         };
-        let neighbor = self.neighbor_outside(&picker.targets);
-        self.selection.message = neighbor;
+        self.select_neighbor_outside(&picker.targets);
         self.clear_marks();
+        self.mail.relocated.extend(&picker.targets);
         self.queue.push(Command::Move {
             messages: picker.targets,
             to: destination,
