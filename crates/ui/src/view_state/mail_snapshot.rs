@@ -89,7 +89,9 @@ impl MailSnapshot {
                 if let Some(entry) = self.accounts.iter_mut().find(|a| a.id == account) {
                     entry.state = state;
                 }
-                if state == model::ConnectionState::Online {
+                // Another account coming online says nothing about the failure
+                // shown for the one in view.
+                if state == model::ConnectionState::Online && is_shown(selection, &account) {
                     self.error = None;
                 }
             }
