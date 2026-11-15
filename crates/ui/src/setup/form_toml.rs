@@ -47,6 +47,7 @@ impl SetupForm {
         let imap_host = host_of(&self.imap_host, "the incoming server")?;
         plain_only_here(&imap_host, self.imap_security, "the incoming server")?;
         let imap_port = port_of(&self.imap_port, "the incoming server's port")?;
+        port_fits_security(imap_port, self.imap_security, "the incoming server", (993, 143))?;
         let username = nonempty(&self.username).unwrap_or_else(|| email.clone());
         let name = nonempty(&self.name).unwrap_or_else(|| email.split('@').next().unwrap_or("").to_string());
 
@@ -95,6 +96,7 @@ impl SetupForm {
         let smtp_host = host_of_text(&smtp_host, "the outgoing server")?;
         plain_only_here(&smtp_host, self.smtp_security, "the outgoing server")?;
         let smtp_port = port_of(&self.smtp_port, "the outgoing server's port")?;
+        port_fits_security(smtp_port, self.smtp_security, "the outgoing server", (465, 587))?;
         let mut put = |key: &str, value: toml::Value| {
             table.insert(key.to_string(), value);
         };
@@ -160,6 +162,24 @@ fn plain_only_here(host: &str, security: Security, what: &str) -> Result<(), Str
         ));
     }
     Ok(())
+}
+
+/// The usual ports go with one kind of security each: a connection to the
+/// first port is encrypted before anything is said, one to the second starts
+/// plain and switches after hello. The other pairing connects and then waits
+/// in silence (each side expects the other to speak first), so the form says
+/// which way to change it before anything is tried.
+fn port_fits_security(port: u16, security: Security, what: &str, (from_start, after_hello): (u16, u16)) -> Result<(), String> {
+    let (tls, starttls) = (Security::Implicit.label(), Security::Starttls.label());
+    match security {
+        Security::Starttls if port == from_start => Err(format!(
+            "check the security of {what}: port {port} is for connections encrypted from the start, so choose \"{tls}\", or use port {after_hello} for \"{starttls}\""
+        )),
+        Security::Implicit if port == after_hello => Err(format!(
+            "check the security of {what}: port {port} starts plain and switches to encryption after hello, so choose \"{starttls}\", or use port {from_start} for \"{tls}\""
+        )),
+        _ => Ok(()),
+    }
 }
 
 /// One `@`, text on both sides, nothing that could not be in an address.

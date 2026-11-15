@@ -93,8 +93,12 @@ pub fn click(form: &mut SetupForm, field: SetupField) -> Outcome {
         form.move_focus(field);
         return Outcome::Submit;
     }
+    let was_focused = form.focus == field;
     form.move_focus(field);
-    if field.is_choice() {
+    // A box ticks at the first click. A choice among several words changes
+    // only when its row already has focus: the first click just goes there,
+    // so clicking a row to look at it never changes the setting.
+    if field == SetupField::AllowChanges || (field.is_choice() && was_focused) {
         form.change_choice(true);
     }
     form.quit_armed = false;
