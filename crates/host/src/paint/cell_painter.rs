@@ -68,6 +68,7 @@ pub fn paint_symbols(
     changes: &CellChanges,
 ) {
     let area = frame.area();
+    let stroke = context.frame_stroke(frame.line_weight);
     for row in area.top()..area.bottom() {
         for col in area.left()..area.right() {
             if changes.replaced.iter().any(|area| contains(*area, col, row)) {
@@ -81,19 +82,22 @@ pub fn paint_symbols(
                     0
                 },
                 inside: frame_inside(context, changes, col, row),
+                stroke,
             };
             paint_symbol(canvas, context, frame, (col, row), plan);
         }
     }
 }
 
-/// What the effects do to one cell.
+/// What the effects and the frame's line weight do to one cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 struct CellPlan {
     /// Pixels to lower this cell by.
     offset: i32,
     /// The inside of an outline the cell sits in, which a bar stays within.
     inside: Option<PixelRect>,
+    /// How thick the lines of a border character are, in pixels.
+    stroke: u32,
 }
 
 fn contains(area: Rect, col: u16, row: u16) -> bool {
@@ -111,7 +115,8 @@ fn frame_inside(
         .framed
         .iter()
         .find(|(area, _)| contains(*area, col, row))?;
-    context.grid.area(*area).shrink(weight + 1)
+    let weight = u8::try_from(*weight).unwrap_or(u8::MAX);
+    context.grid.area(*area).shrink(context.line_pixels(weight) + 1)
 }
 
 /// The symbol of one cell, and the lines its style asks for.
@@ -152,8 +157,7 @@ fn draw_shape_or_glyph(
     (style, plan): (&CellStyle, CellPlan),
 ) {
     if let Some(glyph) = box_glyph(ch) {
-        let stroke = context.grid.metrics.stroke;
-        draw_box(canvas, slot, stroke, glyph, style.fg);
+        draw_box(canvas, slot, plan.stroke, glyph, style.fg);
         return;
     }
     if let Some(block) = block_glyph(ch) {

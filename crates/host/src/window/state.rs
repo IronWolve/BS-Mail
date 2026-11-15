@@ -194,7 +194,7 @@ impl Presenter for WindowState<'_> {
         let palette = self.options.palette;
         self.canvas.clear(palette.bg);
         let grid = self.grid_geometry();
-        let mut context = PaintContext::new(self.fonts, &mut self.cache, grid, palette);
+        let mut context = PaintContext::new(self.fonts, &mut self.cache, grid, palette).with_scale(self.scale_factor);
         paint_frame(&mut self.canvas, &mut context, frame);
         if let Some(presenter) = &mut self.presenter
             && let Err(error) = presenter.show(&self.canvas)

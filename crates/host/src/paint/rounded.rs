@@ -23,10 +23,11 @@ pub fn draw_rounded_fill(canvas: &mut Canvas, context: &PaintContext<'_>, effect
     });
 }
 
-/// The rounded outline around a one-row bar.
+/// The rounded outline around a one-row bar. Its weight is given at scale
+/// factor 1, so it thickens with the display's scale like the frame lines.
 pub fn draw_gauge_outline(canvas: &mut Canvas, context: &PaintContext<'_>, effect: &GaugeOutline) {
     let rect = context.grid.area(effect.area);
-    let weight = f32::from(effect.weight.max(1));
+    let weight = context.line_pixels(effect.weight) as f32;
     // The stroke straddles the path, so it is inset by half its weight to
     // stay inside the cells the gauge was given.
     let inset = weight / 2.0;

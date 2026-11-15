@@ -245,6 +245,7 @@ impl AppView {
     /// Draws the whole screen for a `cols` x `rows` grid.
     pub fn render(&self, cols: u16, rows: u16) -> Frame {
         let mut frame = Frame::new(Rect::new(0, 0, cols, rows));
+        frame.line_weight = self.config.appearance.line_weight.max(1);
         let ctx = DrawContext::new(&self.theme, &self.icons, &self.config, self.now);
         let area = frame.area();
         if let Some(form) = &self.setup {

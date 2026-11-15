@@ -37,15 +37,21 @@ pub struct Frame {
     pub effects: Vec<Effect>,
     /// `None` hides the cursor.
     pub cursor: Option<CursorRequest>,
+    /// How thick a host that draws frame lines itself makes them, in pixels
+    /// at scale factor 1 (the host multiplies by its own scale). A terminal
+    /// ignores it. At least 1.
+    pub line_weight: u8,
 }
 
 impl Frame {
-    /// An empty frame covering `area`, with no effects and no cursor.
+    /// An empty frame covering `area`, with no effects and no cursor, and
+    /// the thinnest lines.
     pub fn new(area: Rect) -> Self {
         Self {
             cells: Buffer::empty(area),
             effects: Vec::new(),
             cursor: None,
+            line_weight: 1,
         }
     }
 
