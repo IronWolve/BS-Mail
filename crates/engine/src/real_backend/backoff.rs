@@ -1,7 +1,11 @@
 //! The wait before the next reconnect attempt: doubling from a start value up
-//! to a ceiling, back to the start after a success.
+//! to a ceiling, spread by a random amount so many copies of the program that
+//! lost the same server do not all come back at the same moment, and back to
+//! the start only once a session has lasted.
 
 use std::time::Duration;
+
+use crate::send::random::random_bytes;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Backoff {
@@ -27,10 +31,27 @@ impl Backoff {
         now
     }
 
+    /// As `next_delay`, spread over a quarter either way of it.
+    pub fn next_wait(&mut self) -> Duration {
+        spread(self.next_delay())
+    }
+
     /// Back to the first, shortest wait.
     pub fn reset(&mut self) {
         self.next = self.start;
     }
+}
+
+/// `delay` made between three quarters and one and a quarter of itself, by a
+/// random amount; unchanged if the system has no randomness to give.
+fn spread(delay: Duration) -> Duration {
+    let Ok(bytes) = random_bytes::<2>() else {
+        return delay;
+    };
+    let roll = u128::from(u16::from_le_bytes(bytes));
+    let top = u128::from(u16::MAX);
+    let nanos = delay.as_nanos() * (75 * top + 50 * roll) / (100 * top);
+    Duration::from_nanos(u64::try_from(nanos).unwrap_or(u64::MAX))
 }
 
 #[cfg(test)]

@@ -14,6 +14,9 @@ use crate::send::SmtpTimeouts;
 pub struct Timing {
     pub(super) backoff_start: Duration,
     pub(super) backoff_max: Duration,
+    /// A session that lasted this long counts as having worked: only then
+    /// does the reconnect wait start over from its shortest.
+    pub(super) stable_after: Duration,
     pub(super) keepalive: Duration,
     pub(super) timeouts: Timeouts,
     pub(super) smtp: SmtpTimeouts,
@@ -26,12 +29,14 @@ pub struct Timing {
 }
 
 impl Timing {
-    /// Reconnect after 2 s, doubling to 5 min; a check every 60 s; a search
-    /// goes on to another folder only within its first 20 s.
+    /// Reconnect after about 2 s, doubling to 5 min and starting over only
+    /// after a session of a minute; a check every 60 s; a search goes on to
+    /// another folder only within its first 20 s.
     pub const fn production() -> Self {
         Self {
             backoff_start: Duration::from_secs(2),
             backoff_max: Duration::from_secs(300),
+            stable_after: Duration::from_secs(60),
             keepalive: Duration::from_secs(60),
             timeouts: Timeouts::production(),
             smtp: SmtpTimeouts::production(),
@@ -45,6 +50,14 @@ impl Timing {
     pub const fn with_backoff(mut self, start: Duration, max: Duration) -> Self {
         self.backoff_start = start;
         self.backoff_max = max;
+        self
+    }
+
+    /// A session lasting this long counts as having worked, which is when the
+    /// reconnect wait starts over from its shortest.
+    #[cfg(feature = "test-support")]
+    pub const fn with_stable_after(mut self, lasting: Duration) -> Self {
+        self.stable_after = lasting;
         self
     }
 
@@ -78,10 +91,12 @@ impl Timing {
         Self {
             backoff_start: Duration::from_millis(40),
             backoff_max: Duration::from_millis(160),
+            stable_after: Duration::from_secs(1),
             keepalive: Duration::from_millis(60),
             timeouts: Timeouts {
                 connect: Duration::from_secs(5),
                 command: Duration::from_secs(10),
+                body: Duration::from_secs(10),
             },
             smtp: SmtpTimeouts {
                 connect: Duration::from_secs(5),

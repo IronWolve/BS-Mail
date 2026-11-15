@@ -1,7 +1,7 @@
 //! The worker thread's supervisor: connect, serve commands while connected,
 //! and when the connection is lost or refused, wait and try again.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use model::{AccountId, Command, ConnectionState, FolderId, MessageId};
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -25,6 +25,8 @@ use crate::session_state::SessionState;
 pub(super) struct Wanted {
     pub folder: Option<FolderId>,
     pub body: Option<MessageId>,
+    /// How many times the connection was lost while that body was coming.
+    pub body_losses: u8,
 }
 
 pub(super) struct Worker {
@@ -94,11 +96,18 @@ impl Worker {
             };
             let pause = match outcome {
                 Ok(session) => {
-                    backoff.reset();
                     told_user = false;
+                    let began = Instant::now();
                     match self.serve(session, commands).await {
                         Served::Stopped => return,
-                        Served::Lost => Some(backoff.next_delay()),
+                        Served::Lost => {
+                            // Signing in is not enough: a server that accepts the
+                            // sign-in and then drops the session is still failing.
+                            if began.elapsed() >= self.timing.stable_after {
+                                backoff.reset();
+                            }
+                            Some(backoff.next_wait())
+                        }
                     }
                 }
                 Err(error) => self.after_failed_connect(&error, &mut told_user, &mut backoff),
@@ -125,7 +134,7 @@ impl Worker {
             self.sink.send(self.sink.failure(error.operation(), error.reason()));
             *told_user = true;
         }
-        if permanent { None } else { Some(backoff.next_delay()) }
+        if permanent { None } else { Some(backoff.next_wait()) }
     }
 
     /// Waits out the delay (or, with none, waits for the user to ask for a

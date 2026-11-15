@@ -14,6 +14,11 @@ pub struct Timeouts {
     pub connect: Duration,
     /// One command, from sending it to its last response line.
     pub command: Duration,
+    /// Fetching one message, which can be large. The library hands over a
+    /// fetched message only when all of it has arrived, so a slow download
+    /// cannot be told from a stuck one while it goes on: this is a longer
+    /// limit on the whole of it.
+    pub body: Duration,
 }
 
 impl Timeouts {
@@ -21,6 +26,7 @@ impl Timeouts {
         Self {
             connect: Duration::from_secs(20),
             command: Duration::from_secs(90),
+            body: Duration::from_secs(180),
         }
     }
 }

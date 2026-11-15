@@ -9,6 +9,10 @@ use super::worker::Worker;
 use crate::imap_session::{ImapSession, SessionError, build_envelope, build_tree, fetched_row};
 use crate::mime_render::render_message;
 
+/// How many times a message is asked for when the connection keeps being lost
+/// while it comes: the first time and one replay after the reconnect.
+const BODY_TRIES: u8 = 2;
+
 /// How many messages one page of a folder holds.
 const PAGE_SIZE: u32 = 50;
 
@@ -134,12 +138,34 @@ impl Worker {
         let Some(path) = self.state.folder_path(folder).map(str::to_owned) else {
             return Ok(vec![self.sink.failure("fetch body", "the folder is gone")]);
         };
+        if self.wanted.body != Some(message) {
+            self.wanted.body_losses = 0;
+        }
         self.wanted.body = Some(message);
         let body = self.read_body(session, message, folder, &path, uid.0).await;
-        if !matches!(&body, Err(error) if error.is_lost()) {
+        if matches!(&body, Err(error) if error.is_lost()) {
+            self.wanted.body_losses += 1;
+            if self.wanted.body_losses >= BODY_TRIES {
+                self.give_up_on_body();
+            }
+        } else {
             self.wanted.body = None;
+            self.wanted.body_losses = 0;
         }
         body
+    }
+
+    /// The same message was lost twice on the way: it is not asked for again
+    /// by itself, so a message the connection cannot carry does not keep the
+    /// account reconnecting and downloading for ever.
+    fn give_up_on_body(&mut self) {
+        self.wanted.body = None;
+        self.wanted.body_losses = 0;
+        self.sink.send(self.sink.failure(
+            "fetch body",
+            "this message could not be downloaded: the connection failed twice while it was coming; \
+             select it again to try once more",
+        ));
     }
 
     async fn read_body(

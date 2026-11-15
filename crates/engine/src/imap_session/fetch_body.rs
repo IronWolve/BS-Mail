@@ -28,7 +28,7 @@ impl ImapSession {
     /// The start of the message with this UID from the open mailbox, or `None`
     /// when the server no longer has it.
     pub async fn fetch_body(&mut self, uid: u32) -> Result<Option<RawMessage>, SessionError> {
-        let limit = self.limits.command;
+        let limit = self.limits.body;
         let session = &mut self.inner;
         let query = format!("(UID RFC822.SIZE BODY.PEEK[]<0.{MAX_BODY_BYTES}>)");
         let result = bounded(limit, async {
