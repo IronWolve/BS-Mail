@@ -8,6 +8,19 @@ use super::summary::OptionsPaths;
 pub const UNKNOWN: &str = "not known";
 const NOTE: &str = "Reload settings reads the settings file and the theme again.";
 
+/// What is kept and where, said where the folder is shown.
+pub const KEPT: &str = "Kept in the data folder and nowhere else: each account's file with its password or sign-in \
+    token (plain text, limited to your user where the system allows it), your settings and window sizes, and \
+    sent messages not yet saved on the server. Mail itself is not kept on disk.";
+
+/// Who the program talks to.
+pub const CONTACTED: &str = "Contacted: your mail servers and, for a browser sign-in, the provider's sign-in service. \
+    Nothing is sent to the author of this program.";
+
+/// How to erase it all.
+pub const REMOVE: &str = "To remove everything, close the program and delete the data folder. Removing an account \
+    here deletes its own folder but leaves the settings and any saved client ids.";
+
 pub fn rows(paths: &OptionsPaths, width: u16) -> Vec<Row> {
     let path = |text: &str| {
         let text = if text.is_empty() { UNKNOWN } else { text };
@@ -22,6 +35,10 @@ pub fn rows(paths: &OptionsPaths, width: u16) -> Vec<Row> {
     rows.extend(button_rows(vec![Item::button(Control::Reload, "Reload settings")], width));
     rows.push(Row::blank());
     rows.extend(paragraph(NOTE, width, Tone::Dim));
+    for text in [KEPT, CONTACTED, REMOVE] {
+        rows.push(Row::blank());
+        rows.extend(paragraph(text, width, Tone::Dim));
+    }
     rows
 }
 
