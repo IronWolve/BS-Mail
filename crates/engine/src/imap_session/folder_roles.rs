@@ -1,5 +1,9 @@
 //! Which folder is the Inbox, Sent, Drafts, Archive, Spam or Trash: the
 //! server's SPECIAL-USE attributes first, common names as a fallback.
+//!
+//! "Bin" is not among the names for the Trash. Servers that call their Trash
+//! "Bin" mark it, and a person's own folder with that name must never become
+//! the place where deleting removes mail for good.
 
 use model::FolderRole;
 
@@ -18,7 +22,7 @@ const NAMED: [(FolderRole, &[&str]); 5] = [
     ),
     (
         FolderRole::Trash,
-        &["trash", "deleted items", "deleted messages", "bin"],
+        &["trash", "deleted items", "deleted messages"],
     ),
 ];
 
