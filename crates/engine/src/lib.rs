@@ -5,6 +5,7 @@
 pub mod account_config;
 mod account_oauth;
 mod account_smtp;
+mod change_refusals;
 mod imap_session;
 mod mime_render;
 pub mod mock;

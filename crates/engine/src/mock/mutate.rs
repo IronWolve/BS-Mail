@@ -1,11 +1,13 @@
 //! Changes the mock's in-memory data when commands arrive: flags, moves and
 //! deletes, with the folder counts kept in step. A parent folder's counts
 //! include its children (as in the fixture); the virtual Starred and Alerts
-//! folders are not recounted.
+//! folders are not recounted. What the real backend refuses is refused here
+//! too, in the same words (see `change_refusals`).
 
 use model::{FlagChange, Flags, FolderId, FolderRole, MessageId};
 
 use super::fixture_load::Fixture;
+use crate::change_refusals::NO_TRASH;
 
 /// What a flag change did.
 pub(crate) struct FlagOutcome {
@@ -22,6 +24,8 @@ pub(crate) struct MoveOutcome {
     pub unknown: Vec<MessageId>,
     /// Folders that lost or gained messages, each once.
     pub touched: Vec<FolderId>,
+    /// Why the known messages were left alone, when they were.
+    pub refused: Option<&'static str>,
 }
 
 /// Applies `change` to each message and adjusts unread counts when a message
@@ -60,14 +64,33 @@ pub(crate) fn move_messages(data: &mut Fixture, ids: &[MessageId], to: FolderId)
 }
 
 /// Deletes each message: into the Trash folder, or for good when it is
-/// already there or the account has no Trash.
+/// already there. An account with no Trash folder refuses and removes nothing.
 pub(crate) fn delete_messages(data: &mut Fixture, ids: &[MessageId]) -> MoveOutcome {
     let trash = data
         .folders
         .iter()
         .find(|folder| folder.role == FolderRole::Trash)
         .map(|folder| folder.id);
-    relocate(data, ids, |source| trash.filter(|&trash| trash != source))
+    let Some(trash) = trash else {
+        return refuse(data, ids, NO_TRASH);
+    };
+    relocate(data, ids, |source| Some(trash).filter(|&trash| trash != source))
+}
+
+/// Leaves every message where it is; ids that are not in the fixture are
+/// still told apart.
+fn refuse(data: &Fixture, ids: &[MessageId], reason: &'static str) -> MoveOutcome {
+    let unknown: Vec<MessageId> = ids
+        .iter()
+        .copied()
+        .filter(|id| !data.messages.iter().any(|envelope| envelope.id == *id))
+        .collect();
+    let refused = (unknown.len() < ids.len()).then_some(reason);
+    MoveOutcome {
+        unknown,
+        touched: Vec::new(),
+        refused,
+    }
 }
 
 /// Moves each message to the folder `target` picks for it (`None` removes it).
@@ -79,6 +102,7 @@ fn relocate(
     let mut outcome = MoveOutcome {
         unknown: Vec::new(),
         touched: Vec::new(),
+        refused: None,
     };
     for &id in ids {
         let Some(index) = data.messages.iter().position(|envelope| envelope.id == id) else {

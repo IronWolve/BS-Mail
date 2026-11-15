@@ -3,12 +3,9 @@
 
 use model::{FlagChange, Flags, FolderId, FolderRole};
 
+use crate::change_refusals::{NO_TRASH, move_refusal};
 use crate::imap_session::{ServerCaps, StoreFlag, StoreMode};
 use crate::session_state::SessionState;
-
-/// Why the deleted flag in a flag change is not carried out.
-pub(super) const DELETED_NOT_HERE: &str =
-    "the deleted flag is not changed this way; use delete";
 
 /// Why a move is refused for a server with neither MOVE nor UIDPLUS.
 const CANNOT_MOVE: &str = "this server cannot move safely (it offers neither MOVE nor UIDPLUS); \
@@ -109,8 +106,8 @@ pub(super) fn destination(state: &SessionState, to: FolderId) -> Result<(FolderI
     let Some(folder) = state.folder(to) else {
         return Err(format!("unknown folder id: {}", to.0));
     };
-    if matches!(folder.role, FolderRole::Starred | FolderRole::Alerts) {
-        return Err("that folder is a saved search, not a mailbox; nothing was moved".to_owned());
+    if let Some(reason) = move_refusal(folder.role) {
+        return Err(reason.to_owned());
     }
     Ok((folder.id, folder.path.clone()))
 }
@@ -145,7 +142,7 @@ pub(super) fn plan_delete(state: &SessionState, source: FolderId, caps: &ServerC
         };
     }
     let Some(trash) = state.trash_folder() else {
-        return DeletePlan::Refuse("this account has no Trash folder; nothing was deleted".to_owned());
+        return DeletePlan::Refuse(NO_TRASH.to_owned());
     };
     match move_how(caps) {
         MoveHow::Refuse(_) => DeletePlan::Refuse(

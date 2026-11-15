@@ -4,10 +4,11 @@ use std::collections::HashMap;
 
 use model::{FlagChange, Flags, MessageId};
 
-use super::change_rules::{DELETED_NOT_HERE, FlagPlan, plan_flags};
+use super::change_rules::{FlagPlan, plan_flags};
 use super::changes::Tally;
 use super::resolve::{Group, resolve};
 use super::worker::Worker;
+use crate::change_refusals::DELETED_NOT_HERE;
 use crate::imap_session::{ImapSession, SessionError, UidSet};
 
 impl Worker {
