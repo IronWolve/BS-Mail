@@ -2,13 +2,14 @@
 //! held until the run ends. The lock belongs to the operating system, so a
 //! crash lets go of it and a copied `lock` file is harmless.
 
-use std::fs::{self, File, OpenOptions, TryLockError};
+use std::fs::{File, OpenOptions, TryLockError};
 use std::io::{Read, Seek, Write};
 use std::path::Path;
 
 use chrono::{Local, TimeZone};
 
 use crate::paths::LOCK_FILE;
+use crate::private_dirs;
 
 /// The lock on a data folder, held for as long as this value lives.
 #[derive(Debug)]
@@ -31,7 +32,7 @@ pub struct Busy {
 /// the system has no way to say so. Only a lock that is held elsewhere
 /// refuses.
 pub fn take(folder: &Path) -> Result<Option<DataLock>, Busy> {
-    if fs::create_dir_all(folder).is_err() {
+    if private_dirs::make(folder).is_err() {
         return Ok(None);
     }
     let path = folder.join(LOCK_FILE);

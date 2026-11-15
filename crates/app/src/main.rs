@@ -18,6 +18,7 @@ mod oauth_clients;
 mod options_flow;
 mod paths;
 mod picture;
+mod private_dirs;
 mod pump;
 mod report;
 mod run;

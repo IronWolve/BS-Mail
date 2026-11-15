@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 pub(super) fn write(path: &Path, text: &str) -> io::Result<()> {
     let target = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
     let folder = target.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
-    fs::create_dir_all(folder)?;
+    crate::private_dirs::make(folder)?;
     let temporary = temporary_beside(&target);
     let result = write_then_rename(&temporary, &target, text);
     if result.is_err() {

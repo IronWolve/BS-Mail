@@ -95,7 +95,7 @@ pub fn save(dir: &Path, state: &State) -> io::Result<()> {
     };
     let text = toml::to_string_pretty(&file)
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
-    fs::create_dir_all(dir)?;
+    crate::private_dirs::make(dir)?;
     let target = path_in(dir);
     let temporary = dir.join(format!("{STATE_NAME}.part"));
     fs::write(&temporary, text)?;

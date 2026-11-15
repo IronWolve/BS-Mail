@@ -5,6 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::account_writer::save_account;
+use crate::private_dirs;
 
 use super::merge::carry_over;
 use super::plan::Plan;
@@ -23,7 +24,7 @@ pub struct Saved {
 pub fn save(plan: &Plan) -> Result<Saved, String> {
     let text = if plan.edit { merged(plan) } else { refuse_if_taken(plan)?; plan.text.clone() };
     if let Some(folder) = plan.file.parent().filter(|dir| !dir.as_os_str().is_empty()) {
-        fs::create_dir_all(folder).map_err(|error| format!("could not make the folder {}: {error}", folder.display()))?;
+        private_dirs::make(folder).map_err(|error| format!("could not make the folder {}: {error}", folder.display()))?;
     }
     let saved = save_account(&plan.file, &text)?;
     Ok(Saved { file: plan.file.clone(), kept_old_as: saved.kept_old_as })
