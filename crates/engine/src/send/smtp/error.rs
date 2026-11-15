@@ -5,6 +5,8 @@
 
 use std::fmt;
 
+use crate::scrub::scrub;
+
 use super::reply::Reply;
 use super::wire::WireError;
 use crate::send::check::Refusal;
@@ -50,9 +52,12 @@ pub struct Said {
 }
 
 impl Said {
-    pub fn of(reply: &Reply, secret: &str) -> Self {
-        let text: String = reply.text().chars().filter(|c| !c.is_control()).take(160).collect();
-        let text = if secret.is_empty() { text } else { scrub(&text, secret) };
+    /// The words are cleaned of controls and of every secret first, and only
+    /// then cut, so a secret that straddles the cut is not left in part.
+    pub fn of(reply: &Reply, secrets: &[String]) -> Self {
+        let clean: String = reply.text().chars().filter(|c| !c.is_control()).collect();
+        let secrets: Vec<&str> = secrets.iter().map(String::as_str).collect();
+        let text: String = scrub(&clean, &secrets).chars().take(160).collect();
         Self { code: reply.code, text: text.trim().to_owned() }
     }
 
@@ -67,12 +72,6 @@ impl fmt::Display for Said {
         write!(f, "{} {}", self.code, self.text)?;
         Ok(())
     }
-}
-
-/// `text` with every copy of `secret` and of its base64 form replaced.
-fn scrub(text: &str, secret: &str) -> String {
-    let coded = crate::send::base64::encode(secret.as_bytes());
-    text.replace(secret, "***").replace(&coded, "***")
 }
 
 /// Why a send did not complete.

@@ -47,8 +47,9 @@ pub struct Link {
     pub(super) progress: Progress,
     identity: String,
     pub(super) secure: bool,
-    /// The password, kept only to remove it from anything the server says.
-    pub(super) secret: String,
+    /// The password, and whatever else was sent that is a secret, kept only
+    /// to remove it from anything the server says.
+    pub(super) secrets: Vec<String>,
 }
 
 impl Link {
@@ -59,7 +60,7 @@ impl Link {
             progress,
             identity: opened.identity,
             secure: opened.secure,
-            secret: settings.password.expose().to_owned(),
+            secrets: vec![settings.password.expose().to_owned()],
         }
     }
 
@@ -74,7 +75,7 @@ impl Link {
     }
 
     pub(super) fn said(&self, reply: &Reply) -> Said {
-        Said::of(reply, &self.secret)
+        Said::of(reply, &self.secrets)
     }
 
     /// Sends one command line and reads its answer.
@@ -117,9 +118,9 @@ impl Link {
         if reply.code != 220 {
             return Err(SmtpError::StartTlsMissing);
         }
-        let Self { wire, limits, progress, identity, secret, .. } = self;
+        let Self { wire, limits, progress, identity, secrets, .. } = self;
         let wire = connect::start_tls(settings, host, wire, limits.connect).await?;
-        Ok(Self { wire, limits, progress, identity, secure: true, secret })
+        Ok(Self { wire, limits, progress, identity, secure: true, secrets })
     }
 
     /// Says goodbye and waits a moment for the answer; never fails. For a

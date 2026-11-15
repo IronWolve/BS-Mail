@@ -9,6 +9,7 @@ use super::caps::ServerCaps;
 use crate::account_config::Security;
 use crate::account_smtp::{SmtpAuth, SmtpSettings};
 use crate::oauth::{TokenError, TokenSource, xoauth2_blob};
+use crate::scrub::plain_blob;
 use crate::send::base64;
 
 impl Link {
@@ -40,12 +41,9 @@ impl Link {
     }
 
     async fn auth_plain(&mut self, settings: &SmtpSettings) -> Result<(), SmtpError> {
-        let mut blob = Vec::new();
-        blob.push(0);
-        blob.extend_from_slice(settings.username.as_bytes());
-        blob.push(0);
-        blob.extend_from_slice(settings.password.expose().as_bytes());
-        let reply = self.ask(&format!("AUTH PLAIN {}", base64::encode(&blob)), Step::SignIn).await?;
+        let coded = plain_blob(&settings.username, settings.password.expose());
+        self.secrets.push(coded.clone());
+        let reply = self.ask(&format!("AUTH PLAIN {coded}"), Step::SignIn).await?;
         self.expect_signed_in(&reply)
     }
 
@@ -87,7 +85,7 @@ impl Link {
             Err(_) => return Err(SmtpError::TokenUnavailable("getting the access token took too long".to_owned())),
         };
         // Whatever the server says back must not repeat the token.
-        self.secret = token.expose().to_owned();
+        self.secrets.push(token.expose().to_owned());
         let blob = xoauth2_blob(&settings.username, token.expose()).map_err(SmtpError::SignInEnded)?;
         let reply = self.ask(&format!("AUTH XOAUTH2 {blob}"), Step::SignIn).await?;
         let last = if reply.code == 334 { self.ask("", Step::SignIn).await? } else { reply };

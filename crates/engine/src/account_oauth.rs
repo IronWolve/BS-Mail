@@ -42,8 +42,9 @@ pub enum AuthKind {
 // The listener binds IPv4 loopback only, so an IPv6 name could not be reached.
 const REDIRECT_HOSTS: [&str; 2] = ["127.0.0.1", "localhost"];
 
-/// The values as the file spelled them.
-#[derive(Debug, Default)]
+/// The values as the file spelled them. Its debug output never shows the
+/// client secret.
+#[derive(Default)]
 pub(crate) struct RawOAuth {
     pub provider: Option<String>,
     pub client_id: Option<String>,
@@ -52,6 +53,20 @@ pub(crate) struct RawOAuth {
     pub token_url: Option<String>,
     pub scopes: Option<Vec<String>>,
     pub redirect_host: Option<String>,
+}
+
+impl std::fmt::Debug for RawOAuth {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RawOAuth")
+            .field("provider", &self.provider)
+            .field("client_id", &self.client_id)
+            .field("client_secret", &self.client_secret.as_ref().map(|_| "***"))
+            .field("auth_url", &self.auth_url)
+            .field("token_url", &self.token_url)
+            .field("scopes", &self.scopes)
+            .field("redirect_host", &self.redirect_host)
+            .finish()
+    }
 }
 
 /// Everything the sign-in needs about the provider and the client, checked.

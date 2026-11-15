@@ -15,13 +15,19 @@ use super::timeouts::bounded;
 /// The most of one message that is downloaded to read it.
 pub const MAX_BODY_BYTES: u32 = 16 * 1024 * 1024;
 
-/// One message as the server gave it.
-#[derive(Debug)]
+/// One message as the server gave it. Its debug output shows sizes, never
+/// the message.
 pub struct RawMessage {
     /// The message from its first byte, at most `MAX_BODY_BYTES` of it.
     pub bytes: Vec<u8>,
     /// The size of the whole message, when the server said.
     pub total: Option<u64>,
+}
+
+impl std::fmt::Debug for RawMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RawMessage({} bytes of {:?})", self.bytes.len(), self.total)
+    }
 }
 
 impl ImapSession {

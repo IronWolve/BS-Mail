@@ -46,8 +46,9 @@ pub struct SmtpSettings {
     pub save_sent: bool,
 }
 
-/// The option values as the file spelled them, before defaults.
-#[derive(Debug, Default)]
+/// The option values as the file spelled them, before defaults. Its debug
+/// output never shows the password.
+#[derive(Default)]
 pub(crate) struct RawSmtp {
     pub host: Option<String>,
     pub port: Option<u16>,
@@ -56,6 +57,20 @@ pub(crate) struct RawSmtp {
     pub password: Option<String>,
     pub trust: Option<Trust>,
     pub save_sent: Option<bool>,
+}
+
+impl std::fmt::Debug for RawSmtp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RawSmtp")
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("security", &self.security)
+            .field("username", &self.username)
+            .field("password", &self.password.as_ref().map(|_| "***"))
+            .field("trust", &self.trust)
+            .field("save_sent", &self.save_sent)
+            .finish()
+    }
 }
 
 impl SmtpSettings {

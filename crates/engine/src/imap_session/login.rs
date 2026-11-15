@@ -11,6 +11,7 @@ use super::error::{ConnectError, server_words};
 use super::stream::MailStream;
 use crate::account_config::AccountConfig;
 use crate::oauth::{HttpLimits, TokenError, TokenSource, xoauth2_raw};
+use crate::scrub::scrub;
 
 /// Sends the credentials. A refusal is `AuthFailed` with the server's words
 /// (`OAuthRefused` for an OAuth2 account); anything else is a connection
@@ -27,11 +28,19 @@ pub async fn sign_in(
     match tokio::time::timeout(limit, attempt).await {
         Ok(Ok(session)) => Ok(session),
         Ok(Err((ImapError::No(text) | ImapError::Bad(text), _))) => {
-            Err(ConnectError::AuthFailed(server_words(&text)))
+            Err(ConnectError::AuthFailed(clean_words(&text, config.password.expose())))
         }
         Ok(Err((other, _))) => Err(ConnectError::Unreachable(other.to_string())),
         Err(_) => Err(ConnectError::Unreachable("the login timed out".to_owned())),
     }
+}
+
+/// The server's words for a refused sign-in with the password taken out. A
+/// server that repeats the command would otherwise put the password in the
+/// line shown to the user. Taken out before the words are cut and again after
+/// they are unquoted, since the library quotes the text it wraps them in.
+fn clean_words(text: &str, password: &str) -> String {
+    scrub(&server_words(&scrub(text, &[password])), &[password])
 }
 
 /// Answers the server's first challenge with the XOAUTH2 response and any
@@ -83,3 +92,6 @@ async fn access_token(config: &AccountConfig, limit: Duration) -> Result<model::
         Err(_) => Err(ConnectError::SignInTrouble("getting the access token took too long".to_owned())),
     }
 }
+
+#[cfg(test)]
+include!("login.tests.rs");

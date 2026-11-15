@@ -13,6 +13,7 @@ pub mod multi_backend;
 mod oauth;
 mod private_fs;
 pub mod real_backend;
+mod scrub;
 mod search;
 mod send;
 mod session_state;
