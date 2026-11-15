@@ -1,7 +1,7 @@
 //! Looking at what the person typed before any of it goes near a header or
-//! a command line. Anything with a line break or another control character
-//! in an address, a name or a subject is refused, never cleaned up: a
-//! changed message is a message nobody wrote.
+//! a command line. Anything with a line break, another control character or
+//! a hidden formatting character in an address, a name or a subject is
+//! refused, never cleaned up: a changed message is a message nobody wrote.
 
 use std::fmt;
 
@@ -43,13 +43,37 @@ pub fn is_forbidden(c: char) -> bool {
     c.is_control() || c == '\u{2028}' || c == '\u{2029}'
 }
 
+/// Unicode format characters (category Cf) that change how text is drawn or
+/// hide in it: the bidirectional embeddings, overrides and isolates, the
+/// zero-width and other invisible characters, the byte order mark, the soft
+/// hyphen, the annotation marks and the tag characters. In a name or subject
+/// they make the text read differently in the recipient's program from what
+/// was checked here. The joiners and direction marks (U+200C to U+200F,
+/// U+061C) and the number signs of some scripts are left alone on purpose:
+/// real names and subjects in Persian, Hindi, Arabic and Hebrew need them.
+pub fn is_hidden_format(c: char) -> bool {
+    matches!(
+        c,
+        '\u{00AD}'
+            | '\u{180E}'
+            | '\u{200B}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2060}'..='\u{2064}'
+            | '\u{2066}'..='\u{206F}'
+            | '\u{FEFF}'
+            | '\u{FFF9}'..='\u{FFFB}'
+            | '\u{E0001}'
+            | '\u{E0020}'..='\u{E007F}'
+    )
+}
+
 /// A piece of text for a message, shown back with anything odd replaced and
 /// cut short, so a refusal never echoes a line break.
 pub fn shown(text: &str) -> String {
     let mut out: String = text
         .chars()
         .take(60)
-        .map(|c| if is_forbidden(c) { '?' } else { c })
+        .map(|c| if is_forbidden(c) || is_hidden_format(c) { '?' } else { c })
         .collect();
     if text.chars().count() > 60 {
         out.push_str("...");
@@ -63,6 +87,12 @@ pub fn check_clean(what: &str, text: &str) -> Result<(), Refusal> {
     if text.chars().any(is_forbidden) {
         return Err(Refusal::new(format!(
             "{what} contains a line break or another control character; nothing was sent"
+        )));
+    }
+    if text.chars().any(is_hidden_format) {
+        return Err(Refusal::new(format!(
+            "{what} contains a hidden formatting character (a text-direction override or a \
+             zero-width space, for example); nothing was sent"
         )));
     }
     Ok(())
