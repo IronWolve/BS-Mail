@@ -2,11 +2,14 @@
 //!
 //! A full screen repeats a few dozen shapes thousands of times, so every
 //! glyph is rasterized once. A font-size or scale-factor change clears the
-//! cache; nothing else invalidates an entry.
+//! cache; nothing else invalidates an entry. The banner's text shapes are
+//! kept here too, because they go stale at the same moments.
 
 use std::collections::HashMap;
 
 use swash::scale::ScaleContext;
+
+use crate::paint::mask_cache::MaskCache;
 
 use super::embedded::{FaceKind, FontSet};
 use super::rasterize::{GlyphBitmap, rasterize};
@@ -26,6 +29,9 @@ pub struct GlyphCache {
     /// `None` records a glyph that rasterized to nothing, so it is not tried
     /// again every frame.
     entries: HashMap<Key, Option<GlyphBitmap>>,
+    /// The banner's text shapes, which depend on the same sizes and are
+    /// dropped with the glyphs.
+    pub masks: MaskCache,
 }
 
 impl GlyphCache {
@@ -57,6 +63,7 @@ impl GlyphCache {
     /// Drops every entry, after a font-size or scale-factor change.
     pub fn clear(&mut self) {
         self.entries.clear();
+        self.masks.clear();
     }
 
     pub fn len(&self) -> usize {

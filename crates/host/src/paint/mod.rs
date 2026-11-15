@@ -12,6 +12,7 @@ pub mod glow;
 pub mod glyph_draw;
 pub mod grid;
 pub mod icon_fit;
+pub mod mask_cache;
 pub mod rounded;
 pub mod scaled_text;
 pub mod shapes;

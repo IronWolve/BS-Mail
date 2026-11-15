@@ -12,27 +12,37 @@ use crate::font::{FaceKind, choose, is_icon};
 use super::canvas::Canvas;
 use super::colors::{Ink, Rgb};
 use super::context::PaintContext;
-use super::glow::draw_glow;
+use super::glow::lay_glow;
 use super::grid::PixelRect;
 use super::icon_fit::{centered_pen, fitted_size};
+use super::mask_cache::MaskKey;
 use super::text_mask::TextMask;
 
-/// Draws one scaled-text effect.
+/// Draws one scaled-text effect. The shape of the text and its blurred glow
+/// are kept between frames (see `mask_cache`); only the coloring is done each
+/// time.
 pub fn draw_scaled_text(canvas: &mut Canvas, context: &mut PaintContext<'_>, effect: &ScaledText) {
     let scale = u32::from(effect.scale.max(1));
     let rect = context.grid.area(effect.area);
     let margin = effect.glow.map_or(0, |glow| u32::from(glow.radius) * scale);
-    let mask = build_mask(context, effect, rect.grow(margin), scale);
-    if mask.is_blank() {
-        return;
-    }
-    if let Some(glow) = effect.glow {
+    let bounds = rect.grow(margin);
+    let glow = effect.glow.map(|glow| {
         let color = context.palette.resolve(glow.color, Ink::Foreground);
-        let radius = u8::try_from(u32::from(glow.radius) * scale).unwrap_or(u8::MAX);
-        draw_glow(canvas, &mask, color, radius);
-    }
+        (color, u8::try_from(u32::from(glow.radius) * scale).unwrap_or(u8::MAX))
+    });
     let stops = fill_stops(context, &effect.fill);
-    paint_mask(canvas, &mask, rect, &stops);
+    let key = MaskKey::new(effect, scale, (rect, bounds), &context.grid.metrics);
+    if !context.cache.masks.contains(&key) {
+        let mask = build_mask(context, effect, bounds, scale);
+        context.cache.masks.insert(key.clone(), mask);
+    }
+    let Some(shape) = context.cache.masks.shape(&key, glow.map(|(_, radius)| radius)) else {
+        return;
+    };
+    if let (Some(blurred), Some((color, _))) = (shape.glow, glow) {
+        lay_glow(canvas, blurred, color);
+    }
+    paint_mask(canvas, shape.mask, rect, &stops);
 }
 
 /// Stamps every character of the run into a mask at the scaled size.

@@ -15,7 +15,11 @@ pub fn draw_glow(canvas: &mut Canvas, mask: &TextMask, color: Rgb, radius: u8) {
     if radius == 0 || mask.is_blank() {
         return;
     }
-    let blurred = mask.blurred(radius);
+    lay_glow(canvas, &mask.blurred(radius), color);
+}
+
+/// Lays a shape that is already blurred onto the canvas in `color`.
+pub fn lay_glow(canvas: &mut Canvas, blurred: &TextMask, color: Rgb) {
     let rect = blurred.rect;
     for y in rect.y..rect.bottom() {
         for x in rect.x..rect.right() {
