@@ -132,6 +132,25 @@ pub fn draw_folder_tree(
     }
 }
 
+/// The unread count and where it starts. A name always keeps at least the
+/// one cell its ellipsis needs: when the count would take that, the count
+/// is left out instead.
+fn count_slot(
+    ctx: &DrawContext<'_>,
+    row: &FolderRowInfo<'_>,
+    line: Rect,
+    name_x: u16,
+) -> (Option<String>, u16) {
+    let count = sidebar_count(&ctx.config.appearance, row.folder.unread);
+    let count_x = count
+        .as_ref()
+        .map_or(line.right(), |text| line.right().saturating_sub(cells(text)));
+    if count_x.saturating_sub(1).saturating_sub(name_x) == 0 {
+        return (None, line.right());
+    }
+    (count, count_x)
+}
+
 fn draw_row(
     frame: &mut Frame,
     ctx: &DrawContext<'_>,
@@ -153,11 +172,8 @@ fn draw_row(
     let (icon, icon_role) = icon_for(row);
     let icon_x = line.x.saturating_add(ICON_AT).saturating_add(shift);
     put_text(frame, line, icon_x, line.y, ctx.icon(icon), pick(icon_role));
-    let count = sidebar_count(&ctx.config.appearance, row.folder.unread);
-    let count_x = count
-        .as_ref()
-        .map_or(line.right(), |text| line.right().saturating_sub(cells(text)));
     let name_x = line.x.saturating_add(NAME_AT).saturating_add(shift);
+    let (count, count_x) = count_slot(ctx, row, line, name_x);
     let room = count_x.saturating_sub(1).saturating_sub(name_x);
     let name_end = put_cut(frame, line, name_x, line.y, &row.folder.name, room, pick(roles::SIDEBAR_ITEM));
     if row.has_children {

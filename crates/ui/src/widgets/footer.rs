@@ -5,12 +5,12 @@ use model::{ConnectionState, SyncStatus};
 use surface::{Frame, Rect};
 
 use super::account_strip::MailboxSummary;
-use super::cell_text::{Run, put_text};
+use super::cell_text::{Run, put_text, runs_width};
 use super::draw_context::DrawContext;
 use super::key_bar::key_text;
-use super::segment_row::{draw_segments, segments_fit};
+use super::segment_row::{MIN_GAP, draw_segments, segments_fit};
 use crate::app_identity::AppIdentity;
-use crate::format::group_thousands;
+use crate::format::{ELLIPSIS_CHAR, group_thousands, truncate};
 use crate::icons::IconId;
 use crate::layout::inset_h;
 use crate::theme::roles;
@@ -80,25 +80,24 @@ fn segment(ctx: &DrawContext<'_>, name: &str, data: &FooterData<'_>) -> Option<V
     }
 }
 
-/// The connection state and the failure, the failure cut to what is left.
+/// The connection state and the failure, the failure cut by display width to
+/// the cells left beside the connection segment and the gap. When nothing is
+/// left, only the connection segment remains.
 fn error_segments(
     ctx: &DrawContext<'_>,
     data: &FooterData<'_>,
     error: &str,
     width: u16,
 ) -> Vec<Vec<Run>> {
-    // The connection segment and its separator take about this much.
-    const TAKEN: usize = 22;
-    let room = usize::from(width).saturating_sub(TAKEN).max(8);
-    let mut text: String = error.chars().take(room).collect();
-    if error.chars().count() > room {
-        text.pop();
-        text.push('\u{2026}');
+    let connection = connection_segment(ctx, data.connection);
+    let room = width
+        .saturating_sub(runs_width(&connection))
+        .saturating_sub(MIN_GAP);
+    if room == 0 {
+        return vec![connection];
     }
-    vec![
-        connection_segment(ctx, data.connection),
-        vec![Run::new(text, ctx.fg(roles::FOOTER_ERROR))],
-    ]
+    let text = truncate(error, usize::from(room), ELLIPSIS_CHAR);
+    vec![connection, vec![Run::new(text, ctx.fg(roles::FOOTER_ERROR))]]
 }
 
 /// Draws the footer into the one-row `rect` (inside the frame). Segments
