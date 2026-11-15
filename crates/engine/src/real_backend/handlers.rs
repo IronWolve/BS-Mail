@@ -8,7 +8,7 @@ use super::lifecycle::{now_unix, progress, quota_event};
 use super::worker::Worker;
 use crate::imap_session::{ImapSession, SessionError, build_envelope, build_tree, fetched_row};
 use crate::mime_render::{body_preference, render_message};
-use crate::send::parse_threading_headers;
+use crate::send::{ids_from_envelope, parse_threading_headers};
 
 /// How many times a message is asked for when the connection keeps being lost
 /// while it comes: the first time and one replay after the reconnect.
@@ -16,6 +16,10 @@ const BODY_TRIES: u8 = 2;
 
 /// How many messages one page of a folder holds.
 const PAGE_SIZE: u32 = 50;
+
+/// What is said when a folder's UIDVALIDITY changed under the ids the screen
+/// holds.
+pub(super) const FOLDER_REBUILT: &str = "the folder was rebuilt on the server; refresh it";
 
 impl Worker {
     /// Reads the folder list and quota again: the folder tree, then the sync
@@ -85,7 +89,7 @@ impl Worker {
             }
             other => other?,
         };
-        self.state.note_validity(folder, info.uid_validity);
+        self.note_validity(folder, info.uid_validity);
         // The screen drops a search it is showing when a page arrives.
         self.search_shown = false;
         Ok(vec![Event::EnvelopePage {
@@ -110,9 +114,8 @@ impl Worker {
             return Ok(vec![self.sink.failure("load older mail", reason)]);
         };
         let info = session.examine(&path).await?;
-        if self.state.note_validity(folder, info.uid_validity) {
-            let reason = "the folder was rebuilt on the server; refresh it";
-            return Ok(vec![self.sink.failure("load older mail", reason)]);
+        if self.note_validity(folder, info.uid_validity) {
+            return Ok(vec![self.sink.failure("load older mail", FOLDER_REBUILT)]);
         }
         let fetched = session.fetch_page(info.exists, have, PAGE_SIZE).await?;
         if fetched.is_empty() {
@@ -178,9 +181,8 @@ impl Worker {
         uid: u32,
     ) -> Result<Vec<Event>, SessionError> {
         let reopened = session.ensure_examined(path).await?;
-        if reopened.is_some_and(|info| self.state.note_validity(folder, info.uid_validity)) {
-            let reason = "the folder was rebuilt on the server; refresh it";
-            return Ok(vec![self.sink.failure("fetch body", reason)]);
+        if reopened.is_some_and(|info| self.note_validity(folder, info.uid_validity)) {
+            return Ok(vec![self.sink.failure("fetch body", FOLDER_REBUILT)]);
         }
         let Some(raw) = session.fetch_body(uid).await? else {
             let reason = "the message is no longer on the server";
@@ -190,7 +192,7 @@ impl Worker {
         self.threads.keep(message, parse_threading_headers(&raw.bytes));
         Ok(vec![Event::BodyReady {
             message,
-            body: render_message(raw.bytes, raw.total, body_preference()),
+            body: render_message(raw.bytes, raw.total, body_preference()).await,
         }])
     }
 
@@ -225,12 +227,27 @@ impl Worker {
         Ok(events)
     }
 
+    /// Records a folder's UIDVALIDITY. True when it changed since the last
+    /// time: every message id the folder had is void then, and so are the
+    /// flags remembered for it, which belong to messages that are gone.
+    pub(super) fn note_validity(&mut self, folder: FolderId, validity: Option<u32>) -> bool {
+        let changed = self.state.note_validity(folder, validity);
+        if changed {
+            self.poll.forget_flags(folder);
+        }
+        changed
+    }
+
     fn envelopes_of(&mut self, folder: FolderId, fetched: &[Fetch]) -> Vec<Envelope> {
         let envelopes: Vec<Envelope> = fetched
             .iter()
             .filter_map(fetched_row)
             .map(|row| {
                 let id = self.state.message_id(folder, model::Uid(row.uid));
+                // A reply to a message not opened lately can still be threaded.
+                let wire = row.envelope;
+                let ids = wire.and_then(|e| ids_from_envelope(e.message_id.as_deref(), e.in_reply_to.as_deref()));
+                self.listed.keep(id, ids);
                 build_envelope(id, folder, &row)
             })
             .collect();

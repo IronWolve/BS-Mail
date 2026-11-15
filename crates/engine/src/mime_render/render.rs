@@ -16,18 +16,26 @@ use super::styled_lines::style_lines;
 /// `prefer` says which part to show when a message has a plain and an HTML one.
 /// Bytes that do not parse as a message are shown as text. The work is done
 /// on a thread of its own with a time limit; a message that cannot be read in
-/// time, or that stops the reader, is replaced by a line that says so.
-pub fn render_message(raw: Vec<u8>, total: Option<u64>, prefer: BodyPreference) -> Body {
-    match guarded::run(move || build(&raw, total, prefer)) {
+/// time, or that stops the reader, is replaced by a line that says so. The
+/// wait for the reader does not block the runtime it is awaited on.
+pub async fn render_message(raw: Vec<u8>, total: Option<u64>, prefer: BodyPreference) -> Body {
+    match guarded::run(move || build(&raw, total, prefer)).await {
         Ok(body) => body,
         Err(failure) => notice_only(failure.words()),
     }
 }
 
+/// `render_message` for a test that is not async.
+#[cfg(test)]
+pub fn render_blocking(raw: Vec<u8>, total: Option<u64>, prefer: BodyPreference) -> Body {
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("a runtime");
+    runtime.block_on(render_message(raw, total, prefer))
+}
+
 /// A whole message, for the tests.
 #[cfg(test)]
 pub fn render_body(raw: &[u8]) -> Body {
-    render_message(raw.to_vec(), None, BodyPreference::Plain)
+    render_blocking(raw.to_vec(), None, BodyPreference::Plain)
 }
 
 fn build(raw: &[u8], total: Option<u64>, prefer: BodyPreference) -> Body {
