@@ -10,6 +10,7 @@ use super::backoff::Backoff;
 use super::lifecycle::{announce, changes_allowed, connection};
 use super::online::Served;
 use super::poll_state::PollState;
+use super::retry_ids::RetryIds;
 use super::save_sent::{SentCopies, SentCopy};
 use super::sent_queue::SentQueue;
 use super::sink::EventSink;
@@ -50,6 +51,8 @@ pub(super) struct Worker {
     pub(super) unsaved: Vec<SentCopy>,
     /// Where those copies are kept on disk.
     pub(super) queue: SentQueue,
+    /// The message ids of sends that did not end well.
+    pub(super) retry_ids: RetryIds,
 }
 
 /// How a pause between connection attempts ended.
@@ -75,6 +78,7 @@ impl Worker {
             copies: SentCopies::new(),
             unsaved: Vec::new(),
             queue,
+            retry_ids: RetryIds::default(),
         }
     }
 

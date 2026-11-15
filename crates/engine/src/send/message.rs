@@ -4,7 +4,8 @@
 //! 1. `check` looks at every address, name, the subject and the size, and
 //!    refuses on the first problem. It touches no network and no clock.
 //! 2. `Checked::finish` adds what only a message that will really go needs:
-//!    the date, a random message id and the reply headers.
+//!    the date, a random message id (the same one again when the caller says
+//!    this is a retry) and the reply headers.
 //!
 //! `Prepared::render` then produces the bytes once the server has said
 //! whether it takes 8 bit text.
@@ -16,7 +17,7 @@ use model::{Address, OutgoingMessage};
 use super::check::{Mailbox, Refusal, check_mailbox, check_subject};
 use super::date::rfc5322;
 use super::flowed::flow;
-use super::header_block::{HeaderParts, header_block};
+use super::header_block::{HeaderParts, bcc_line, header_block};
 use super::limits::{MAX_MESSAGE_BYTES, MAX_RECIPIENTS};
 use super::random::random_hex;
 use super::reply_ids::ReplyIds;
@@ -35,6 +36,7 @@ pub struct Checked {
     from: Mailbox,
     to: Vec<Mailbox>,
     cc: Vec<Mailbox>,
+    bcc: Vec<Mailbox>,
     envelope: Vec<String>,
     subject: String,
     body: String,
@@ -46,6 +48,9 @@ pub struct Prepared {
     sender: String,
     recipients: Vec<String>,
     headers: String,
+    /// The `Bcc` header of the Sent copy; never part of what is sent.
+    bcc_line: String,
+    message_id: String,
     flowed: String,
 }
 
@@ -84,7 +89,7 @@ pub fn check(sender: Sender<'_>, message: &OutgoingMessage) -> Result<Checked, R
     let envelope = envelope_of(&[&to, &cc, &bcc])?;
     check_subject(&message.subject)?;
     check_body(&message.body)?;
-    Ok(Checked { from, to, cc, envelope, subject: message.subject.clone(), body: message.body.clone() })
+    Ok(Checked { from, to, cc, bcc, envelope, subject: message.subject.clone(), body: message.body.clone() })
 }
 
 fn check_all(role: &str, people: &[Address]) -> Result<Vec<Mailbox>, Refusal> {
@@ -142,28 +147,80 @@ fn too_big() -> Refusal {
 impl Checked {
     /// Adds the date (`now`, Unix seconds), a message id that cannot be
     /// guessed and the reply headers, when there are any.
+    #[cfg(test)]
     pub fn finish(self, reply: Option<&ReplyIds>, now: i64) -> Result<Prepared, Refusal> {
-        let domain = self.from.address.rsplit_once('@').map_or("localhost", |(_, domain)| domain);
-        let random = random_hex::<16>().map_err(Refusal::new)?;
+        self.finish_as(reply, now, None)
+    }
+
+    /// As `finish`, with the message id of an earlier attempt at this same
+    /// message when there is one, so a message sent again after "may or may
+    /// not have been sent" is one message to everything that sees it.
+    pub fn finish_as(self, reply: Option<&ReplyIds>, now: i64, earlier: Option<String>) -> Result<Prepared, Refusal> {
+        let message_id = match earlier {
+            Some(id) => id,
+            None => {
+                let domain = self.from.address.rsplit_once('@').map_or("localhost", |(_, domain)| domain);
+                format!("{}@{domain}", random_hex::<16>().map_err(Refusal::new)?)
+            }
+        };
         let headers = header_block(&HeaderParts {
             from: &self.from,
             to: &self.to,
             cc: &self.cc,
             subject: &self.subject,
             date: &rfc5322(now),
-            message_id: &format!("{random}@{domain}"),
+            message_id: &message_id,
             reply,
         });
         Ok(Prepared {
             sender: self.from.address,
             recipients: self.envelope,
             headers,
+            bcc_line: bcc_line(&self.bcc),
+            message_id,
             flowed: flow(&self.body),
         })
+    }
+
+    /// A number that is the same for the same message: sender, every
+    /// recipient, subject and text. Two attempts to send one message have the
+    /// same one; a message edited in between does not.
+    pub fn fingerprint(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        let people = [&self.to, &self.cc, &self.bcc];
+        (&self.from.address, &self.subject, &self.body).hash(&mut hasher);
+        for (role, list) in people.iter().enumerate() {
+            for who in list.iter() {
+                (role, &who.name, &who.address).hash(&mut hasher);
+            }
+        }
+        hasher.finish()
     }
 }
 
 impl Prepared {
+    /// The message id, without the angle brackets.
+    pub fn message_id(&self) -> &str {
+        &self.message_id
+    }
+
+    /// The copy for the Sent folder: what the server accepted (`sent`, the
+    /// bytes `render` made) with the `Bcc` header added, so the sender can see
+    /// later who was blind-copied. Only the copy has it; the message that went
+    /// out never did. Without hidden recipients, or if `sent` is not this
+    /// message, the bytes come back as they are.
+    pub fn sent_copy(&self, sent: &[u8]) -> Vec<u8> {
+        if self.bcc_line.is_empty() || !sent.starts_with(self.headers.as_bytes()) {
+            return sent.to_vec();
+        }
+        let mut copy = Vec::with_capacity(sent.len() + self.bcc_line.len());
+        copy.extend_from_slice(self.headers.as_bytes());
+        copy.extend_from_slice(self.bcc_line.as_bytes());
+        copy.extend_from_slice(&sent[self.headers.len()..]);
+        copy
+    }
+
     /// The address for `MAIL FROM`.
     pub fn sender(&self) -> &str {
         &self.sender

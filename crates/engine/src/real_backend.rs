@@ -44,6 +44,7 @@ mod online;
 mod poll;
 mod poll_state;
 mod resolve;
+mod retry_ids;
 mod reply_lookup;
 mod save_sent;
 mod sent_queue;

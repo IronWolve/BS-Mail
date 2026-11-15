@@ -1,7 +1,9 @@
 //! The header lines of an outgoing message, in the order they are written.
 //!
-//! There is no `Bcc` here, ever: hidden recipients are in the envelope only.
-//! And no header names the program that wrote the message. Every value
+//! There is no `Bcc` in the block, ever: hidden recipients are in the
+//! envelope only. The one place their names are written is the copy kept in
+//! the Sent folder, which gets `bcc_line` and never goes to a server but the
+//! user's own. And no header names the program that wrote the message. Every value
 //! comes from text that was already checked for line breaks and controls,
 //! and every line ends with CRLF.
 
@@ -42,6 +44,17 @@ pub fn header_block(parts: &HeaderParts<'_>) -> String {
         push(&mut out, "In-Reply-To", &reply.in_reply_to());
         push(&mut out, "References", &id_list("References", &reply.thread()));
     }
+    out
+}
+
+/// The `Bcc` header for the Sent copy, so the sender can see later who was
+/// blind-copied; empty when nobody was.
+pub fn bcc_line(bcc: &[Mailbox]) -> String {
+    if bcc.is_empty() {
+        return String::new();
+    }
+    let mut out = String::new();
+    push(&mut out, "Bcc", &address_list("Bcc", bcc));
     out
 }
 

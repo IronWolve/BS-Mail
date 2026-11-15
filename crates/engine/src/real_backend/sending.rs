@@ -16,6 +16,7 @@ use model::{Event, OutgoingMessage};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::save_sent::SentCopy;
+use super::retry_ids::RetryIds;
 use super::sent_queue::SentQueue;
 use super::sink::EventSink;
 use super::stop::Stop;
@@ -40,6 +41,10 @@ struct SendJob {
     copies: UnboundedSender<SentCopy>,
     /// Where the copy is kept on disk until the mailbox has it.
     queue: SentQueue,
+    /// Told when the server accepts the message.
+    retry_ids: RetryIds,
+    /// Which message this is, for `retry_ids`.
+    key: u64,
 }
 
 /// The failure notice for a send, named as the screen expects.
@@ -104,13 +109,16 @@ impl Worker {
 
     /// Dates and numbers the message and starts the task that sends it.
     fn launch(&self, checked: Checked, ids: Option<&ReplyIds>) {
-        let prepared = match checked.finish(ids, now_unix()) {
+        let key = checked.fingerprint();
+        let earlier = self.retry_ids.earlier(key);
+        let prepared = match checked.finish_as(ids, now_unix(), earlier) {
             Ok(prepared) => prepared,
             Err(refusal) => {
                 self.sink.send(failure(&self.sink, refusal.reason()));
                 return;
             }
         };
+        self.retry_ids.begin(key, prepared.message_id());
         let tokens = match self.config.smtp.auth {
             SmtpAuth::OAuth2 => TokenSource::with_limits(&self.config, HttpLimits::within(self.timing.smtp.connect)),
             SmtpAuth::Password => None,
@@ -123,6 +131,8 @@ impl Worker {
             stop: self.stop.clone(),
             copies: self.copies.sender(),
             queue: self.queue.clone(),
+            retry_ids: self.retry_ids.clone(),
+            key,
         };
         tokio::spawn(watched(job, prepared));
     }
@@ -145,9 +155,10 @@ async fn deliver(job: SendJob, prepared: Prepared) {
     match sent {
         None => {}
         Some(Ok(mut accepted)) => {
+            job.retry_ids.accepted(job.key);
             job.sink.send(Event::MessageSent { account: job.sink.account().clone() });
             if job.settings.save_sent {
-                let bytes = accepted.take_bytes();
+                let bytes = prepared.sent_copy(&accepted.take_bytes());
                 let file = job.queue.store(&bytes);
                 let _ = job.copies.send(SentCopy { bytes, file });
             }
