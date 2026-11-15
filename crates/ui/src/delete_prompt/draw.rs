@@ -13,6 +13,8 @@ pub const KEEP: &str = " Keep them ";
 const WIDTH: u16 = 60;
 const HEIGHT: u16 = 7;
 const WARNING: &str = "This removes it from the server for good, with no undo.";
+/// Said instead when some of the messages only move to the Trash.
+const WARNING_MIXED: &str = "Removed for good: no undo. The rest can be got back.";
 const HINT: &str = " y deletes   n or Esc keeps ";
 
 /// Where the box and its buttons sit.
@@ -60,13 +62,26 @@ pub fn draw_delete_prompt(frame: &mut Frame, ctx: &DrawContext<'_>, grid: Rect, 
     frame.effects.retain(|effect| !overlaps(effect.area(), rect));
     fill_cells(frame, rect, ctx.full(roles::MENU_BASE));
     draw_border(frame, ctx, rect);
-    let count = prompt.for_good;
-    let question = if count == 1 { "Delete this message for good?".to_string() } else { format!("Delete {count} messages for good?") };
+    let question = question(prompt.for_good, prompt.targets.len().saturating_sub(prompt.for_good));
+    let warning = if prompt.for_good < prompt.targets.len() { WARNING_MIXED } else { WARNING };
     let inner = Rect::new(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2);
     put_text(frame, inner, inner.x + 2, rect.y + 2, &question, ctx.fg(roles::FOOTER_ERROR).add_modifier(Modifier::BOLD));
-    put_text(frame, inner, inner.x + 2, rect.y + 3, WARNING, ctx.fg(roles::MENU_BASE));
+    put_text(frame, inner, inner.x + 2, rect.y + 3, warning, ctx.fg(roles::MENU_BASE));
     draw_button(frame, ctx, rects.delete, DELETE, prompt.focus == Choice::Delete);
     draw_button(frame, ctx, rects.keep, KEEP, prompt.focus == Choice::Keep);
+}
+
+/// What is asked: how many messages are removed for good and, when some of the
+/// targets are not in the Trash, how many only move there. Saying only the
+/// first would let a yes remove mail the question never named.
+pub(super) fn question(for_good: usize, to_trash: usize) -> String {
+    let messages = |count: usize| if count == 1 { "1 message".to_string() } else { format!("{count} messages") };
+    match (for_good, to_trash) {
+        (1, 0) => "Delete this message for good?".to_string(),
+        (count, 0) => format!("Delete {count} messages for good?"),
+        (count, 1) => format!("Delete {} for good and move 1 other to the Trash?", messages(count)),
+        (count, moved) => format!("Delete {} for good and move {moved} others to the Trash?", messages(count)),
+    }
 }
 
 fn draw_border(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect) {
