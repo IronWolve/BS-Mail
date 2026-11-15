@@ -34,6 +34,13 @@ impl SentQueue {
         Self { dir: config.state_dir.as_ref().map(|dir| dir.join(FOLDER)), id: config.id.clone() }
     }
 
+    /// Whether copies are meant to be kept on disk: the account has a folder
+    /// of its own. A copy that then cannot be written is a failure to report;
+    /// an account with no such folder never meant to keep files.
+    pub(super) fn keeps_files(&self) -> bool {
+        self.dir.is_some()
+    }
+
     /// Keeps `bytes` and says where, or `None` when they cannot be kept on
     /// disk (no folder, no room, no permission): the copy then lives only in
     /// memory, which is what it did before.

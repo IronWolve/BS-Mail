@@ -8,6 +8,7 @@ use tokio::sync::mpsc::UnboundedReceiver;
 
 use super::backoff::Backoff;
 use super::lifecycle::{announce, changes_allowed, connection};
+use super::in_flight::SendsInFlight;
 use super::inbox::Inbox;
 use super::online::Served;
 use super::poll_state::PollState;
@@ -61,6 +62,8 @@ pub(super) struct Worker {
     pub(super) answers: Inbox<MessageId>,
     /// Originals still to be marked as answered, waiting for the mailbox.
     pub(super) answered_waiting: Vec<MessageId>,
+    /// The sends on their way, which closing waits for.
+    pub(super) sends: SendsInFlight,
 }
 
 /// How a pause between connection attempts ended.
@@ -70,7 +73,13 @@ enum Pause {
 }
 
 impl Worker {
-    pub(super) fn new(config: AccountConfig, timing: Timing, sink: EventSink, stop: Stop) -> Self {
+    pub(super) fn new(
+        config: AccountConfig,
+        timing: Timing,
+        sink: EventSink,
+        stop: Stop,
+        sends: SendsInFlight,
+    ) -> Self {
         let queue = SentQueue::for_account(&config);
         Self {
             account: sink.account().clone(),
@@ -90,6 +99,7 @@ impl Worker {
             threads: ThreadCache::default(),
             answers: Inbox::new(),
             answered_waiting: Vec::new(),
+            sends,
         }
     }
 

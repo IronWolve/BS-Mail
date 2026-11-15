@@ -39,6 +39,7 @@ mod change_rules;
 mod changes;
 mod handlers;
 mod host_info;
+mod in_flight;
 mod inbox;
 mod lifecycle;
 mod offline;
@@ -64,11 +65,13 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
 use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
 
 use model::{AccountId, Command, ConnectionState, Event, MailBackend};
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 use tokio::sync::watch;
 
+use self::in_flight::SendsInFlight;
 use self::lifecycle::connection;
 use self::offline::OFFLINE_REASON;
 use self::sink::EventSink;
@@ -96,6 +99,9 @@ pub struct RealBackend {
     events: Receiver<Event>,
     stop: watch::Sender<bool>,
     worker: Option<JoinHandle<()>>,
+    /// The sends that are on their way, which closing waits for.
+    sends: SendsInFlight,
+    send_grace: Duration,
 }
 
 impl RealBackend {
@@ -121,9 +127,12 @@ impl RealBackend {
         let online = sink.online_flag();
         let writes = !config.read_only;
         let failed_sink = sink.clone();
+        let sends = SendsInFlight::default();
+        let worker_sends = sends.clone();
+        let send_grace = timing.send_grace;
         let spawned = std::thread::Builder::new()
             .name("mail-worker".to_owned())
-            .spawn(move || run_worker(Worker::new(config, timing, sink, stop), command_receiver));
+            .spawn(move || run_worker(Worker::new(config, timing, sink, stop, worker_sends), command_receiver));
         let worker = match spawned {
             Ok(handle) => Some(handle),
             Err(error) => {
@@ -139,6 +148,8 @@ impl RealBackend {
             events,
             stop: stop_sender,
             worker,
+            sends,
+            send_grace,
         }
     }
 
@@ -215,9 +226,14 @@ impl MailBackend for RealBackend {
 }
 
 impl Drop for RealBackend {
-    /// Stops the worker and waits for it. Every wait in the worker gives way
-    /// to the stop signal, so this returns promptly.
+    /// Lets the sends that are under way finish, for a few seconds at most,
+    /// then stops the worker and waits for it. Every wait in the worker gives
+    /// way to the stop signal, so that returns promptly.
     fn drop(&mut self) {
+        let until = Instant::now() + self.send_grace;
+        while self.sends.count() > 0 && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(10));
+        }
         let _ = self.stop.send(true);
         drop(self.commands.take());
         if let Some(worker) = self.worker.take() {

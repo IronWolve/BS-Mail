@@ -17,6 +17,7 @@
 use model::{Event, MessageId, OutgoingMessage};
 use tokio::sync::mpsc::UnboundedSender;
 
+use super::in_flight::InFlight;
 use super::save_sent::SentCopy;
 use super::retry_ids::RetryIds;
 use super::sent_queue::SentQueue;
@@ -49,9 +50,17 @@ struct SendJob {
     /// server accepts it.
     answers: UnboundedSender<MessageId>,
     original: Option<MessageId>,
+    /// Counts this send as on its way until the task ends, so that closing
+    /// the program waits for it.
+    _in_flight: InFlight,
     /// Which message this is, for `retry_ids`.
     key: u64,
 }
+
+/// What is said when the server took the message and its copy could not be
+/// written to disk: the copy is held in memory only.
+const COPY_NOT_ON_DISK: &str = "the message was sent, but its copy could not be written to disk, so it is held \
+     in memory until the Sent folder has it; if the program is closed first, the copy is lost";
 
 /// The failure notice for a send, named as the screen expects.
 fn failure(sink: &EventSink, reason: impl Into<String>) -> Event {
@@ -141,6 +150,7 @@ impl Worker {
             retry_ids: self.retry_ids.clone(),
             answers: self.answers.sender(),
             original,
+            _in_flight: self.sends.begin(),
             key,
         };
         tokio::spawn(watched(job, prepared));
@@ -165,14 +175,23 @@ async fn deliver(job: SendJob, prepared: Prepared) {
         None => {}
         Some(Ok(mut accepted)) => {
             job.retry_ids.accepted(job.key);
-            job.sink.send(Event::MessageSent { account: job.sink.account().clone() });
-            if let Some(original) = job.original {
-                let _ = job.answers.send(original);
-            }
-            if job.settings.save_sent {
+            // The copy is written before the send is called a success, so
+            // that nothing which says "sent" leaves the only record of it in
+            // memory for even a moment.
+            let copy = job.settings.save_sent.then(|| {
                 let bytes = prepared.sent_copy(&accepted.take_bytes());
                 let file = job.queue.store(&bytes);
-                let _ = job.copies.send(SentCopy { bytes, file });
+                SentCopy { bytes, file }
+            });
+            job.sink.send(Event::MessageSent { account: job.sink.account().clone() });
+            if let Some(copy) = copy {
+                if copy.file.is_none() && job.queue.keeps_files() {
+                    job.sink.send(job.sink.failure("save sent copy", COPY_NOT_ON_DISK));
+                }
+                let _ = job.copies.send(copy);
+            }
+            if let Some(original) = job.original {
+                let _ = job.answers.send(original);
             }
             job.stop.guard(accepted.say_goodbye()).await;
         }

@@ -26,6 +26,8 @@ pub struct Timing {
     /// After this long a search stops going on to further folders and
     /// answers with what it has.
     pub(super) search_deadline: Duration,
+    /// Closing waits this long for sends that are under way to finish.
+    pub(super) send_grace: Duration,
 }
 
 impl Timing {
@@ -42,6 +44,7 @@ impl Timing {
             smtp: SmtpTimeouts::production(),
             poll: None,
             search_deadline: Duration::from_secs(20),
+            send_grace: Duration::from_secs(8),
         }
     }
 
@@ -78,6 +81,13 @@ impl Timing {
         self
     }
 
+    /// Closing waits this long for a send under way, for tests.
+    #[cfg(feature = "test-support")]
+    pub const fn with_send_grace(mut self, grace: Duration) -> Self {
+        self.send_grace = grace;
+        self
+    }
+
     /// A search stops going on to further folders after this long.
     #[cfg(feature = "test-support")]
     pub const fn with_search_deadline(mut self, deadline: Duration) -> Self {
@@ -106,6 +116,7 @@ impl Timing {
             },
             poll: None,
             search_deadline: Duration::from_secs(20),
+            send_grace: Duration::from_secs(3),
         }
     }
 }
