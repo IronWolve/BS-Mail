@@ -3,8 +3,9 @@
 use surface::ColorDepth;
 
 /// The color depth of the terminal. `NO_COLOR` set to anything turns color
-/// off; `COLORTERM` says true color outright; otherwise `TERM` is read for
-/// 256 colors, and a terminal that says nothing is taken to have sixteen.
+/// off; `COLORTERM` says true color outright; otherwise `TERM` is read: a
+/// direct-color name (such as `xterm-direct`) is true color, a `256color` name
+/// is 256 colors, and a terminal that says nothing is taken to have sixteen.
 pub fn color_depth(env: &dyn Fn(&str) -> Option<String>) -> ColorDepth {
     if env("NO_COLOR").is_some_and(|value| !value.is_empty()) {
         return ColorDepth::None;
@@ -14,7 +15,8 @@ pub fn color_depth(env: &dyn Fn(&str) -> Option<String>) -> ColorDepth {
     }
     match env("TERM").as_deref() {
         Some("dumb") | Some("") => ColorDepth::None,
-        Some(term) if term.contains("256color") || term.contains("direct") => ColorDepth::Indexed256,
+        Some(term) if term.contains("direct") => ColorDepth::TrueColor,
+        Some(term) if term.contains("256color") => ColorDepth::Indexed256,
         _ => ColorDepth::Ansi16,
     }
 }
