@@ -7,6 +7,7 @@ mod check;
 mod date;
 mod flowed;
 mod header_block;
+mod idn;
 mod limits;
 mod message;
 pub(crate) mod random;

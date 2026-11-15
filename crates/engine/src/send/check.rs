@@ -7,6 +7,7 @@ use std::fmt;
 
 use model::Address;
 
+use super::idn::ascii_domain;
 use super::limits::{MAX_ADDRESS_BYTES, MAX_NAME_CHARS, MAX_SUBJECT_CHARS};
 
 /// Why a message was not sent, as one plain sentence.
@@ -82,7 +83,8 @@ pub fn check_subject(subject: &str) -> Result<(), Refusal> {
 /// "a recipient") for the reason text.
 pub fn check_mailbox(role: &str, who: &Address) -> Result<Mailbox, Refusal> {
     check_clean(&format!("the address of {role}"), &who.email)?;
-    if let Some(problem) = address_problem(&who.email) {
+    let address = ascii_form(&who.email);
+    if let Some(problem) = address_problem(&address) {
         return Err(Refusal::new(format!(
             "\"{}\", the address of {role}, {problem}; nothing was sent",
             shown(&who.email)
@@ -104,17 +106,34 @@ pub fn check_mailbox(role: &str, who: &Address) -> Result<Mailbox, Refusal> {
             Some(name.to_owned()).filter(|name| *name != who.email)
         }
     };
-    Ok(Mailbox { name, address: who.email.clone() })
+    Ok(Mailbox { name, address })
+}
+
+/// The address as it goes into the envelope and the headers: a domain with
+/// characters outside ASCII becomes its `xn--` form. Anything that cannot be
+/// converted comes back as it is, for `address_problem` to refuse.
+fn ascii_form(address: &str) -> String {
+    let split = address.split_once('@');
+    match split {
+        Some((local, domain)) if !address.is_ascii() && local.is_ascii() && address.len() <= MAX_ADDRESS_BYTES => {
+            ascii_domain(domain).map_or_else(|| address.to_owned(), |domain| format!("{local}@{domain}"))
+        }
+        _ => address.to_owned(),
+    }
 }
 
 /// What is wrong with a bare address, or `None` when it can be used. Plain
 /// ASCII `local@domain` only: no quoted parts, comments or address literals.
+/// A domain with other characters is converted first, by `ascii_form`.
 pub fn address_problem(address: &str) -> Option<&'static str> {
     if address.len() > MAX_ADDRESS_BYTES {
         return Some("is too long");
     }
     if !address.is_ascii() {
-        return Some("has characters outside plain ASCII, which this program cannot send yet");
+        return Some(
+            "has characters outside plain ASCII, which this program cannot send: \
+             only a domain name after the @ may have them",
+        );
     }
     let Some((local, domain)) = address.split_once('@') else {
         return Some("is not a mail address (it has no @)");
