@@ -24,6 +24,13 @@ pub fn run(host: &mut TtyHost, sink: &mut dyn EventSink) -> Result<(), HostError
     }
     host.request_redraw_now();
     loop {
+        if host.take_resumed() {
+            // The terminal may have been resized while the program was stopped.
+            let (cols, rows) = terminal::size().map_err(|error| HostError(format!("the terminal's size is unknown: {error}")))?;
+            if sink.on_input(InputEvent::Resized { cols, rows }, host) == Flow::Quit {
+                return Ok(());
+            }
+        }
         if host.take_redraw() {
             sink.on_redraw(host);
         }

@@ -4,7 +4,8 @@
 //! reports, bracketed paste and focus reports, and hides the cursor. Giving
 //! it back undoes all of that. It happens when the session is dropped, when
 //! the program panics, and when the terminal is hung up or told to terminate,
-//! so the user's shell is never left in raw mode on a blank screen.
+//! so the user's shell is never left in raw mode on a blank screen. Suspending
+//! (Ctrl+Z) gives it back the same way and takes it over again on resume.
 
 use std::io::{self, Write};
 use std::sync::Arc;
@@ -34,25 +35,45 @@ pub struct Session {
     left: Arc<AtomicBool>,
 }
 
+/// Takes the terminal over: raw input and the full-screen state. A failure
+/// part way gives back what was taken.
+fn take_over() -> io::Result<()> {
+    enable_raw_mode()?;
+    let mut out = io::stdout();
+    let started = execute!(
+        out,
+        EnterAlternateScreen,
+        DisableLineWrap,
+        EnableMouseCapture,
+        EnableBracketedPaste,
+        EnableFocusChange,
+        Hide
+    );
+    ACTIVE.store(true, Ordering::SeqCst);
+    if started.is_err() {
+        restore();
+    }
+    started
+}
+
+/// Suspends the program the way a terminal program does on Ctrl+Z: the
+/// terminal is given back first, so the shell finds it in its own state, then
+/// the program stops itself (the shell reports the job as stopped) and goes on
+/// from here when the shell continues it, taking the terminal over again. Raw
+/// input has no Ctrl+Z signal, which is why this is done by hand. A program
+/// that may not be stopped (its process group has no shell around it) simply
+/// comes back at once. Does not run on Windows.
+#[cfg(unix)]
+pub fn suspend() -> io::Result<()> {
+    restore();
+    let stopped = signal_hook::low_level::raise(signal_hook::consts::SIGTSTP);
+    take_over()?;
+    stopped
+}
+
 impl Session {
     pub fn start() -> io::Result<Self> {
-        enable_raw_mode()?;
-        let mut out = io::stdout();
-        let started = execute!(
-            out,
-            EnterAlternateScreen,
-            DisableLineWrap,
-            EnableMouseCapture,
-            EnableBracketedPaste,
-            EnableFocusChange,
-            Hide
-        );
-        if let Err(error) = started {
-            ACTIVE.store(true, Ordering::SeqCst);
-            restore();
-            return Err(error);
-        }
-        ACTIVE.store(true, Ordering::SeqCst);
+        take_over()?;
         install_panic_hook();
         let stop = stop_flag();
         let left = Arc::new(AtomicBool::new(false));

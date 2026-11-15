@@ -20,6 +20,9 @@ pub struct TtyHost {
     depth: ColorDepth,
     out: BufWriter<Stdout>,
     redraw: bool,
+    /// Set when the program was stopped and continued, so the loop tells the
+    /// screen the terminal's size again.
+    resumed: bool,
     /// Set by another thread that wants the loop to look for news.
     wake: Arc<AtomicBool>,
     pub(crate) failure: Option<HostError>,
@@ -32,6 +35,7 @@ impl TtyHost {
             depth,
             out: BufWriter::new(io::stdout()),
             redraw: false,
+            resumed: false,
             wake: Arc::new(AtomicBool::new(false)),
             failure: None,
         }
@@ -44,6 +48,10 @@ impl TtyHost {
 
     pub(crate) fn take_redraw(&mut self) -> bool {
         std::mem::take(&mut self.redraw)
+    }
+
+    pub(crate) fn take_resumed(&mut self) -> bool {
+        std::mem::take(&mut self.resumed)
     }
 
     pub(crate) fn take_wake(&mut self) -> bool {
@@ -84,6 +92,27 @@ impl Presenter for TtyHost {
 
     fn set_title(&mut self, title: &str) {
         self.write(title_sequence(title).as_bytes());
+    }
+
+    /// Ctrl+Z: the shell gets the terminal back and the program stops until
+    /// the shell continues it. Not on Windows, which has no such job control.
+    fn suspend(&mut self) -> bool {
+        #[cfg(unix)]
+        {
+            let _ = self.out.flush();
+            if let Err(error) = crate::session::suspend() {
+                self.failure = Some(HostError(format!("the terminal could not be suspended: {error}")));
+            }
+            // The terminal's contents are whatever the shell left there.
+            self.painter.forget();
+            self.redraw = true;
+            self.resumed = true;
+            true
+        }
+        #[cfg(not(unix))]
+        {
+            false
+        }
     }
 
     fn request_redraw(&mut self) {

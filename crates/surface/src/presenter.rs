@@ -94,6 +94,17 @@ pub trait Presenter {
     /// the grid; a host that takes its colors from elsewhere ignores it.
     fn set_base_colors(&mut self, _text: Color, _background: Color) {}
 
+    /// Hands the display back to the shell it came from and stops the program
+    /// until the user continues it (a terminal's Ctrl+Z). When it returns the
+    /// display is the host's again and what the host remembered of it is
+    /// dropped, so the next frame is a full one; the host also reports the
+    /// terminal's size again, which may have changed meanwhile. Returns
+    /// `true` when it did, `false` for a host with no shell to hand the
+    /// display to, which does nothing.
+    fn suspend(&mut self) -> bool {
+        false
+    }
+
     /// Asks the host to call `EventSink::on_redraw` soon.
     fn request_redraw(&mut self);
 
