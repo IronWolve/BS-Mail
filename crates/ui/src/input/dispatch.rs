@@ -20,6 +20,9 @@ impl AppView {
     /// Reacts to one input event on a `cols` x `rows` grid, once the text a
     /// command key brought with it has been set aside (see `paired_text`).
     pub(crate) fn dispatch_input(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
+        if self.setup.is_none() && self.options.is_none() && self.layout(grid.0, grid.1).too_small {
+            return self.input_while_hidden(event, grid);
+        }
         if self.setup.is_some() {
             return self.setup_input(event, grid);
         }
