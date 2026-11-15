@@ -14,7 +14,10 @@
 //! `search` with a plain sentence. When some folders were not searched (the
 //! time ran out before they were reached, a server refused the search in
 //! them, or they could not be opened) the results say so in `incomplete`
-//! instead of passing for the whole answer.
+//! instead of passing for the whole answer. So do results that hold fewer
+//! messages than the search found, because the newest of each folder and the
+//! newest overall are all that is listed: `total` is every match, and
+//! `incomplete` says how many of them are listed.
 
 use std::time::Instant;
 
@@ -80,6 +83,21 @@ impl Tally {
         let covered = folders.saturating_sub(missed);
         Some(format!("searched {covered} of {folders} folders, so messages may be missing: {}", reasons.join("; ")))
     }
+
+    /// A sentence that says the list holds only `shown` of the matches, or
+    /// `None` when it holds all of them.
+    fn cut(&self, shown: usize) -> Option<String> {
+        let total = usize::try_from(self.total).unwrap_or(usize::MAX);
+        (total > shown).then(|| format!("showing only the newest {shown} of {total} matches; older ones are not listed"))
+    }
+}
+
+/// The two notes of a search as one, in the order they were found.
+fn joined(folders: Option<String>, cut: Option<String>) -> Option<String> {
+    match (folders, cut) {
+        (Some(folders), Some(cut)) => Some(format!("{folders}; {cut}")),
+        (one, other) => one.or(other),
+    }
 }
 
 impl Worker {
@@ -109,7 +127,8 @@ impl Worker {
             }
             self.search_folder(session, target, &keys, &mut tally).await?;
         }
-        let incomplete = tally.incomplete(targets.len());
+        let shown = tally.hits.len().min(MAX_RESULTS);
+        let incomplete = joined(tally.incomplete(targets.len()), tally.cut(shown));
         Ok(vec![self.search_answer(request, tally, incomplete)])
     }
 
