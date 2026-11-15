@@ -118,6 +118,12 @@ impl MailSnapshot {
         if selection.folder.is_some_and(|chosen| chosen != folder) {
             return;
         }
+        // So is a page for a folder this account does not have: after a switch
+        // of account the folder list is empty until the new account's arrives,
+        // and a page of the account that was left must not be shown meanwhile.
+        if !self.folders.iter().any(|known| known.id == folder) {
+            return;
+        }
         let shown = self.page.take().filter(|page| page.folder == folder && offset == 0);
         let envelopes = match shown {
             Some(shown) => merge_newest(shown.envelopes, total, envelopes),
