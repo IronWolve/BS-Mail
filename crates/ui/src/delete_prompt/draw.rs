@@ -60,7 +60,7 @@ pub fn draw_delete_prompt(frame: &mut Frame, ctx: &DrawContext<'_>, grid: Rect, 
     frame.effects.retain(|effect| !overlaps(effect.area(), rect));
     fill_cells(frame, rect, ctx.full(roles::MENU_BASE));
     draw_border(frame, ctx, rect);
-    let count = prompt.targets.len();
+    let count = prompt.for_good;
     let question = if count == 1 { "Delete this message for good?".to_string() } else { format!("Delete {count} messages for good?") };
     let inner = Rect::new(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2);
     put_text(frame, inner, inner.x + 2, rect.y + 2, &question, ctx.fg(roles::FOOTER_ERROR).add_modifier(Modifier::BOLD));

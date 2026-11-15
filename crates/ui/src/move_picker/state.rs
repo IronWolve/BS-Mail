@@ -7,7 +7,8 @@ use model::{Folder, FolderId, FolderRole, MessageId};
 pub struct MovePicker {
     /// The messages that will move.
     pub targets: Vec<MessageId>,
-    /// The folder they are in now, which is not a place to move them to.
+    /// The folder they are all in now, which is not a place to move them to;
+    /// `None` when they come from several folders, so every folder is one.
     pub from: Option<FolderId>,
     pub filter: String,
     /// Which of the shown folders is highlighted.

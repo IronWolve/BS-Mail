@@ -83,8 +83,9 @@ impl AppView {
         if !self.changes_allowed_or_note() {
             return;
         }
-        if self.deleting_for_good() {
-            self.ask_before_deleting(ids);
+        let for_good = self.count_deleted_for_good(&ids);
+        if for_good > 0 {
+            self.ask_before_deleting(ids, for_good);
             return;
         }
         self.send_delete(ids);

@@ -11,18 +11,25 @@ use crate::delete_prompt::{Choice, DeletePrompt};
 use model::{Command, MessageId};
 
 impl AppView {
-    /// Whether `d` here would remove mail for good: the folder shown is the
-    /// Trash.
-    pub(crate) fn deleting_for_good(&self) -> bool {
-        let Some(folder) = self.selection.folder else {
-            return false;
+    /// How many of `ids` `d` would remove for good: the ones whose own folder
+    /// is the Trash. The folder shown says nothing about it when the list is
+    /// the answer to a search, which holds mail from every folder. Mail whose
+    /// folder cannot be told is judged by the folder shown, the careful way.
+    pub(crate) fn count_deleted_for_good(&self, ids: &[MessageId]) -> usize {
+        let is_trash = |folder| {
+            self.mail.folders.iter().any(|candidate| candidate.id == folder && candidate.role == model::FolderRole::Trash)
         };
-        self.mail.folders.iter().any(|candidate| candidate.id == folder && candidate.role == model::FolderRole::Trash)
+        let shown = self.mail.page.as_ref().map(|page| page.envelopes.as_slice()).unwrap_or_default();
+        let known: Vec<_> = shown.iter().filter(|envelope| ids.contains(&envelope.id)).collect();
+        let unknown = ids.len() - known.len().min(ids.len());
+        let in_trash = known.iter().filter(|envelope| is_trash(envelope.folder)).count();
+        let unknown_in_trash = if self.selection.folder.is_some_and(is_trash) { unknown } else { 0 };
+        in_trash + unknown_in_trash
     }
 
-    /// Asks before `targets` are removed for good.
-    pub(crate) fn ask_before_deleting(&mut self, targets: Vec<MessageId>) {
-        self.delete_prompt = Some(DeletePrompt::new(targets));
+    /// Asks before `targets` are removed, `for_good` of them for good.
+    pub(crate) fn ask_before_deleting(&mut self, targets: Vec<MessageId>, for_good: usize) {
+        self.delete_prompt = Some(DeletePrompt::counting(targets, for_good));
     }
 
     /// Input while the question is open. Returns whether the screen changed.

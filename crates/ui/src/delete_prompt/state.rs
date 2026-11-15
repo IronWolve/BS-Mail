@@ -12,14 +12,23 @@ pub enum Choice {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeletePrompt {
-    /// The messages that will be removed for good.
+    /// The messages the delete is about.
     pub targets: Vec<MessageId>,
+    /// How many of them are removed for good (the rest go to the Trash).
+    pub for_good: usize,
     pub focus: Choice,
 }
 
 impl DeletePrompt {
+    /// A question about messages that are all removed for good.
     pub fn new(targets: Vec<MessageId>) -> Self {
-        Self { targets, focus: Choice::Keep }
+        let for_good = targets.len();
+        Self::counting(targets, for_good)
+    }
+
+    /// A question about `targets`, `for_good` of which are removed for good.
+    pub fn counting(targets: Vec<MessageId>, for_good: usize) -> Self {
+        Self { targets, for_good, focus: Choice::Keep }
     }
 
     /// Moves focus to the other button.

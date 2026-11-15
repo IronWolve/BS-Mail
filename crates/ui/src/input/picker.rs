@@ -5,7 +5,7 @@
 //! cancels. It only asks the backend; the list changes when the backend says
 //! the messages have moved.
 
-use model::Command;
+use model::{Command, FolderId, MessageId};
 use surface::{InputEvent, KeyEvent, LogicalKey, NamedKey};
 
 use crate::app_view::AppView;
@@ -23,7 +23,22 @@ impl AppView {
             self.mail.error = Some(READ_ONLY_NOTE.to_string());
             return;
         }
-        self.picker = Some(MovePicker::new(targets, self.selection.folder));
+        let from = self.folder_all_are_in(&targets);
+        self.picker = Some(MovePicker::new(targets, from));
+    }
+
+    /// The folder every one of `ids` is in, when there is one: the only
+    /// folder that is no place to move them to. A list that is the answer to
+    /// a search holds mail from several folders, so the folder shown says
+    /// nothing about where a message is; its own folder does. Mail whose
+    /// folder cannot be told is taken to be in the folder shown.
+    fn folder_all_are_in(&self, ids: &[MessageId]) -> Option<FolderId> {
+        let shown = self.mail.page.as_ref().map(|page| page.envelopes.as_slice()).unwrap_or_default();
+        let mut folders = shown.iter().filter(|envelope| ids.contains(&envelope.id)).map(|envelope| envelope.folder);
+        let Some(first) = folders.next() else {
+            return self.selection.folder;
+        };
+        folders.all(|folder| folder == first).then_some(first)
     }
 
     /// Input while the picker is open. Everything is the picker's: nothing
