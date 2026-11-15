@@ -140,12 +140,17 @@ pub fn wrap_words(text: &str, width: usize) -> Vec<String> {
     lines
 }
 
+/// The row under the notes: a problem, else something to tell, else that the
+/// program is connecting, else (so it is always on screen) what the form will
+/// leave unchecked for a server on this computer.
 fn draw_notice(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, form: &SetupForm) {
-    let (text, style) = match (&form.notice, &form.info, form.waiting) {
-        (Some(notice), _, _) => (notice.as_str(), ctx.fg(roles::FOOTER_ERROR)),
-        (None, Some(info), _) => (info.as_str(), ctx.fg(roles::FOOTER_TEXT)),
-        (None, None, true) => ("Connecting to the server\u{2026}", ctx.fg(roles::FOOTER_TEXT)),
-        (None, None, false) => return,
+    let local = form.local_trust_note();
+    let (text, style) = match (&form.notice, &form.info, form.waiting, &local) {
+        (Some(notice), _, _, _) => (notice.as_str(), ctx.fg(roles::FOOTER_ERROR)),
+        (None, Some(info), _, _) => (info.as_str(), ctx.fg(roles::FOOTER_TEXT)),
+        (None, None, true, _) => ("Connecting to the server\u{2026}", ctx.fg(roles::FOOTER_TEXT)),
+        (None, None, false, Some(note)) => (note.as_str(), ctx.fg(roles::FOOTER_TEXT)),
+        (None, None, false, None) => return,
     };
     put_text(frame, rect, rect.x, rect.y, text, style);
 }

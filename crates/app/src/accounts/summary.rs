@@ -79,6 +79,8 @@ pub fn prefill_of(found: &Found) -> Result<AccountPrefill, String> {
         smtp_port: port_of(Some(table), "smtp_port", default_smtp_port(&smtp_security)),
         imap_security: security,
         smtp_security,
+        imap_trust: get("trust").unwrap_or_default(),
+        smtp_trust: get("smtp_trust").unwrap_or_default(),
         browser_provider: browser,
         client_id: get("oauth_client_id").unwrap_or_default(),
         client_secret: get("oauth_client_secret").unwrap_or_default(),

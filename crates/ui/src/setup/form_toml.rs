@@ -72,7 +72,7 @@ impl SetupForm {
                 }
             }
         }
-        if is_local(&imap_host) {
+        if self.imap_trust_any() {
             put("trust", "any".into());
         }
         put("read_only", (!self.allow_changes).into());
@@ -82,7 +82,7 @@ impl SetupForm {
             put("smtp_host", smtp_host.clone().into());
             put("smtp_port", i64::from(smtp_port).into());
             put("smtp_security", self.smtp_security.toml_name().into());
-            if is_local(&smtp_host) {
+            if self.smtp_trust_any() {
                 put("smtp_trust", "any".into());
             }
             if self.files_sent_itself {
@@ -136,11 +136,6 @@ fn valid_address(text: &str) -> bool {
         && domain.contains('.')
         && !domain.contains('@')
         && !text.chars().any(|ch| ch.is_whitespace() || ch.is_control() || matches!(ch, '<' | '>' | ',' | ';' | '"'))
-}
-
-/// A server on this machine, whose own certificate is its own.
-fn is_local(host: &str) -> bool {
-    matches!(host, "127.0.0.1" | "localhost" | "[::1]" | "::1")
 }
 
 #[cfg(test)]

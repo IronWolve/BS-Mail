@@ -11,12 +11,14 @@ pub mod form_debug;
 pub mod form_toml;
 pub mod input;
 pub mod layout;
+pub mod local_host;
 pub mod link_panel;
 pub mod link_panel_input;
 pub mod prefill;
 pub mod providers;
 pub mod saved_client;
 pub mod simple_providers;
+pub mod trust_note;
 
 pub use account_id::account_id_for;
 pub use action::SetupAction;

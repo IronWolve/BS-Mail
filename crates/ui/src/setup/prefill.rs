@@ -27,6 +27,10 @@ pub struct AccountPrefill {
     pub smtp_host: String,
     pub smtp_port: u16,
     pub smtp_security: String,
+    /// The saved `trust` word of the incoming server, or empty.
+    pub imap_trust: String,
+    /// The saved `smtp_trust` word, or empty.
+    pub smtp_trust: String,
     /// `google` or `microsoft` when the account signs in through a browser.
     pub browser_provider: Option<String>,
     pub client_id: String,
@@ -70,6 +74,8 @@ impl SetupForm {
         form.smtp_host.set_text(&prefill.smtp_host);
         form.smtp_port.set_text(&prefill.smtp_port.to_string());
         form.smtp_security = Security::from_name(&prefill.smtp_security).unwrap_or(Security::Starttls);
+        form.verified_imap_host = prefill.imap_trust.eq_ignore_ascii_case("verify").then(|| prefill.imap_host.trim().to_string());
+        form.verified_smtp_host = prefill.smtp_trust.eq_ignore_ascii_case("verify").then(|| prefill.smtp_host.trim().to_string());
         form.allow_changes = prefill.allow_changes;
         form.signin = if prefill.browser_provider.is_some() { SignIn::Browser } else { SignIn::Password };
         form.oauth_provider = prefill.browser_provider.as_deref().and_then(browser_provider);

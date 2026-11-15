@@ -56,6 +56,12 @@ pub struct SetupForm {
     pub(crate) saved_clients: Vec<SavedClient>,
     /// The provider files a copy of sent mail itself, so the program must not.
     pub(super) files_sent_itself: bool,
+    /// The incoming server of the account being edited, when its file says
+    /// `trust = "verify"`: that choice is kept for that host, not replaced by
+    /// the local-server rule.
+    pub(super) verified_imap_host: Option<String>,
+    /// The same for the outgoing server and `smtp_trust`.
+    pub(super) verified_smtp_host: Option<String>,
     pub(super) servers_touched: bool,
     pub(super) username_touched: bool,
     pub(super) name_touched: bool,
@@ -101,6 +107,8 @@ impl SetupForm {
             edit_id: None,
             saved_clients: Vec::new(),
             files_sent_itself: false,
+            verified_imap_host: None,
+            verified_smtp_host: None,
             servers_touched: false,
             username_touched: false,
             name_touched: false,
