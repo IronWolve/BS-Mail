@@ -3,7 +3,7 @@
 //! crash lets go of it and a copied `lock` file is harmless.
 
 use std::fs::{File, OpenOptions, TryLockError};
-use std::io::{Read, Seek, Write};
+use std::io::{ErrorKind, Read, Seek, Write};
 use std::path::Path;
 
 use chrono::{Local, TimeZone};
@@ -17,36 +17,50 @@ pub struct DataLock {
     _file: File,
 }
 
-/// Another copy already holds the folder; `holder` says who, as far as the
-/// lock file could tell.
+/// Why a copy may not use the data folder.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Busy {
-    pub holder: String,
+pub enum Refused {
+    /// Another copy already holds the folder; `holder` says who, as far as
+    /// the lock file could tell.
+    Busy { holder: String },
+    /// The folder can be written but no lock can be had on it (the lock file
+    /// cannot be opened, or the file system has no locks), so nothing would
+    /// keep two copies from writing the same files at once.
+    Unlockable { reason: String },
 }
 
 /// Takes the lock on `folder`, making the folder if it is not there yet.
 ///
-/// `Ok(None)` means the lock cannot be had here (a folder that cannot be
-/// written, a file system without locks): the run goes on without one, as
-/// before, since nothing can then be written there by two copies at once or
-/// the system has no way to say so. Only a lock that is held elsewhere
-/// refuses.
-pub fn take(folder: &Path) -> Result<Option<DataLock>, Busy> {
+/// `Ok(None)` means the folder cannot be written at all (it cannot be made,
+/// or the lock file may not be created in it): nothing can then be damaged by
+/// two copies, and the run goes on without a lock, as before. A lock that is
+/// held elsewhere refuses, and so does a folder that can be written but
+/// cannot be locked: failing open there would let two copies race on the
+/// account and token files.
+pub fn take(folder: &Path) -> Result<Option<DataLock>, Refused> {
     if private_dirs::make(folder).is_err() {
         return Ok(None);
     }
     let path = folder.join(LOCK_FILE);
     let opened = OpenOptions::new().read(true).write(true).create(true).truncate(false).open(&path);
-    let Ok(mut file) = opened else {
-        return Ok(None);
+    let mut file = match opened {
+        Ok(file) => file,
+        Err(error) if matches!(error.kind(), ErrorKind::PermissionDenied | ErrorKind::ReadOnlyFilesystem) => {
+            return Ok(None);
+        }
+        Err(error) => {
+            return Err(Refused::Unlockable { reason: format!("the lock file {} cannot be opened: {error}", path.display()) });
+        }
     };
     match file.try_lock() {
         Ok(()) => {
             write_holder(&mut file);
             Ok(Some(DataLock { _file: file }))
         }
-        Err(TryLockError::WouldBlock) => Err(Busy { holder: read_holder(&path) }),
-        Err(TryLockError::Error(_)) => Ok(None),
+        Err(TryLockError::WouldBlock) => Err(Refused::Busy { holder: read_holder(&path) }),
+        Err(TryLockError::Error(error)) => {
+            Err(Refused::Unlockable { reason: format!("this file system cannot lock the folder: {error}") })
+        }
     }
 }
 

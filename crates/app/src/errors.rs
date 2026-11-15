@@ -12,6 +12,9 @@ pub enum AppError {
     /// Another copy of the program is using this data folder; the text says
     /// who, when it could be told.
     Locked(PathBuf, String),
+    /// The data folder can be written but cannot be locked, so a second copy
+    /// could not be kept out.
+    Unlockable(PathBuf, String),
     Theme(String),
     Fonts(String),
     Output(io::Error),
@@ -30,6 +33,12 @@ impl fmt::Display for AppError {
             Self::Account(path, reason) => {
                 write!(f, "the account file {} cannot be used: {reason}", path.display())
             }
+            Self::Unlockable(folder, reason) => write!(
+                f,
+                "the data folder cannot be locked ({reason}), so two copies could damage each other's \
+                 files; fix the folder, or start this one with --data-dir <another folder> (this folder: {})",
+                folder.display()
+            ),
             Self::Locked(folder, holder) => {
                 let who = if holder.is_empty() { String::new() } else { format!(" ({holder})") };
                 write!(

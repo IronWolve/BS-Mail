@@ -11,7 +11,7 @@ use ui::{AppView, OptionsPaths};
 use crate::accounts::{Place, Scan, scan};
 use crate::cli::Options;
 use crate::config_io::{self, CONFIG_NAME};
-use crate::data_lock::{self, DataLock};
+use crate::data_lock::{self, DataLock, Refused};
 use crate::errors::AppError;
 use crate::identity::identity;
 use crate::options_flow::Settings;
@@ -67,7 +67,10 @@ fn hold_data_folder(source: &Source) -> Result<Option<DataLock>, AppError> {
     let Some(folder) = source.data_folder() else {
         return Ok(None);
     };
-    data_lock::take(&folder).map_err(|busy| AppError::Locked(folder, busy.holder))
+    data_lock::take(&folder).map_err(|refused| match refused {
+        Refused::Busy { holder } => AppError::Locked(folder, holder),
+        Refused::Unlockable { reason } => AppError::Unlockable(folder, reason),
+    })
 }
 
 fn scene_for(source: &Source, view: AppView, base: Base, scanned: &Scan) -> Result<Scene, AppError> {
