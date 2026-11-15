@@ -17,6 +17,7 @@ mod sizes;
 mod terms;
 mod wire;
 
+pub use ast::{Date, Expr, Status, Term};
 pub use compile::compile;
 pub use parser::parse;
 pub use wire::{Keys, Part};

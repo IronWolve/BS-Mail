@@ -64,6 +64,18 @@ pub fn field_term(name: &str, value: &str) -> Result<Term, SearchError> {
     }
 }
 
+/// The term for a quick filter, `:name`. It means `is:name`, so `:unread` is
+/// the unread messages and `:starred` the starred ones. A name `is:` does not
+/// know is refused: it must not be searched for as text.
+pub fn quick_term(name: &str) -> Result<Term, SearchError> {
+    status(name).map(Term::Is).map_err(|_| {
+        SearchError::new(format!(
+            "the quick filter \":{name}\" is not known; use :unread or :starred (or is:unread, is:starred), \
+             or put it in quotes to search for the text"
+        ))
+    })
+}
+
 const FIELDS_WITH_VALUES: [&str; 11] =
     ["from", "to", "cc", "subject", "body", "tag", "is", "before", "after", "size", "folder"];
 

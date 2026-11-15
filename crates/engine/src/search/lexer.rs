@@ -1,6 +1,6 @@
 //! Cuts a query into tokens: words, quoted phrases, `field:value` pairs,
-//! parentheses, the words `or` and `not`, and a minus that negates the term
-//! right after it.
+//! parentheses, the words `or` and `not`, quick filters such as `:unread`, and
+//! a minus that negates the term right after it.
 
 use super::error::SearchError;
 
@@ -19,6 +19,9 @@ pub enum Token {
     Word(String),
     /// `name:value`, with the name in lower case.
     Field { name: String, value: String },
+    /// A quick filter: a colon and a name, as in `:unread`, with the name in
+    /// lower case. Only an unquoted word makes one.
+    Quick(String),
 }
 
 /// The tokens of `text`, or the problem that stops it from being read.
@@ -107,6 +110,11 @@ fn read_word(chars: &[char], start: usize) -> Result<(Token, usize), SearchError
 }
 
 fn classify(word: String) -> Token {
+    if let Some(name) = word.strip_prefix(':')
+        && is_field_name(name)
+    {
+        return Token::Quick(name.to_ascii_lowercase());
+    }
     if let Some((name, value)) = word.split_once(':')
         && is_field_name(name)
     {

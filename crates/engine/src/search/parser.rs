@@ -6,7 +6,7 @@ use super::ast::{Expr, Query, Term};
 use super::error::SearchError;
 use super::lexer::{Token, lex};
 use super::scope::split_scope;
-use super::terms::{check_text, field_term};
+use super::terms::{check_text, field_term, quick_term};
 
 /// The most terms one query may hold.
 pub const MAX_TERMS: usize = 30;
@@ -116,6 +116,7 @@ impl Parser {
             Token::Open => self.group(),
             Token::Word(text) => self.term(Term::Any(check_text(text)?)),
             Token::Field { name, value } => self.term(field_term(&name, &value)?),
+            Token::Quick(name) => self.term(quick_term(&name)?),
             Token::Close | Token::Or | Token::Not => {
                 Err(SearchError::new("the search has a stray word where a term was expected"))
             }
