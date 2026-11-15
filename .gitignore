@@ -3,13 +3,15 @@
 # last so they override the allow rules above them.
 *
 
-# Allowed files.
-!.gitignore
-!Cargo.toml
-!Cargo.lock
-!README.md
-!LICENSE
-!NOTICE
+# Allowed files, at the repo root only. A name with no slash matches in every
+# directory, so each one carries a leading slash; a nested ignore file or a
+# nested README can then not reopen the deny-all.
+!/.gitignore
+!/Cargo.toml
+!/Cargo.lock
+!/README.md
+!/LICENSE
+!/NOTICE
 
 # Assets and everything under them.
 !assets/
@@ -28,3 +30,9 @@
 # Tests are never tracked. These come after the allow rules on purpose.
 *.tests.rs
 **/tests/
+
+# The font files and their license texts live outside Git while the build
+# setting `font_source` is "outside" (build-support/build-settings.toml). This
+# comes after every allow rule, so the assets rule above cannot reopen it.
+# Remove this line only in the same change that sets `font_source` to "tracked".
+assets/fonts/
