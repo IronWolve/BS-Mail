@@ -21,6 +21,10 @@ pub struct LayoutOptions {
     pub reader: ReaderPosition,
     /// Header lines in the reading pane.
     pub reader_header_rows: u16,
+    /// The message is being read: where the screen has no room for the
+    /// reading pane beside the list (or it is hidden), the message fills the
+    /// main area in place of the list.
+    pub reader_full: bool,
     pub columns: ColumnSpec,
 }
 
@@ -43,6 +47,7 @@ impl LayoutOptions {
             content,
             reader: config.reader.position,
             reader_header_rows: u16::try_from(config.reader.headers.len()).unwrap_or(0),
+            reader_full: false,
             columns: ColumnSpec::from_names(&config.list.columns, &config.list.flex_column),
         }
     }

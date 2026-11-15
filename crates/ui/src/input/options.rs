@@ -6,7 +6,7 @@
 //! the view's setters. While the screen is open no key and no click reaches
 //! the mail beneath it, and the account form, when it is open, sits above.
 
-use surface::{ButtonState, InputEvent, PointerButton, PointerShape};
+use surface::{ButtonState, InputEvent, LogicalKey, NamedKey, PointerButton, PointerShape};
 
 use crate::app_view::AppView;
 use crate::options::OptionsAction;
@@ -43,13 +43,19 @@ impl AppView {
     }
 
     /// Input while the screen is open. Returns whether the screen changed.
+    /// On a grid too small to draw the screen only Escape is used, so no
+    /// control the person cannot see (the removal question among them) can be
+    /// pressed.
     pub(crate) fn options_input(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
+        let rects = Self::options_rects(grid);
+        if rects.is_none() && !is_escape(event) {
+            return false;
+        }
         let Some(mut state) = self.options.take() else {
             return false;
         };
         let typed = is_user_input(event);
         let had_line = typed && self.options_host.line.take().is_some();
-        let rects = Self::options_rects(grid);
         // The mail may have changed since the last input (an account list
         // from the backend): start from something that exists.
         self.settle_options(&mut state, rects.as_ref(), false);
@@ -99,6 +105,15 @@ impl AppView {
         let rows = page_rows(&self.options_view(), state, rects.page.width);
         if is_clickable(state, &rects, &rows, col, row) { PointerShape::Hand } else { PointerShape::Arrow }
     }
+}
+
+/// Escape with no modifier: the one key that is safe when nothing is drawn.
+fn is_escape(event: &InputEvent) -> bool {
+    let InputEvent::Key(key) = event else {
+        return false;
+    };
+    let held = key.modifiers;
+    !held.ctrl && !held.alt && !held.meta && key.key == LogicalKey::Named(NamedKey::Escape)
 }
 
 /// A key, text or a button press: the inputs that clear the old line.
