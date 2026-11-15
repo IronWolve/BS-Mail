@@ -10,6 +10,14 @@ use crate::delete_prompt::draw::{button_at, prompt_rects};
 use crate::delete_prompt::{Choice, DeletePrompt};
 use model::{Command, MessageId};
 
+/// The keys that answer the question with no: `n` and Escape.
+fn refuses(key: &KeyEvent) -> bool {
+    !key.modifiers.ctrl
+        && !key.modifiers.alt
+        && !key.modifiers.meta
+        && matches!(key.key, LogicalKey::Char('n' | 'N') | LogicalKey::Named(NamedKey::Escape))
+}
+
 impl AppView {
     /// How many of `ids` `d` would remove for good: the ones whose own folder
     /// is the Trash. The folder shown says nothing about it when the list is
@@ -34,6 +42,18 @@ impl AppView {
 
     /// Input while the question is open. Returns whether the screen changed.
     pub(crate) fn delete_prompt_input(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
+        if self.layout(grid.0, grid.1).too_small {
+            // The screen then says only that the window is too small, so the
+            // question cannot be seen: it can be dismissed but never answered
+            // yes, whatever key is pressed.
+            return match event {
+                InputEvent::Key(key) if refuses(key) => {
+                    self.answer_delete_prompt(Choice::Keep);
+                    true
+                }
+                _ => false,
+            };
+        }
         match event {
             InputEvent::Key(key) => self.delete_prompt_key(key),
             InputEvent::Button { button: PointerButton::Left, state: ButtonState::Pressed, pos, .. } => {
