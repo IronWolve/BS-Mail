@@ -98,7 +98,15 @@ pub fn save(dir: &Path, state: &State) -> io::Result<()> {
     crate::private_dirs::make(dir)?;
     let target = path_in(dir);
     let temporary = dir.join(format!("{STATE_NAME}.part"));
-    fs::write(&temporary, text)?;
+    // A leftover of an earlier try is removed (a link is removed itself, never
+    // followed) and the new one is made fresh, so nothing a link points at is
+    // ever written.
+    if fs::symlink_metadata(&temporary).is_ok() {
+        fs::remove_file(&temporary)?;
+    }
+    let mut file = fs::OpenOptions::new().write(true).create_new(true).open(&temporary)?;
+    io::Write::write_all(&mut file, text.as_bytes())?;
+    drop(file);
     fs::rename(&temporary, &target)
 }
 

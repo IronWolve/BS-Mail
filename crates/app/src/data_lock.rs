@@ -2,7 +2,7 @@
 //! held until the run ends. The lock belongs to the operating system, so a
 //! crash lets go of it and a copied `lock` file is harmless.
 
-use std::fs::{File, OpenOptions, TryLockError};
+use std::fs::{self, File, OpenOptions, TryLockError};
 use std::io::{ErrorKind, Read, Seek, Write};
 use std::path::Path;
 
@@ -42,11 +42,27 @@ pub fn take(folder: &Path) -> Result<Option<DataLock>, Refused> {
         return Ok(None);
     }
     let path = folder.join(LOCK_FILE);
+    if let Ok(found) = fs::symlink_metadata(&path)
+        && !found.file_type().is_file()
+    {
+        // A link would send the lock, and the text written into it, to
+        // whatever it points at.
+        let reason = format!("the lock path {} is a link or not a plain file", path.display());
+        return Err(Refused::Unlockable { reason });
+    }
     let opened = OpenOptions::new().read(true).write(true).create(true).truncate(false).open(&path);
     let mut file = match opened {
         Ok(file) => file,
         Err(error) if matches!(error.kind(), ErrorKind::PermissionDenied | ErrorKind::ReadOnlyFilesystem) => {
-            return Ok(None);
+            // Nothing can be damaged only when nothing can be written to the
+            // folder either; a folder that can be written with a lock file
+            // that cannot is a folder two copies could race in.
+            return if folder_is_writable(folder) {
+                let reason = format!("the lock file {} cannot be opened for writing: {error}", path.display());
+                Err(Refused::Unlockable { reason })
+            } else {
+                Ok(None)
+            };
         }
         Err(error) => {
             return Err(Refused::Unlockable { reason: format!("the lock file {} cannot be opened: {error}", path.display()) });
@@ -62,6 +78,17 @@ pub fn take(folder: &Path) -> Result<Option<DataLock>, Refused> {
             Err(Refused::Unlockable { reason: format!("this file system cannot lock the folder: {error}") })
         }
     }
+}
+
+/// Whether a new file can be made in `folder`: a probe file is created and
+/// removed again.
+fn folder_is_writable(folder: &Path) -> bool {
+    let probe = folder.join(format!(".lock-probe-{}", std::process::id()));
+    let made = OpenOptions::new().write(true).create_new(true).open(&probe).is_ok();
+    if made {
+        let _ = fs::remove_file(&probe);
+    }
+    made
 }
 
 /// Records this process in the lock file, for the message a second copy gets.
