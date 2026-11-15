@@ -11,4 +11,9 @@ pub struct ActiveSearch {
     /// What the answer says it could not cover, when it says so: the list may
     /// then be missing messages.
     pub incomplete: Option<String>,
+    /// The query whose hits are the rows now, once an answer has arrived.
+    /// `None` while the answer is awaited: the rows are the folder's own then,
+    /// and are titled so. A new search over hits keeps the old ones until its
+    /// own answer replaces them.
+    pub showing: Option<String>,
 }

@@ -2,8 +2,6 @@
 //! and the host both ask for: the window's title, the open mailbox, the
 //! connection of the selected account.
 
-use std::borrow::Cow;
-
 use model::{BodyRole, ConnectionState, StyledLine, StyledSpan};
 
 use crate::app_view::AppView;
@@ -57,14 +55,17 @@ impl AppView {
     }
 
     fn list_summary_without_marks(&self) -> Option<MailboxSummary> {
-        let Some(search) = &self.search else {
+        // The title names the search only once its answer is what the rows
+        // are; until then they are still the folder's own.
+        let Some(query) = self.search.as_ref().and_then(|search| search.showing.as_ref()) else {
             return self.mailbox_summary();
         };
         let page = self.mail.page.as_ref()?;
         let unread = page.envelopes.iter().filter(|envelope| !envelope.flags.seen).count();
-        let marker = if search.incomplete.is_some() { " (incomplete)" } else { "" };
+        let incomplete = self.search.as_ref().is_some_and(|search| search.incomplete.is_some());
+        let marker = if incomplete { " (incomplete)" } else { "" };
         Some(MailboxSummary {
-            name: format!("Search: {}{marker}", search.query),
+            name: format!("Search: {query}{marker}"),
             unread: u32::try_from(unread).unwrap_or(u32::MAX),
             total: page.total,
         })
@@ -75,15 +76,13 @@ impl AppView {
         self.config_problem = problem;
     }
 
-    /// The lines the reader shows for the selected message: a line for each
-    /// attachment, then a blank, then the body. `None` while its body is not
-    /// here yet. Borrowed whole when there are no attachments.
-    pub(crate) fn reader_lines(&self) -> Option<Cow<'_, [StyledLine]>> {
+    /// What the reader shows for the selected message: a line for each
+    /// attachment and a blank (`lead`), then the lines of the body. `None`
+    /// while its body is not here yet. The body is borrowed, never copied, so
+    /// a long message costs nothing more to scroll for having an attachment.
+    pub(crate) fn reader_content(&self) -> Option<ReaderContent<'_>> {
         let (_, body) = self.mail.body.as_ref().filter(|(id, _)| Some(*id) == self.selection.message)?;
-        if body.attachments.is_empty() {
-            return Some(Cow::Borrowed(body.lines.as_slice()));
-        }
-        let mut lines: Vec<StyledLine> = body
+        let mut lead: Vec<StyledLine> = body
             .attachments
             .iter()
             .map(|attachment| StyledLine {
@@ -98,8 +97,19 @@ impl AppView {
                 }],
             })
             .collect();
-        lines.push(StyledLine::default());
-        lines.extend(body.lines.iter().cloned());
-        Some(Cow::Owned(lines))
+        if !lead.is_empty() {
+            lead.push(StyledLine::default());
+        }
+        Some(ReaderContent { lead, body: body.lines.as_slice() })
     }
 }
+
+/// The lines the reader draws, in two parts so the body is never copied.
+pub(crate) struct ReaderContent<'a> {
+    /// The attachment lines and the blank after them; empty with none.
+    pub lead: Vec<StyledLine>,
+    pub body: &'a [StyledLine],
+}
+
+#[cfg(test)]
+include!("view_facts.tests.rs");

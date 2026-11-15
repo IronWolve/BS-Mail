@@ -2,9 +2,11 @@
 //!
 //! `/` opens a box for the query; Enter asks the backend, and the answer
 //! replaces the list until Escape brings the folder back. Typed letters are
-//! the query, so no command key runs while the box is open. A search is
-//! forgotten when the user goes to another folder, or when the folder's own
-//! page arrives, which is what a delete or a move inside the results brings.
+//! the query, so no command key runs while the box is open. Until the answer
+//! arrives the rows, and their title, are still the folder's. A search is
+//! forgotten when the user goes to another folder, when its request fails, or
+//! once its hits show and the folder's own page arrives, which is what a
+//! delete or a move inside the results brings.
 
 use model::{Command, Event, RequestId};
 use surface::{InputEvent, KeyEvent, LogicalKey, NamedKey};
@@ -82,10 +84,15 @@ impl AppView {
         };
         self.next_request += 1;
         let request = RequestId(self.next_request);
+        // Hits already showing stay the rows, and keep their title, until the
+        // answer to this search replaces them.
+        let (showing, incomplete) =
+            self.search.take().map_or((None, None), |old| (old.showing, old.incomplete));
         self.search = Some(ActiveSearch {
             query: query.clone(),
             request,
-            incomplete: None,
+            incomplete,
+            showing,
         });
         self.queue.push(Command::Search {
             request,
@@ -94,24 +101,36 @@ impl AppView {
         });
     }
 
-    /// Goes back from the results to the folder.
+    /// Goes back from the results to the folder. A search still waiting for
+    /// its answer has changed nothing on screen: the rows are the folder's.
     pub(crate) fn end_search(&mut self) {
-        if self.search.take().is_none() {
+        let Some(search) = self.search.take() else {
+            return;
+        };
+        if search.showing.is_none() {
             return;
         }
         self.clear_marks();
-        // The hits are not the folder's own list: drop them, so the folder's
-        // newest page replaces them instead of being merged with them (which
-        // would keep hits from other folders under this folder's name).
-        self.mail.page = None;
+        self.leave_hits();
         if let Some(folder) = self.selection.folder {
             self.queue.push(Command::OpenFolder { folder });
         }
     }
 
+    /// The hits are not the folder's own list: drop them, so the folder's
+    /// newest page replaces them instead of being merged with them (which
+    /// would keep hits from other folders under this folder's name). The row
+    /// that is selected goes back to the top, for the page to move it if the
+    /// message is on it.
+    fn leave_hits(&mut self) {
+        self.mail.page = None;
+        self.selection.message_index = 0;
+    }
+
     /// The answer to the search that is showing replaces the list; an answer
     /// to an earlier one, or to none, is ignored. A fresh page of the folder
-    /// ends the search.
+    /// that the screen takes ends a search whose hits are showing, and a
+    /// failure of the search ends one still waiting for its answer.
     pub(crate) fn note_search_event(&mut self, event: &Event) {
         match event {
             Event::SearchResults { request, total, envelopes, incomplete } => {
@@ -121,10 +140,11 @@ impl AppView {
                 };
                 if let Some(search) = self.search.as_mut() {
                     search.incomplete.clone_from(incomplete);
+                    search.showing = Some(search.query.clone());
                 }
                 // The footer says what was missed, so a partial answer is
                 // not taken for the whole one.
-                self.mail.error = incomplete.clone();
+                self.mail.set_note(incomplete.clone());
                 self.mail.page = Some(ListPage {
                     folder,
                     offset: 0,
@@ -136,7 +156,19 @@ impl AppView {
                 self.scroll.list = 0;
                 self.scroll.reader = 0;
             }
-            Event::EnvelopePage { .. } => self.search = None,
+            Event::EnvelopePage { folder, .. } => {
+                let showing = self.search.as_ref().is_some_and(|search| search.showing.is_some());
+                if showing && self.mail.accepts_page(*folder, &self.selection) {
+                    self.search = None;
+                    self.leave_hits();
+                }
+            }
+            Event::OpFailed { account, operation, .. } if operation == "search" => {
+                let ours = account.as_ref().is_none_or(|id| self.selection.account.as_ref() == Some(id));
+                if ours && self.search.as_ref().is_some_and(|search| search.showing.is_none()) {
+                    self.search = None;
+                }
+            }
             _ => {}
         }
     }
