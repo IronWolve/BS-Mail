@@ -46,7 +46,7 @@ pub fn preset_for(email: &str) -> Option<Preset> {
 /// list shows.
 const GOOGLE_NAME: &str = "Gmail (Google)";
 const MICROSOFT_NAME: &str = "Outlook / Hotmail (Microsoft)";
-const PROTON_NAME: &str = "Proton Mail (needs its Bridge program)";
+const PROTON_NAME: &str = "Proton Mail Bridge";
 
 /// The preset of a provider chosen from the list by name, whatever the
 /// address looks like: a mailbox under the owner's own domain is the usual
@@ -162,7 +162,7 @@ fn local_bridge() -> Preset {
         smtp_host: "127.0.0.1".to_string(),
         smtp_port: 1025,
         smtp_security: Security::Starttls,
-        note: "This provider needs its companion mail program running on this computer; use the password that program shows you.",
+        note: "This needs the Proton Mail Bridge program running on this computer. Use the user name and password Bridge shows you, not your Proton account password.",
         oauth: None,
         browser_first: false,
         files_sent_itself: false,
