@@ -10,7 +10,6 @@ use surface::{
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
-use winit::keyboard::{Key, NamedKey};
 use winit::window::WindowId;
 
 use crate::font::FontSet;
@@ -18,6 +17,7 @@ use crate::input::{WheelCarry, key_event, modifiers, pointer_button, typed_text}
 
 use super::create::create_window;
 use super::options::WindowOptions;
+use super::shortcuts::{Shortcut, shortcut_for};
 use super::state::WindowState;
 
 /// Opens the window and runs until the screen asks to stop or it is closed.
@@ -144,7 +144,7 @@ impl WindowApp<'_, '_> {
         }
     }
 
-    /// Text size and full screen, which belong to the window itself.
+    /// Text size, full screen and paste, which belong to the window itself.
     fn window_shortcut(
         &mut self,
         event_loop: &ActiveEventLoop,
@@ -153,41 +153,29 @@ impl WindowApp<'_, '_> {
         if event.state != ElementState::Pressed {
             return false;
         }
-        if matches!(&event.logical_key, Key::Named(NamedKey::F11)) {
-            self.state.toggle_full_screen();
-            return true;
-        }
-        if self.paste_requested(event_loop, event) {
-            return true;
-        }
-        let Key::Character(text) = &event.logical_key else {
+        let Some(shortcut) = shortcut_for(&event.logical_key, self.modifiers) else {
             return false;
         };
-        if !self.modifiers.ctrl {
-            return false;
-        }
         let points = self.state.points();
-        let next = match text.as_str() {
-            "=" | "+" => WindowOptions::stepped(points, 1),
-            "-" => WindowOptions::stepped(points, -1),
-            "0" => self.state.options().points,
-            _ => return false,
+        let next = match shortcut {
+            Shortcut::FullScreen => return self.toggle_full_screen(),
+            Shortcut::Paste => return self.paste(event_loop),
+            Shortcut::Larger => WindowOptions::stepped(points, 1),
+            Shortcut::Smaller => WindowOptions::stepped(points, -1),
+            Shortcut::ResetSize => self.state.options().points,
         };
         self.set_points(event_loop, next);
         true
     }
 
-    /// Ctrl+V and Shift+Insert: the system clipboard's text goes to the
-    /// screen as a paste. With nothing on the clipboard the key does nothing.
-    fn paste_requested(&mut self, event_loop: &ActiveEventLoop, event: &winit::event::KeyEvent) -> bool {
-        let is_paste = match &event.logical_key {
-            Key::Character(text) => self.modifiers.ctrl && !self.modifiers.alt && text.eq_ignore_ascii_case("v"),
-            Key::Named(NamedKey::Insert) => self.modifiers.shift,
-            _ => false,
-        };
-        if !is_paste {
-            return false;
-        }
+    fn toggle_full_screen(&mut self) -> bool {
+        self.state.toggle_full_screen();
+        true
+    }
+
+    /// The system clipboard's text goes to the screen as a paste. With
+    /// nothing on the clipboard the key does nothing.
+    fn paste(&mut self, event_loop: &ActiveEventLoop) -> bool {
         if let Some(text) = self.state.clipboard_text() {
             self.deliver(event_loop, InputEvent::Paste(text));
         }

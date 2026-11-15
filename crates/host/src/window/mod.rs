@@ -5,6 +5,7 @@ pub mod create;
 pub mod event_loop;
 pub mod geometry;
 pub mod options;
+pub mod shortcuts;
 pub mod state;
 
 pub use event_loop::run_window;

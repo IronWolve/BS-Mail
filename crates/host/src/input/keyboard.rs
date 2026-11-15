@@ -4,6 +4,14 @@
 //! letter the user sees. Text the layout produced, including dead keys and
 //! compose sequences, is delivered separately and only when no modifier is
 //! holding the key for a shortcut.
+//!
+//! Two things differ on a Mac, and both are settled here, where the window
+//! library's event becomes ours. The Command key is the shortcut key, so it
+//! is reported as Ctrl: Command+C, +V, +Q, +Z and Command with the wheel then
+//! mean what Ctrl does elsewhere. And Option held with a key still makes the
+//! character it makes (Option+2 is a trademark sign), so that character is
+//! typed. Windows and Linux are as they were: there Alt held with a key is a
+//! shortcut and types nothing, and a layout's AltGr arrives without Alt.
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -12,13 +20,29 @@ use surface::{KeyEvent, LogicalKey, Modifiers, NamedKey, PhysicalKey};
 use winit::event::ElementState;
 use winit::keyboard::{Key, ModifiersState, NamedKey as WinitNamed, PhysicalKey as WinitPhysical};
 
+/// Whether Command is the shortcut key, as it is on a Mac, so it is reported
+/// as Ctrl.
+const COMMAND_IS_CTRL: bool = cfg!(target_os = "macos");
+
+/// Whether Option held with a key still types the character it makes, as it
+/// does on a Mac. On Windows and Linux, Alt held with a key types nothing.
+const OPTION_TYPES_TEXT: bool = cfg!(target_os = "macos");
+
 /// The modifier keys held down.
 pub fn modifiers(state: ModifiersState) -> Modifiers {
+    modifiers_for(state, COMMAND_IS_CTRL)
+}
+
+/// The modifier keys held down. With `command_is_ctrl`, the Command key (the
+/// window library's "super") counts as Ctrl and is not reported as meta, so a
+/// screen that ignores keys with meta held does not ignore a Command shortcut.
+pub fn modifiers_for(state: ModifiersState, command_is_ctrl: bool) -> Modifiers {
+    let command = command_is_ctrl && state.super_key();
     Modifiers {
         shift: state.shift_key(),
-        ctrl: state.control_key(),
+        ctrl: state.control_key() || command,
         alt: state.alt_key(),
-        meta: state.super_key(),
+        meta: state.super_key() && !command,
     }
 }
 
@@ -37,10 +61,24 @@ pub fn key_event(event: &winit::event::KeyEvent, modifiers: Modifiers) -> Option
 
 /// The text a key press produced, when it is text and not a shortcut.
 pub fn typed_text(event: &winit::event::KeyEvent, modifiers: Modifiers) -> Option<String> {
-    if event.state != ElementState::Pressed || modifiers.ctrl || modifiers.alt || modifiers.meta {
+    let pressed = event.state == ElementState::Pressed;
+    text_typed(pressed, event.text.as_deref(), modifiers, OPTION_TYPES_TEXT)
+}
+
+/// `typed_text` on what the event says. Ctrl and Meta always make a key a
+/// shortcut. Alt does too, except where Option still types its character
+/// (`option_types_text`): that character is then the text.
+fn text_typed(
+    pressed: bool,
+    text: Option<&str>,
+    modifiers: Modifiers,
+    option_types_text: bool,
+) -> Option<String> {
+    let alt_holds_the_key = modifiers.alt && !option_types_text;
+    if !pressed || modifiers.ctrl || modifiers.meta || alt_holds_the_key {
         return None;
     }
-    let text = event.text.as_ref()?;
+    let text = text?;
     if text.chars().any(|ch| ch.is_control()) {
         return None;
     }
