@@ -5,7 +5,12 @@
 //! state, anything odd) is answered 404 and the wait goes on. The wait as a
 //! whole ends at its deadline. The listener is closed when the function
 //! returns, whatever the outcome.
+//!
+//! A redirect to `localhost` may reach this machine over IPv4 or over IPv6,
+//! whichever the browser tries first, so that one can be served on both
+//! loopback addresses at once (`wait_for_redirect_on_both`).
 
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -65,13 +70,34 @@ pub async fn wait_for_redirect(
     state: &str,
     limits: &ListenLimits,
 ) -> Result<Redirect, ListenError> {
+    wait(&listener, None, state, limits).await
+}
+
+/// The same wait on two listeners at once (the IPv4 and the IPv6 loopback
+/// address on one port); a connection on either counts, and the connection
+/// limit is shared.
+pub async fn wait_for_redirect_on_both(
+    first: TcpListener,
+    second: TcpListener,
+    state: &str,
+    limits: &ListenLimits,
+) -> Result<Redirect, ListenError> {
+    wait(&first, Some(&second), state, limits).await
+}
+
+async fn wait(
+    first: &TcpListener,
+    second: Option<&TcpListener>,
+    state: &str,
+    limits: &ListenLimits,
+) -> Result<Redirect, ListenError> {
     let until = Instant::now() + limits.wait;
     let (found, mut results) = tokio::sync::mpsc::unbounded_channel::<Redirect>();
     let room = Arc::new(Semaphore::new(MAX_OPEN));
     loop {
         tokio::select! {
             Some(redirect) = results.recv() => return Ok(redirect),
-            accepted = timeout_at(until, listener.accept()) => {
+            accepted = timeout_at(until, accept_either(first, second)) => {
                 let accepted = accepted.map_err(|_| ListenError::NoAnswer)?;
                 let socket = match accepted {
                     Ok((socket, _)) => socket,
@@ -85,6 +111,20 @@ pub async fn wait_for_redirect(
                 tokio::spawn(serve_one(socket, state.to_owned(), deadline, found.clone(), permit));
             }
         }
+    }
+}
+
+/// The next connection on either listener.
+async fn accept_either(
+    first: &TcpListener,
+    second: Option<&TcpListener>,
+) -> std::io::Result<(TcpStream, SocketAddr)> {
+    match second {
+        None => first.accept().await,
+        Some(second) => tokio::select! {
+            accepted = first.accept() => accepted,
+            accepted = second.accept() => accepted,
+        },
     }
 }
 
