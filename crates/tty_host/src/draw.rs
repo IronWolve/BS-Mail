@@ -58,7 +58,10 @@ impl Painter {
     }
 
     /// Which columns of `row` must be written. A wide symbol and the cell it
-    /// covers are written together, so if either changed both are.
+    /// covers are written together, so if either changed both are. The cell a
+    /// wide symbol covers holds no symbol of its own whatever it reads back
+    /// as (the UI resets it, which reads as a blank), so it is found by the
+    /// symbol before it.
     fn changed_columns(&self, frame: &Frame, row: u16, same_size: bool) -> Vec<bool> {
         let area = frame.area();
         let width = usize::from(area.width);
@@ -73,13 +76,16 @@ impl Painter {
                 continue;
             }
             let col = area.left() + u16::try_from(index).unwrap_or(0);
-            let cell = frame.cells.cell((col, row));
-            let wide_here = cell.is_some_and(|c| UnicodeWidthStr::width(c.symbol()) >= 2);
-            let covered = cell.is_some_and(|c| c.symbol().is_empty());
+            let wide_here = frame.cells.cell((col, row)).is_some_and(|c| UnicodeWidthStr::width(c.symbol()) >= 2);
+            let covered = index > 0
+                && frame
+                    .cells
+                    .cell((col - 1, row))
+                    .is_some_and(|before| UnicodeWidthStr::width(before.symbol()) >= 2);
             if wide_here && index + 1 < width {
                 changed[index + 1] = true;
             }
-            if covered && index > 0 {
+            if covered {
                 changed[index - 1] = true;
             }
         }
@@ -103,8 +109,9 @@ impl Painter {
                 break;
             };
             let symbol = cell.symbol();
-            // A cell a wide symbol covers has no symbol of its own; the
-            // terminal gives it those columns.
+            // The columns a symbol takes: a wide one gives its columns to the
+            // terminal, so the cells it covers are stepped over, not written.
+            let columns = u16::try_from(UnicodeWidthStr::width(symbol)).unwrap_or(1).max(1);
             if !symbol.is_empty() {
                 let style = Style::new().fg(cell.fg).bg(cell.bg).add_modifier(cell.modifier);
                 if *current != Some(style) {
@@ -113,7 +120,7 @@ impl Painter {
                 }
                 out.write_all(symbol.as_bytes())?;
             }
-            col += 1;
+            col = col.saturating_add(columns);
         }
         Ok(col)
     }
