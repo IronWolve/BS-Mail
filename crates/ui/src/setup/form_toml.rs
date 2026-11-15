@@ -6,8 +6,10 @@
 use crate::composer::EditorBuffer;
 
 use super::account_id::account_id_for;
-use super::fields::SignIn;
+use super::ascii_domain::ascii_domain;
+use super::fields::{Security, SignIn};
 use super::form::SetupForm;
+use super::local_host::is_local_host;
 
 /// The longest client id or secret taken; real ones are far shorter.
 const MAX_CLIENT_TEXT: usize = 512;
@@ -38,7 +40,11 @@ impl SetupForm {
         if !valid_address(&email) {
             return Err("type your full email address, such as you@example.org".to_string());
         }
+        if !domain_has_ascii_form(&email) {
+            return Err("the part of your address after the @ cannot be used as a server name".to_string());
+        }
         let imap_host = host_of(&self.imap_host, "the incoming server")?;
+        plain_only_here(&imap_host, self.imap_security, "the incoming server")?;
         let imap_port = port_of(&self.imap_port, "the incoming server's port")?;
         let username = nonempty(&self.username).unwrap_or_else(|| email.clone());
         let name = nonempty(&self.name).unwrap_or_else(|| email.split('@').next().unwrap_or("").to_string());
@@ -76,20 +82,31 @@ impl SetupForm {
             put("trust", "any".into());
         }
         put("read_only", (!self.allow_changes).into());
-        if let Some(smtp_host) = nonempty(&self.smtp_host) {
-            let smtp_host = host_of_text(&smtp_host, "the outgoing server")?;
-            let smtp_port = port_of(&self.smtp_port, "the outgoing server's port")?;
-            put("smtp_host", smtp_host.clone().into());
-            put("smtp_port", i64::from(smtp_port).into());
-            put("smtp_security", self.smtp_security.toml_name().into());
-            if self.smtp_trust_any() {
-                put("smtp_trust", "any".into());
-            }
-            if self.files_sent_itself {
-                put("save_sent", false.into());
-            }
-        }
+        self.put_outgoing(&mut table)?;
         toml::to_string(&table).map_err(|error| format!("the settings could not be written: {error}"))
+    }
+
+    /// The outgoing server's lines, when there is an outgoing server.
+    fn put_outgoing(&self, table: &mut toml::Table) -> Result<(), String> {
+        let Some(smtp_host) = nonempty(&self.smtp_host) else {
+            return Ok(());
+        };
+        let smtp_host = host_of_text(&smtp_host, "the outgoing server")?;
+        plain_only_here(&smtp_host, self.smtp_security, "the outgoing server")?;
+        let smtp_port = port_of(&self.smtp_port, "the outgoing server's port")?;
+        let mut put = |key: &str, value: toml::Value| {
+            table.insert(key.to_string(), value);
+        };
+        put("smtp_host", smtp_host.into());
+        put("smtp_port", i64::from(smtp_port).into());
+        put("smtp_security", self.smtp_security.toml_name().into());
+        if self.smtp_trust_any() {
+            put("smtp_trust", "any".into());
+        }
+        if self.files_sent_itself {
+            put("save_sent", false.into());
+        }
+        Ok(())
     }
 }
 
@@ -125,6 +142,23 @@ fn port_of(buffer: &EditorBuffer, what: &str) -> Result<u16, String> {
         Ok(port) if port > 0 => Ok(port),
         _ => Err(format!("check {what}: a number from 1 to 65535")),
     }
+}
+
+/// Whether the domain of the address can be written as a host name. Always so
+/// for an ASCII domain; one with other letters needs its ASCII form.
+fn domain_has_ascii_form(email: &str) -> bool {
+    email.rsplit_once('@').is_some_and(|(_, domain)| ascii_domain(&domain.to_lowercase()).is_some())
+}
+
+/// "Not encrypted" is for this computer only: for another host the engine
+/// refuses it, so the form says so before anything is tried.
+fn plain_only_here(host: &str, security: Security, what: &str) -> Result<(), String> {
+    if security == Security::None && !is_local_host(host) {
+        return Err(format!(
+            "check the security of {what}: \"not encrypted\" is for this computer only, so choose an encrypted setting for {host}"
+        ));
+    }
+    Ok(())
 }
 
 /// One `@`, text on both sides, nothing that could not be in an address.

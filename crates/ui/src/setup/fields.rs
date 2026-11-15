@@ -52,6 +52,16 @@ impl Security {
             Self::None => Self::Starttls,
         }
     }
+
+    /// One step in a direction, wrapping. "Not encrypted" is only on the way
+    /// for a server on this computer: for any other host no single step
+    /// lands on it, because the engine refuses that setting and the person
+    /// would only learn so after trying to connect.
+    pub fn step(self, forward: bool, local_host: bool) -> Self {
+        let one = |from: Self| if forward { from.next() } else { from.previous() };
+        let to = one(self);
+        if to == Self::None && !local_host { one(to) } else { to }
+    }
 }
 
 /// How the user proves who they are.

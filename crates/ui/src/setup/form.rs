@@ -10,6 +10,7 @@
 use crate::composer::EditorBuffer;
 
 use super::fields::{Security, SetupField, SignIn};
+use super::local_host::is_local_host;
 use super::providers::{Preset, preset_for};
 use super::saved_client::SavedClient;
 
@@ -149,11 +150,15 @@ impl SetupForm {
         })
     }
 
-    /// Whether anything has been typed.
+    /// Whether anything has been typed. A client id or secret and a user name
+    /// count once the user wrote them; ones the program filled in do not.
     pub fn is_empty(&self) -> bool {
+        let client_typed = self.client_touched && !(self.client_id.is_empty() && self.client_secret.is_empty());
+        let username_typed = self.username_touched && !self.username.is_empty();
         self.email.is_empty()
             && self.password.is_empty()
-            && (self.client_id.is_empty() || !self.client_touched)
+            && !client_typed
+            && !username_typed
             && !self.name_touched
             && !self.servers_touched
     }
@@ -254,6 +259,17 @@ impl SetupForm {
         self.files_sent_itself = preset.files_sent_itself;
     }
 
+    /// Whether the servers in the form are those of a provider that files a
+    /// copy of sent mail itself, so the program must not add another.
+    fn servers_file_sent_mail(&self) -> bool {
+        let email = self.email.text();
+        let Some(preset) = preset_for(email.trim()) else {
+            return false;
+        };
+        let same = |buffer: &EditorBuffer, host: &str| buffer.text().trim().eq_ignore_ascii_case(host);
+        preset.files_sent_itself && same(&self.imap_host, &preset.imap_host) && same(&self.smtp_host, &preset.smtp_host)
+    }
+
     /// Records that the user, not the guess, set this field.
     pub fn note_edit(&mut self) {
         self.notice = None;
@@ -261,7 +277,9 @@ impl SetupForm {
         self.quit_armed = false;
         if self.focus.is_server() {
             self.servers_touched = true;
-            self.files_sent_itself = false;
+            // Only leaving the provider's own servers ends the rule; a
+            // security or port change, or a host put back, keeps it.
+            self.files_sent_itself = self.servers_file_sent_mail();
         }
         match self.focus {
             SetupField::Username => self.username_touched = true,
@@ -277,10 +295,12 @@ impl SetupForm {
     pub fn change_choice(&mut self, forward: bool) {
         match self.focus {
             SetupField::ImapSecurity => {
-                self.imap_security = if forward { self.imap_security.next() } else { self.imap_security.previous() };
+                let local = is_local_host(self.imap_host.text().trim());
+                self.imap_security = self.imap_security.step(forward, local);
             }
             SetupField::SmtpSecurity => {
-                self.smtp_security = if forward { self.smtp_security.next() } else { self.smtp_security.previous() };
+                let local = is_local_host(self.smtp_host.text().trim());
+                self.smtp_security = self.smtp_security.step(forward, local);
             }
             SetupField::SignIn => self.signin = self.signin.other(),
             SetupField::AllowChanges => self.allow_changes = !self.allow_changes,
