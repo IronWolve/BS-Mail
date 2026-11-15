@@ -96,7 +96,8 @@ fn load_chain(
 
 /// Lays `child` over `parent`: palette entries and `ansi16` entries of the
 /// child replace the parent's, and a role present in both is merged field by
-/// field, the child's fields winning. The result no longer inherits.
+/// field, the child's fields winning; a child `fg` without a `gradient` also
+/// drops the parent's gradient. The result no longer inherits.
 pub fn merge_inherited(parent: ThemeFile, child: ThemeFile) -> ThemeFile {
     let mut merged = parent;
     if !child.name.is_empty() {
@@ -116,10 +117,18 @@ pub fn merge_inherited(parent: ThemeFile, child: ThemeFile) -> ThemeFile {
 }
 
 fn overlay_role(old: Role, new: Role) -> Role {
+    // A child that names a plain foreground and no gradient wants that one
+    // color. The role's colors are drawn from the gradient first, so the
+    // parent's stops must not survive it.
+    let gradient = if new.fg.is_some() && new.gradient.is_none() {
+        None
+    } else {
+        new.gradient.or(old.gradient)
+    };
     Role {
         fg: new.fg.or(old.fg),
         bg: new.bg.or(old.bg),
-        gradient: new.gradient.or(old.gradient),
+        gradient,
         bold: new.bold.or(old.bold),
         italic: new.italic.or(old.italic),
         dim: new.dim.or(old.dim),
