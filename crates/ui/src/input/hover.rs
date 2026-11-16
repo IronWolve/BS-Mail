@@ -62,7 +62,7 @@ impl AppView {
             Hit::Folder(index) => Some(HoverTarget::Folder(index)),
             Hit::Account(index) => Some(HoverTarget::Account(index)),
             Hit::KeyBar(_) => {
-                let (action, x, width) = button_span_at(layout.key_bar?, &self.config.key_bar.buttons, col)?;
+                let (action, x, width) = button_span_at(layout.key_bar?, &self.config.key_bar.buttons, &self.keys, col)?;
                 Some(HoverTarget::KeyBar(action, x, width))
             }
             Hit::Nothing => self.footer_span_at(&layout, col, row).map(HoverTarget::Footer),

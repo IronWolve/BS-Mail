@@ -10,6 +10,7 @@ mod reload;
 mod remove;
 mod save_note;
 mod set_icons;
+mod set_layout;
 mod set_text;
 mod set_theme;
 mod settings;

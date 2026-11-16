@@ -2,6 +2,7 @@
 
 use surface::{KeyEvent, LogicalKey, NamedKey};
 
+use crate::keys::KeyMap;
 use crate::view_state::Focus;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -138,11 +139,20 @@ impl Direction {
     }
 }
 
-/// The action for a key press, or `None` for a key the screen ignores.
-/// Shortcuts with `Ctrl`, `Alt` or the logo key are never read here, except
-/// `Ctrl+u` and `Ctrl+d`: the rest belong to the window and to the commands
-/// that come later.
+/// The action for a key press with no key rebound, or `None` for a key the
+/// screen ignores. The screen itself asks its own `KeyMap`, which has the
+/// user's `[keys]` laid over these.
 pub fn action_for(key: &KeyEvent) -> Option<Action> {
+    KeyMap::standard().action(key)
+}
+
+/// The action of a key that cannot be rebound: the keys that move, go in and
+/// out, mark and select, the half pages, and the extra keys some actions have
+/// (F2 composes, Delete deletes, Menu and Shift+F10 open the menu). The keys
+/// that can be rebound are in `keys::actions`. Shortcuts with `Ctrl`, `Alt`
+/// or the logo key are not read here, except `Ctrl+u` and `Ctrl+d`: the rest
+/// belong to the window and to text boxes.
+pub fn fixed_action(key: &KeyEvent) -> Option<Action> {
     let held = key.modifiers;
     if held.ctrl && !held.alt && !held.meta && !held.shift {
         return match key.key {
@@ -156,44 +166,7 @@ pub fn action_for(key: &KeyEvent) -> Option<Action> {
     }
     match key.key {
         LogicalKey::Named(named) => named_action(named, held.shift),
-        LogicalKey::Char('j') if !held.shift => Some(Action::Down),
-        LogicalKey::Char('k') if !held.shift => Some(Action::Up),
         LogicalKey::Char(' ') => Some(if held.shift { Action::SpaceUp } else { Action::SpaceDown }),
-        LogicalKey::Char('u') if !held.shift => Some(Action::ToggleRead),
-        LogicalKey::Char('*') => Some(Action::ToggleStar),
-        LogicalKey::Char('?') => Some(Action::Help),
-        LogicalKey::Char('c') if !held.shift => Some(Action::Compose),
-        LogicalKey::Char('m') if !held.shift => Some(Action::Move),
-        LogicalKey::Char('/') => Some(Action::Search),
-        LogicalKey::Char('r') if !held.shift => Some(Action::Reply),
-        LogicalKey::Char('R') => Some(Action::ReplyAll),
-        LogicalKey::Char('f') if !held.shift => Some(Action::Forward),
-        LogicalKey::Char('w') if !held.shift => Some(Action::EditAsNew),
-        LogicalKey::Char('d') if !held.shift => Some(Action::Delete),
-        LogicalKey::Char('a') if !held.shift => Some(Action::MarkAll),
-        LogicalKey::Char('A') => Some(Action::UnmarkAll),
-        LogicalKey::Char('i') if !held.shift => Some(Action::InvertMarks),
-        LogicalKey::Char('e') if !held.shift => Some(Action::Archive),
-        LogicalKey::Char('!') => Some(Action::Spam),
-        LogicalKey::Char('n') if !held.shift => Some(Action::NextMessage),
-        LogicalKey::Char('p') if !held.shift => Some(Action::PreviousMessage),
-        LogicalKey::Char('N') => Some(Action::NextUnread),
-        LogicalKey::Char('s') if !held.shift => Some(Action::Sync),
-        LogicalKey::Char('g') if !held.shift => Some(Action::GoTo),
-        LogicalKey::Char('.') => Some(Action::ContextMenu),
-        LogicalKey::Char('t') if !held.shift => Some(Action::Tag),
-        LogicalKey::Char('+') => Some(Action::ToggleAlert),
-        LogicalKey::Char('F') => Some(Action::FolderKeys),
-        LogicalKey::Char('y') if !held.shift => Some(Action::Copy),
-        LogicalKey::Char('Y') => Some(Action::CopySender),
-        LogicalKey::Char('H') => Some(Action::ViewHeaders),
-        LogicalKey::Char('v') if !held.shift => Some(Action::ViewSource),
-        LogicalKey::Char('b') if !held.shift => Some(Action::OpenInBrowser),
-        LogicalKey::Char('x') if !held.shift => Some(Action::NextAttachment),
-        LogicalKey::Char('X') => Some(Action::PreviousAttachment),
-        LogicalKey::Char('1') => Some(Action::FocusPane(Focus::Sidebar)),
-        LogicalKey::Char('2') => Some(Action::FocusPane(Focus::List)),
-        LogicalKey::Char('3') => Some(Action::FocusPane(Focus::Reader)),
         LogicalKey::Char(_) => None,
     }
 }
@@ -218,7 +191,6 @@ fn named_action(named: NamedKey, shift: bool) -> Option<Action> {
         NamedKey::Menu => Action::ContextMenu,
         NamedKey::Function(2) => Action::Compose,
         NamedKey::Function(10) if shift => Action::ContextMenu,
-        NamedKey::Function(10) => Action::Options,
         NamedKey::Escape | NamedKey::Backspace => Action::Back,
         _ => return None,
     })

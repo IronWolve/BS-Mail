@@ -51,6 +51,7 @@ pub mod motion;
 pub mod movement;
 pub mod new_mail;
 pub mod options;
+pub mod options_layout_press;
 pub mod options_press;
 pub mod paired_text;
 pub mod pointer_events;

@@ -36,6 +36,15 @@ pub struct AccountPrefill {
     pub client_id: String,
     pub client_secret: String,
     pub allow_changes: bool,
+    /// `poll_seconds` as the file says it; `None` when it does not.
+    pub poll_seconds: Option<u32>,
+    /// `save_sent` as the file says it; `None` when it does not.
+    pub save_sent: Option<bool>,
+    /// The signature, with real line breaks.
+    pub signature: String,
+    /// The `folders` table: sent, drafts, trash, archive and spam, each the
+    /// path the file names or empty.
+    pub folders: [String; 5],
 }
 
 impl fmt::Debug for AccountPrefill {
@@ -86,6 +95,7 @@ impl SetupForm {
         form.signin_touched = true;
         form.client_touched = !prefill.client_id.is_empty();
         form.note_provider(&prefill);
+        form.load_settings(&prefill);
         form
     }
 

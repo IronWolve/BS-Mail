@@ -3,6 +3,8 @@
 
 use model::config::IconMode;
 
+use super::layout_choices::LayoutChange;
+
 /// One request from the Options screen.
 #[derive(Debug, Clone, PartialEq)]
 pub enum OptionsAction {
@@ -20,6 +22,9 @@ pub enum OptionsAction {
     SetFontSize(u8),
     /// Row height multiplier, within the allowed range.
     SetLineSpacing(f32),
+    /// A setting of the main screen's layout: where the reader sits, the
+    /// spacing, the columns and the panels. The screen has already switched.
+    SetLayout(LayoutChange),
     /// Read the settings files again.
     ReloadSettings,
 }

@@ -1,14 +1,16 @@
 //! Editing an account keeps what the form cannot say.
 //!
 //! The form writes only the keys it has a row for. An account file can hold
-//! more (custom sign-in endpoints, a poll interval, separate outgoing
-//! credentials), and an edit must not throw those away: they are carried over
-//! from the old file, and the form's text decides everything else.
+//! more (custom sign-in endpoints, separate outgoing credentials), and an edit
+//! must not throw those away: they are carried over from the old file, and the
+//! form's text decides everything else. The form's second page has rows for
+//! the poll interval, the signature and the five folders, so those are the
+//! form's too.
 
 /// The keys the form writes or leaves out on purpose. Whatever it does not
 /// write for one of these is gone after an edit; any other key of the old
 /// file stays.
-const FORM_KEYS: [&str; 19] = [
+const FORM_KEYS: [&str; 22] = [
     "id",
     "name",
     "address",
@@ -28,6 +30,11 @@ const FORM_KEYS: [&str; 19] = [
     "smtp_security",
     "smtp_trust",
     "save_sent",
+    // The second page of the form shows these, so the form says them all (an
+    // empty box is a key given up), and an edit does not bring an old one back.
+    "poll_seconds",
+    "signature",
+    "folders",
 ];
 
 /// `new_text` with the keys of `old_text` that the form cannot express added.

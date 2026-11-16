@@ -2,7 +2,7 @@
 
 use surface::{InputEvent, Rect};
 
-use super::action::{Action, action_for};
+use super::action::Action;
 use super::movement::{WHEEL_ROWS, step};
 use crate::app_view::AppView;
 use crate::view_state::OverlayKind;
@@ -19,14 +19,14 @@ impl AppView {
         }
         let area = Rect::new(0, 0, grid.0, grid.1);
         let capabilities = self.capabilities();
-        let max = help_max_scroll(area, &capabilities);
+        let max = help_max_scroll(area, &capabilities, &self.keys);
         if max == 0 {
             return false;
         }
-        let page = help_capacity(help_rect(area, &help_rows(&capabilities)));
+        let page = help_capacity(help_rect(area, &help_rows(&capabilities, &self.keys)));
         let current = self.overlays.help_scroll.min(max);
         let next = match event {
-            InputEvent::Key(key) => match action_for(key) {
+            InputEvent::Key(key) => match self.keys.action(key) {
                 Some(action) if is_scroll(action) => step(action, current, max + 1, page),
                 _ => return false,
             },

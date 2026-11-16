@@ -3,6 +3,7 @@
 use surface::Rect;
 
 use super::viewport::folder_at;
+use crate::keys::KeyMap;
 use crate::widgets::button_at;
 use crate::layout::{Layout, SectionKind};
 
@@ -37,6 +38,8 @@ pub struct HitView<'a> {
     pub accounts: usize,
     /// The actions the key bar offers, in order.
     pub key_bar_actions: &'a [String],
+    /// The keys in force, which label the key bar's keycaps.
+    pub keys: &'a KeyMap,
 }
 
 /// What lies at column `col`, row `row` of the grid.
@@ -44,7 +47,7 @@ pub fn hit_at(view: &HitView<'_>, col: u16, row: u16) -> Hit {
     if let Some(bar) = view.layout.key_bar
         && inside(bar, col, row)
     {
-        return button_at(bar, view.key_bar_actions, col).map_or(Hit::Nothing, Hit::KeyBar);
+        return button_at(bar, view.key_bar_actions, view.keys, col).map_or(Hit::Nothing, Hit::KeyBar);
     }
     if let Some(sidebar) = &view.layout.sidebar
         && inside(sidebar.rect, col, row)

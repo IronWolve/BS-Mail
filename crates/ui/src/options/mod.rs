@@ -16,6 +16,8 @@ pub mod empty_hint;
 pub mod host;
 pub mod input;
 pub mod layout;
+pub mod layout_choices;
+pub mod layout_page;
 pub mod mouse;
 pub mod pages;
 pub mod place;
@@ -27,5 +29,6 @@ pub mod view_api;
 
 pub use action::OptionsAction;
 pub use control::{Control, Part};
+pub use layout_choices::{Column, LayoutChange, Panel};
 pub use state::{OptionsState, Page, Stop};
 pub use summary::{AccountSummary, OptionsPaths};

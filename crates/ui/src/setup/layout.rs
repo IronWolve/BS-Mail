@@ -22,6 +22,8 @@ pub const PANEL_ROWS: u16 = 12;
 pub const PORT_CELLS: u16 = 6;
 pub const PORT_LABEL_CELLS: u16 = 5;
 pub const BUTTON: &str = " Connect and save ";
+/// The button that opens the second page.
+pub const MORE_BUTTON: &str = " Poll, signature, folders... ";
 
 /// Where each part of the form sits.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,7 +32,7 @@ pub struct SetupRects {
     pub intro: Rect,
     /// The input area of each field, in `SetupField::ALL` order. A row that is
     /// not shown has an empty rectangle.
-    pub fields: [Rect; 16],
+    pub fields: [Rect; 17],
     /// The provider list when it is open: under the provider row, over the
     /// rows below it. Empty when the window leaves no room for it.
     pub menu: Rect,
@@ -75,7 +77,7 @@ pub fn layout(area: Rect, signin: SignIn) -> Option<SetupRects> {
     let field = |offset: u16| Rect::new(x + LABEL_CELLS, top + offset, field_width, 1);
     let host = |offset: u16| Rect::new(x + LABEL_CELLS, top + offset, field_width - PORT_LABEL_CELLS - PORT_CELLS - 1, 1);
     let port = |offset: u16| Rect::new(x + width - PORT_CELLS, top + offset, PORT_CELLS, 1);
-    let mut fields = [Rect::default(); 16];
+    let mut fields = [Rect::default(); 17];
     let mut put = |which: SetupField, rect: Rect| fields[which.index()] = rect;
     put(SetupField::Email, field(3));
     put(SetupField::Provider, field(4));
@@ -101,6 +103,7 @@ pub fn layout(area: Rect, signin: SignIn) -> Option<SetupRects> {
     put(SetupField::SmtpSecurity, field(last + 6));
     put(SetupField::Username, field(last + 8));
     put(SetupField::AllowChanges, field(last + 9));
+    put(SetupField::More, Rect::new(x + LABEL_CELLS, top + last + 10, more_cells(), 1));
     put(SetupField::Save, Rect::new(x + LABEL_CELLS, top + last + 11, button_cells(), 1));
     let menu_top = top + 5;
     let room = (area.bottom() - 1).saturating_sub(menu_top);
@@ -124,7 +127,11 @@ fn button_cells() -> u16 {
     u16::try_from(BUTTON.chars().count()).unwrap_or(18)
 }
 
-fn hint_row(area: Rect) -> Rect {
+fn more_cells() -> u16 {
+    u16::try_from(MORE_BUTTON.chars().count()).unwrap_or(28)
+}
+
+pub(super) fn hint_row(area: Rect) -> Rect {
     Rect::new(area.x + 1, area.bottom() - 1, area.width.saturating_sub(2), 1)
 }
 

@@ -27,6 +27,10 @@ impl Settings {
                 }
                 OptionsAction::SetFontSize(points) => self.set_font_size(view, host, points),
                 OptionsAction::SetLineSpacing(spacing) => self.set_line_spacing(view, host, spacing),
+                OptionsAction::SetLayout(change) => {
+                    self.set_layout(view, change);
+                    None
+                }
                 OptionsAction::ReloadSettings => self.reload(view, host),
                 // The accounts' requests are answered next door.
                 OptionsAction::AddAccount | OptionsAction::EditAccount(_) | OptionsAction::RemoveAccount(_) => None,

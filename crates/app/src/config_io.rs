@@ -11,6 +11,7 @@ use std::path::Path;
 
 use model::config::Config;
 use model::config::font::{FONT_SIZE_MAX, FONT_SIZE_MIN, LINE_SPACING_MAX, LINE_SPACING_MIN};
+use ui::keys::KeyMap;
 use ui::theme::{DEFAULT_THEME_NAME, Theme, builtin_theme_text, default_theme, load_theme_file};
 
 use crate::errors::AppError;
@@ -47,7 +48,18 @@ pub fn load(dir: Option<&Path>) -> Result<Loaded, AppError> {
     let theme = pick_theme(&config.appearance.theme, dir, &mut problems)?;
     // Last, so a problem that changed a value is the one the footer shows.
     problems.extend(unused_settings::note(&config));
+    problems.extend(KeyMap::new(&config.keys).problems().iter().cloned());
     Ok(Loaded { config, theme, problems, file_problem })
+}
+
+/// The one line the footer shows for `problems`: the first, and how many more
+/// there are, so a second mistake is not hidden behind the first.
+pub fn footer_note(problems: &[String]) -> Option<String> {
+    let first = problems.first()?;
+    match problems.len() {
+        1 => Some(first.clone()),
+        more => Some(format!("{first} (and {} more: --print-config lists them)", more - 1)),
+    }
 }
 
 /// The file's settings, or what was wrong with it. No file is no problem.

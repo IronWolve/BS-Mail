@@ -70,17 +70,13 @@ use serde::Deserialize;
 
 use crate::account_folders::FolderPaths;
 use crate::account_oauth::{AuthKind, OAuthSettings, RawOAuth, token_file_in};
-use crate::account_signature::clean_signature;
+pub use crate::account_signature::clean_signature;
 use crate::account_smtp::RawSmtp;
 pub use crate::account_security::{Security, Trust};
 pub use crate::account_smtp::{SmtpAuth, SmtpSettings};
 pub use crate::loopback_host::is_loopback_host;
 
-/// How often the program checks for new mail when the file says nothing.
-pub const DEFAULT_POLL_SECONDS: u32 = 60;
-
-/// The shortest wait between two checks; a smaller non-zero value is raised.
-pub const MIN_POLL_SECONDS: u32 = 15;
+pub use model::{DEFAULT_POLL_SECONDS, MIN_POLL_SECONDS};
 
 /// One mail account, checked and ready to use.
 #[derive(Debug, Clone, PartialEq, Eq)]

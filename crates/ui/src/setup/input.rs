@@ -11,6 +11,8 @@ use super::fields::SetupField;
 use super::form::SetupForm;
 use super::link_panel::PanelChoice;
 use super::link_panel_input;
+use super::settings_input;
+use super::settings_page::FormPage;
 
 /// What the form wants done after an input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,6 +39,9 @@ pub fn handle_key(form: &mut SetupForm, key: &KeyEvent) -> Outcome {
     if form.link.is_some() {
         return link_panel_input::key(key);
     }
+    if form.page == FormPage::Settings {
+        return settings_input::handle_key(form, key);
+    }
     if form.provider_menu.is_some() {
         return match key.key {
             LogicalKey::Named(named) => form.menu_key(named),
@@ -53,6 +58,7 @@ pub fn handle_key(form: &mut SetupForm, key: &KeyEvent) -> Outcome {
         LogicalKey::Named(NamedKey::Function(10)) => Outcome::Submit,
         LogicalKey::Named(NamedKey::Enter) if held.ctrl => Outcome::Submit,
         LogicalKey::Named(NamedKey::Enter) if form.focus == SetupField::Save => Outcome::Submit,
+        LogicalKey::Named(NamedKey::Enter) if form.focus == SetupField::More => open_settings(form),
         LogicalKey::Named(NamedKey::Enter) if form.focus == SetupField::Provider => {
             form.open_provider_menu();
             Outcome::Changed
@@ -68,11 +74,17 @@ pub fn handle_text(form: &mut SetupForm, text: &str) -> Outcome {
     if form.link.is_some() {
         return link_panel_input::text(text);
     }
+    if form.page == FormPage::Settings {
+        return settings_input::handle_text(form, text);
+    }
     if form.provider_menu.is_some() {
         return form.menu_text(text);
     }
     if form.waiting {
         return Outcome::Ignored;
+    }
+    if form.focus == SetupField::More && text == " " {
+        return open_settings(form);
     }
     if form.focus.is_choice() {
         if text == " " && form.focus != SetupField::Save {
@@ -106,6 +118,10 @@ pub fn click(form: &mut SetupForm, field: SetupField) -> Outcome {
         form.move_focus(field);
         return Outcome::Submit;
     }
+    if field == SetupField::More {
+        form.move_focus(field);
+        return open_settings(form);
+    }
     let was_focused = form.focus == field;
     if field == SetupField::Provider {
         // Opening the list changes nothing yet, so the first click opens it.
@@ -121,6 +137,12 @@ pub fn click(form: &mut SetupForm, field: SetupField) -> Outcome {
         form.change_choice(true);
     }
     form.quit_armed = false;
+    Outcome::Changed
+}
+
+/// The button that opens the second page.
+fn open_settings(form: &mut SetupForm) -> Outcome {
+    form.show_settings();
     Outcome::Changed
 }
 

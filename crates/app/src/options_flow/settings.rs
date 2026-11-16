@@ -70,6 +70,7 @@ pub fn is_setting(action: &OptionsAction) -> bool {
             | OptionsAction::SetIcons(_)
             | OptionsAction::SetFontSize(_)
             | OptionsAction::SetLineSpacing(_)
+            | OptionsAction::SetLayout(_)
             | OptionsAction::ReloadSettings
     )
 }

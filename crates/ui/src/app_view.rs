@@ -26,6 +26,7 @@ use crate::setup::draw::draw_setup;
 use crate::input::memory::InputMemory;
 use crate::view_bands::draw_too_small;
 use crate::input::menus::OpenMenu;
+use crate::keys::KeyMap;
 use crate::input::new_mail::NewMail;
 use crate::input::scrollbars::BarDrag;
 use crate::input::{CommandQueue, Drag};
@@ -44,6 +45,8 @@ pub struct AppView {
     pub(crate) identity: AppIdentity,
     pub(crate) theme: Theme,
     pub(crate) config: Config,
+    /// The keys in force: the defaults with the `[keys]` table over them.
+    pub(crate) keys: KeyMap,
     pub(crate) icons: IconSet,
     capabilities: Capabilities,
     pub(crate) now: MailDate,
@@ -148,6 +151,7 @@ impl AppView {
         Self {
             identity,
             theme,
+            keys: KeyMap::new(&config.keys),
             config,
             icons,
             capabilities: Capabilities::window(),
@@ -323,7 +327,7 @@ impl AppView {
     pub fn render(&self, cols: u16, rows: u16) -> Frame {
         let mut frame = Frame::new(Rect::new(0, 0, cols, rows));
         frame.line_weight = self.config.appearance.line_weight.max(1);
-        let ctx = DrawContext::new(&self.theme, &self.icons, &self.config, self.now);
+        let ctx = DrawContext::new(&self.theme, &self.icons, &self.config, self.now).with_keys(&self.keys);
         let area = frame.area();
         if let Some(form) = &self.setup {
             draw_setup(&mut frame, &ctx, area, form);

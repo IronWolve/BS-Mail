@@ -1,6 +1,8 @@
 //! The things on an Options page that take the keyboard focus, and the parts
 //! of them a key or a click can press.
 
+use super::layout_choices::{Column, Panel};
+
 /// One stop on a page for the keyboard.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Control {
@@ -17,6 +19,12 @@ pub enum Control {
     Icons,
     TextSize,
     LineSpacing,
+    /// Where the reader sits, and how the sidebar is spaced.
+    ReaderPosition,
+    Density,
+    /// A column of the list, or a panel, shown or hidden.
+    Column(Column),
+    Panel(Panel),
     Reload,
 }
 
@@ -35,7 +43,7 @@ impl Control {
     pub fn kind(self) -> Kind {
         match self {
             Self::AccountList => Kind::List,
-            Self::Theme | Self::Icons => Kind::Choice,
+            Self::Theme | Self::Icons | Self::ReaderPosition | Self::Density | Self::Column(_) | Self::Panel(_) => Kind::Choice,
             Self::TextSize | Self::LineSpacing => Kind::Stepper,
             _ => Kind::Button,
         }

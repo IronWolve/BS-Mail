@@ -84,6 +84,10 @@ impl SetupForm {
             put("trust", "any".into());
         }
         put("read_only", (!self.allow_changes).into());
+        if !self.sent_copy_on() {
+            put("save_sent", false.into());
+        }
+        self.put_settings(&mut table)?;
         self.put_outgoing(&mut table)?;
         toml::to_string(&table).map_err(|error| format!("the settings could not be written: {error}"))
     }
@@ -105,9 +109,6 @@ impl SetupForm {
         put("smtp_security", self.smtp_security.toml_name().into());
         if self.smtp_trust_any() {
             put("smtp_trust", "any".into());
-        }
-        if self.files_sent_itself {
-            put("save_sent", false.into());
         }
         Ok(())
     }

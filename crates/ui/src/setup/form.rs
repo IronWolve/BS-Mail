@@ -12,6 +12,7 @@ use crate::composer::EditorBuffer;
 use super::fields::{Security, SetupField, SignIn};
 use super::local_host::is_local_host;
 use super::provider_menu::{ProviderChoice, ProviderMenu};
+use super::settings_page::{AccountSettings, FormPage};
 use super::providers::Preset;
 use super::saved_client::SavedClient;
 
@@ -46,6 +47,10 @@ pub struct SetupForm {
     /// it; off keeps the account read-only: nothing is ever changed or sent.
     pub allow_changes: bool,
     pub focus: SetupField,
+    /// Which page shows: the account's details or its settings.
+    pub page: FormPage,
+    /// What the second page holds.
+    pub settings: AccountSettings,
     /// A problem with what was typed, or the server's answer.
     pub notice: Option<String>,
     /// Something to tell the user that is not a problem.
@@ -111,6 +116,8 @@ impl SetupForm {
             oauth_provider: None,
             allow_changes: true,
             focus: SetupField::Email,
+            page: FormPage::Details,
+            settings: AccountSettings::default(),
             notice: None,
             info: None,
             provider_note: "",
@@ -174,6 +181,7 @@ impl SetupForm {
             && !username_typed
             && !self.name_touched
             && !self.servers_touched
+            && self.settings.is_blank()
             && self.provider == ProviderChoice::Auto
     }
 

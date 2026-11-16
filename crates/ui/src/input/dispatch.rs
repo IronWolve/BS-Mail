@@ -6,7 +6,7 @@
 use model::Command;
 use surface::{ButtonState, InputEvent, KeyEvent, LogicalKey, Modifiers, NamedKey};
 
-use super::action::{Action, action_for};
+use super::action::Action;
 use super::compose::ComposeKind;
 use super::hit::{Hit, HitView, hit_at};
 use super::motion::folders_height;
@@ -80,7 +80,7 @@ impl AppView {
         if self.attachment_mode() && self.attachment_mode_key(key) {
             return true;
         }
-        match action_for(key) {
+        match self.keys.action(key) {
             Some(action) => {
                 self.act(action, grid);
                 true
@@ -294,6 +294,7 @@ impl AppView {
             messages: self.shown_page().map_or(0, |page| page.envelopes.len()),
             accounts: self.mail.accounts.len(),
             key_bar_actions: &self.config.key_bar.buttons,
+            keys: &self.keys,
         };
         hit_at(&view, col, row)
     }

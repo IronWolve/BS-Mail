@@ -8,6 +8,7 @@ use super::banner::BannerConfig;
 use super::font::FontConfig;
 use super::footer::FooterConfig;
 use super::key_bar::KeyBarConfig;
+use super::keys::KeysConfig;
 use super::list::ListConfig;
 use super::notify::NotifyConfig;
 use super::reader::ReaderConfig;
@@ -32,6 +33,9 @@ pub struct Config {
     pub key_bar: KeyBarConfig,
     pub footer: FooterConfig,
     pub notify: NotifyConfig,
+    /// What the user rebound; empty when nothing is (so it is not printed).
+    #[serde(skip_serializing_if = "KeysConfig::is_empty")]
+    pub keys: KeysConfig,
 }
 
 /// Builds an owned list of strings from literals.

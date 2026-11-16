@@ -7,9 +7,11 @@ use surface::{CursorRequest, CursorShape, Frame, Modifier, Rect};
 
 use super::fields::{SetupField, SignIn};
 use super::form::SetupForm;
-use super::layout::{BUTTON, FORM_COLS, FORM_ROWS, SetupRects, layout};
+use super::layout::{BUTTON, FORM_COLS, FORM_ROWS, MORE_BUTTON, SetupRects, layout};
 use super::link_panel::draw_panel;
 use super::provider_menu_draw::draw_provider_menu;
+use super::settings_draw::draw_settings;
+use super::settings_page::FormPage;
 use crate::composer::draw::{horizontal_skip, put_cell};
 use crate::composer::graphemes::{cells_between, list};
 use crate::theme::roles;
@@ -26,6 +28,9 @@ pub fn draw_setup(frame: &mut Frame, ctx: &DrawContext<'_>, area: Rect, form: &S
         return;
     }
     fill_cells(frame, area, ctx.full(roles::BASE));
+    if form.page == FormPage::Settings {
+        return draw_settings(frame, ctx, area, form);
+    }
     let Some(rects) = layout(area, form.signin) else {
         let text = format!("Window too small for setup (needs {FORM_COLS} x {FORM_ROWS})");
         put_text(frame, area, area.x + 1, area.y, &text, ctx.fg(roles::FOOTER_ERROR));
@@ -56,6 +61,10 @@ fn draw_field(frame: &mut Frame, ctx: &DrawContext<'_>, rects: &SetupRects, form
         draw_button(frame, ctx, rect, form);
         return;
     }
+    if field == SetupField::More {
+        draw_more(frame, ctx, rects, form);
+        return;
+    }
     let label_style = if focused { ctx.fg(roles::SECTION_TITLE) } else { ctx.fg(roles::READER_HEADER_LABEL) };
     let label_x = rect.x - rects.label_cells(field);
     let label_clip = Rect::new(label_x, rect.y, rect.right() - label_x, 1);
@@ -67,6 +76,19 @@ fn draw_field(frame: &mut Frame, ctx: &DrawContext<'_>, rects: &SetupRects, form
     } else {
         draw_text(frame, rect, form, field, style);
     }
+}
+
+/// The button that opens the second page, with its label before it.
+fn draw_more(frame: &mut Frame, ctx: &DrawContext<'_>, rects: &SetupRects, form: &SetupForm) {
+    let rect = rects.field(SetupField::More);
+    let focused = form.focus == SetupField::More;
+    let label_style = if focused { ctx.fg(roles::SECTION_TITLE) } else { ctx.fg(roles::READER_HEADER_LABEL) };
+    let label_x = rect.x - rects.label_cells(SetupField::More);
+    let label_clip = Rect::new(label_x, rect.y, rect.x - label_x, 1);
+    put_text(frame, label_clip, label_x, rect.y, SetupField::More.label(), label_style);
+    let style = if focused { ctx.full(roles::SIDEBAR_SELECTED).add_modifier(Modifier::BOLD) } else { ctx.full(roles::KEYBAR_CAP) };
+    fill_cells(frame, rect, style);
+    put_text(frame, rect, rect.x, rect.y, MORE_BUTTON, style);
 }
 
 fn choice_text(form: &SetupForm, field: SetupField) -> String {
@@ -151,7 +173,7 @@ pub fn wrap_words(text: &str, width: usize) -> Vec<String> {
 /// The row under the notes: a problem, else something to tell, else that the
 /// program is connecting, else (so it is always on screen) what the form will
 /// leave unchecked for a server on this computer.
-fn draw_notice(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, form: &SetupForm) {
+pub(super) fn draw_notice(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, form: &SetupForm) {
     let local = form.local_trust_note();
     let (text, style) = match (&form.notice, &form.info, form.waiting, &local) {
         (Some(notice), _, _, _) => (notice.as_str(), ctx.fg(roles::FOOTER_ERROR)),

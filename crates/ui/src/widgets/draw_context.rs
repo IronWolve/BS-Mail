@@ -8,6 +8,7 @@ use surface::{Color, Style};
 use crate::borders::BorderSet;
 use crate::format::{CivilTime, format_pattern};
 use crate::icons::{IconId, IconSet};
+use crate::keys::KeyMap;
 use crate::theme::{Theme, surface_color};
 
 pub struct DrawContext<'a> {
@@ -16,6 +17,8 @@ pub struct DrawContext<'a> {
     pub config: &'a Config,
     pub borders: &'static BorderSet,
     pub now: MailDate,
+    /// The keys in force, for the widgets that name a key.
+    pub keys: &'a KeyMap,
 }
 
 impl<'a> DrawContext<'a> {
@@ -26,7 +29,14 @@ impl<'a> DrawContext<'a> {
             config,
             borders: BorderSet::for_style(config.appearance.border),
             now,
+            keys: KeyMap::standard(),
         }
+    }
+
+    /// The same context naming the keys the user has now.
+    pub fn with_keys(mut self, keys: &'a KeyMap) -> Self {
+        self.keys = keys;
+        self
     }
 
     /// Foreground and weight of a role, for text over any background.

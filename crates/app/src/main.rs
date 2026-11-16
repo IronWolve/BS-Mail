@@ -104,7 +104,10 @@ fn print_config(options: &cli::Options) -> ExitCode {
             for problem in &loaded.problems {
                 report::print_error(problem);
             }
-            match toml::to_string_pretty(&loaded.config) {
+            // The keys in force, every action with its key, so the names can be seen and pasted.
+            let mut shown = loaded.config.clone();
+            shown.keys = ui::keys::KeyMap::new(&shown.keys).in_force();
+            match toml::to_string_pretty(&shown) {
                 Ok(text) => {
                     print!("{text}");
                     ExitCode::SUCCESS

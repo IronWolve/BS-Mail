@@ -50,6 +50,7 @@ impl AppView {
     /// Takes settings that were read again: the configuration, the theme and
     /// the icon set made from it.
     pub fn apply_settings(&mut self, config: Config, theme: Theme, icons: IconSet) {
+        self.keys = crate::keys::KeyMap::new(&config.keys);
         self.config = config;
         self.theme = self.at_host_depth(theme);
         self.icons = icons;

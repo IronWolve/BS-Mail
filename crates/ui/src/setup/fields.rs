@@ -109,11 +109,13 @@ pub enum SetupField {
     SmtpSecurity,
     Username,
     AllowChanges,
+    /// The button that opens the second page.
+    More,
     Save,
 }
 
 impl SetupField {
-    pub const ALL: [SetupField; 16] = [
+    pub const ALL: [SetupField; 17] = [
         Self::Email,
         Self::Provider,
         Self::SignIn,
@@ -129,6 +131,7 @@ impl SetupField {
         Self::SmtpSecurity,
         Self::Username,
         Self::AllowChanges,
+        Self::More,
         Self::Save,
     ];
 
@@ -169,6 +172,7 @@ impl SetupField {
             Self::SmtpHost => "Outgoing server",
             Self::Username => "User name",
             Self::AllowChanges => "Let me change mail",
+            Self::More => "Account settings",
             Self::Save => "",
         }
     }
@@ -186,7 +190,7 @@ impl SetupField {
     pub fn is_choice(self) -> bool {
         matches!(
             self,
-            Self::Provider | Self::SignIn | Self::ImapSecurity | Self::SmtpSecurity | Self::AllowChanges | Self::Save
+            Self::Provider | Self::SignIn | Self::ImapSecurity | Self::SmtpSecurity | Self::AllowChanges | Self::More | Self::Save
         )
     }
 

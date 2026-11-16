@@ -10,19 +10,25 @@ use super::form::SetupForm;
 use super::local_host::is_local_host;
 
 impl SetupForm {
-    /// The incoming server is local and its saved certificate check, if any,
-    /// is not being kept: the file will say `trust = "any"`.
+    /// The certificate of the incoming server is not checked: what the user
+    /// chose on the second page, else (the server is local and its saved
+    /// certificate check, if any, is not being kept) so, and the file will say
+    /// `trust = "any"`.
     pub(super) fn imap_trust_any(&self) -> bool {
-        let host = self.imap_host.text();
-        let host = host.trim();
-        is_local_host(host) && self.verified_imap_host.as_deref() != Some(host)
+        self.settings.imap_trust_any.unwrap_or_else(|| {
+            let host = self.imap_host.text();
+            let host = host.trim();
+            is_local_host(host) && self.verified_imap_host.as_deref() != Some(host)
+        })
     }
 
     /// The same for the outgoing server, when there is one.
     pub(super) fn smtp_trust_any(&self) -> bool {
-        let host = self.smtp_host.text();
-        let host = host.trim();
-        !host.is_empty() && is_local_host(host) && self.verified_smtp_host.as_deref() != Some(host)
+        self.settings.smtp_trust_any.unwrap_or_else(|| {
+            let host = self.smtp_host.text();
+            let host = host.trim();
+            !host.is_empty() && is_local_host(host) && self.verified_smtp_host.as_deref() != Some(host)
+        })
     }
 
     /// One line for the form when it will write a local server's certificate

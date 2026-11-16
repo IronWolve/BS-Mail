@@ -27,7 +27,7 @@ mod session_state;
 mod sign_in_advice;
 mod text_clean;
 
-pub use account_config::{AccountConfig, ConfigError, Security, SmtpAuth, SmtpSettings, Trust};
+pub use account_config::{AccountConfig, ConfigError, Security, SmtpAuth, SmtpSettings, Trust, clean_signature};
 pub use account_folders::FolderPaths;
 pub use account_oauth::{AuthKind, OAuthSettings, token_file_in};
 pub use mime_render::{body_preference, set_body_preference};

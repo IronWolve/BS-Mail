@@ -21,6 +21,11 @@ pub mod provider_menu;
 pub mod provider_menu_draw;
 pub mod providers;
 pub mod saved_client;
+pub mod settings_draw;
+pub mod settings_input;
+pub mod settings_layout;
+pub mod settings_page;
+pub mod settings_toml;
 pub mod simple_providers;
 pub mod trust_note;
 
@@ -31,3 +36,4 @@ pub use form::SetupForm;
 pub use prefill::AccountPrefill;
 pub use provider_menu::ProviderChoice;
 pub use saved_client::SavedClient;
+pub use settings_page::{AccountSettings, FormPage, SettingsField};

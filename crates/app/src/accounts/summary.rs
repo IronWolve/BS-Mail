@@ -85,7 +85,23 @@ pub fn prefill_of(found: &Found) -> Result<AccountPrefill, String> {
         client_id: get("oauth_client_id").unwrap_or_default(),
         client_secret: get("oauth_client_secret").unwrap_or_default(),
         allow_changes: table.get("read_only").and_then(toml::Value::as_bool) == Some(false),
+        poll_seconds: table.get("poll_seconds").and_then(toml::Value::as_integer).and_then(|seconds| u32::try_from(seconds).ok()),
+        save_sent: table.get("save_sent").and_then(toml::Value::as_bool),
+        // The engine's own cleaning of the text, so the page shows what the
+        // composer will put under a message.
+        signature: engine::clean_signature(get("signature").as_deref()),
+        folders: folders_of(table),
     })
+}
+
+/// The `folders` table of an account file as the five paths the second page
+/// shows, in the order sent, drafts, trash, archive, spam; empty for one that
+/// is not named. Both the inline and the `[folders]` section spellings are a
+/// table.
+fn folders_of(table: &toml::Table) -> [String; 5] {
+    let named = table.get("folders").and_then(toml::Value::as_table);
+    let path = |key: &str| named.and_then(|folders| folders.get(key)).and_then(toml::Value::as_str).map(str::trim).unwrap_or_default().to_string();
+    ["sent", "drafts", "trash", "archive", "spam"].map(path)
 }
 
 /// The provider the form signs in through for an account that uses the

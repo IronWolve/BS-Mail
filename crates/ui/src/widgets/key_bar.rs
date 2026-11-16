@@ -9,6 +9,7 @@ use surface::{Effect, Frame, Rect, RoundedFill};
 
 use super::cell_text::{cells, put_text};
 use super::draw_context::DrawContext;
+use crate::keys::KeyMap;
 use crate::layout::{Spread, bar_offset, inset_h, spread_items};
 use crate::theme::roles;
 
@@ -19,8 +20,8 @@ const KEPT: [&str; 2] = ["help", "quit"];
 /// The action of the Options button.
 const OPTIONS: &str = "options";
 
-/// A button's default key text and label; the keys table of a later stage
-/// replaces the key text. The default bar (`[keybar] buttons`) offers the ten
+/// A button's default key text and label; the `[keys]` table replaces the key
+/// text of an action it moved (`KeyMap::cap_text`). The default bar (`[keybar] buttons`) offers the ten
 /// buttons of the reference picture; the others (Edit as new, Archive, Spam,
 /// Mark all, Unmark all, Invert marks, Next unread, Tag, Alert) are there for
 /// a bar that lists them.
@@ -63,17 +64,19 @@ pub fn key_text(action: &str) -> Option<&'static str> {
     button_for(action).map(|button| button.key)
 }
 
-/// A button that will be drawn, with or without its label.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A button that will be drawn, with or without its label, and the text of
+/// its keycap (the bar's own, or the key the user moved the action to).
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Placed {
     button: &'static Button,
+    key: String,
     label: bool,
 }
 
 impl Placed {
     /// Keycap cells: a space, the key, a space.
     fn cap_width(&self) -> u16 {
-        cells(self.button.key) + 2
+        cells(&self.key) + 2
     }
 
     fn width(&self) -> u16 {
@@ -106,13 +109,14 @@ fn with_options(actions: &[String]) -> Cow<'_, [String]> {
 }
 
 /// The buttons for `actions` that fit in `available` cells, applying the
-/// dropping rule. Unknown action names have no button and are skipped.
-fn plan_buttons(actions: &[String], available: u16) -> Vec<Placed> {
+/// dropping rule. Unknown action names have no button and are skipped. A key
+/// the user rebound labels its keycap.
+fn plan_buttons(actions: &[String], keys: &KeyMap, available: u16) -> Vec<Placed> {
     let actions = with_options(actions);
     let mut placed: Vec<Placed> = actions
         .iter()
         .filter_map(|action| button_for(action))
-        .map(|button| Placed { button, label: true })
+        .map(|button| Placed { button, key: keys.cap_text(button.action).unwrap_or_else(|| button.key.to_string()), label: true })
         .collect();
     while !fits(&placed, available) {
         // Labels go first, from the right; the Options label goes before them
@@ -137,12 +141,12 @@ struct Row {
     spread: Spread,
 }
 
-fn plan_row(rect: Rect, actions: &[String]) -> Option<Row> {
+fn plan_row(rect: Rect, actions: &[String], keys: &KeyMap) -> Option<Row> {
     if rect.is_empty() {
         return None;
     }
     let area = inset_h(rect, 1);
-    let placed = plan_buttons(actions, area.width);
+    let placed = plan_buttons(actions, keys, area.width);
     let widths: Vec<u16> = placed.iter().map(Placed::width).collect();
     let spread = spread_items(&widths, area.width, MIN_GAP)?;
     Some(Row { area, placed, spread })
@@ -150,14 +154,14 @@ fn plan_row(rect: Rect, actions: &[String]) -> Option<Row> {
 
 /// The action of the button at column `col` of the key bar in `rect`, for a
 /// click. Cells between buttons belong to none.
-pub fn button_at(rect: Rect, actions: &[String], col: u16) -> Option<&'static str> {
-    button_span_at(rect, actions, col).map(|(action, _, _)| action)
+pub fn button_at(rect: Rect, actions: &[String], keys: &KeyMap, col: u16) -> Option<&'static str> {
+    button_span_at(rect, actions, keys, col).map(|(action, _, _)| action)
 }
 
 /// As `button_at`, with where the button starts and how many cells it covers
 /// (its keycap and its label), for the highlight under the pointer.
-pub fn button_span_at(rect: Rect, actions: &[String], col: u16) -> Option<(&'static str, u16, u16)> {
-    let row = plan_row(rect, actions)?;
+pub fn button_span_at(rect: Rect, actions: &[String], keys: &KeyMap, col: u16) -> Option<(&'static str, u16, u16)> {
+    let row = plan_row(rect, actions, keys)?;
     row.placed.iter().enumerate().find_map(|(index, button)| {
         let x = row.area.x.saturating_add(row.spread.starts[index]);
         let width = button.width();
@@ -167,7 +171,7 @@ pub fn button_span_at(rect: Rect, actions: &[String], col: u16) -> Option<(&'sta
 
 /// Draws the key bar into the one-row `rect` (inside the frame).
 pub fn draw_key_bar(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, actions: &[String]) {
-    let Some(Row { area, placed, spread }) = plan_row(rect, actions) else {
+    let Some(Row { area, placed, spread }) = plan_row(rect, actions, ctx.keys) else {
         return;
     };
     for (index, button) in placed.iter().enumerate() {
@@ -188,7 +192,7 @@ fn draw_button(
     (x, y): (u16, u16),
     button: &Placed,
 ) {
-    let cap = format!(" {} ", button.button.key);
+    let cap = format!(" {} ", button.key);
     put_text(frame, area, x, y, &cap, ctx.full(roles::KEYBAR_CAP));
     let appearance = &ctx.config.appearance;
     if let (true, Some(color)) = (appearance.keycap_round, ctx.bg_color(roles::KEYBAR_CAP)) {

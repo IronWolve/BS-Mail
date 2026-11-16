@@ -51,7 +51,7 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
     // What is wrong with an account comes before what is wrong with a setting.
     let note_is_about_settings = scanned.problems.is_empty() && !loaded.problems.is_empty();
     let problems: Vec<String> = scanned.problems.iter().cloned().chain(loaded.problems).collect();
-    view.set_config_problem(problems.first().cloned());
+    view.set_config_problem(config_io::footer_note(&problems));
     view.set_capabilities(capabilities);
     view.set_options_paths(options_paths(data.as_deref(), &source));
     let mut scene = scene_for(&source, view, base, &scanned)?;

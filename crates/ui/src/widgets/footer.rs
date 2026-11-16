@@ -7,7 +7,6 @@ use surface::{Frame, Rect};
 use super::account_strip::MailboxSummary;
 use super::cell_text::{Run, put_text, runs_width};
 use super::draw_context::DrawContext;
-use super::key_bar::key_text;
 use super::segment_row::{MIN_GAP, draw_segments, segments_fit};
 use crate::app_identity::AppIdentity;
 use crate::format::{ELLIPSIS_CHAR, group_thousands, truncate};
@@ -56,7 +55,7 @@ fn connection_segment(ctx: &DrawContext<'_>, state: ConnectionState) -> Vec<Run>
 fn help_segment(ctx: &DrawContext<'_>) -> Vec<Run> {
     vec![
         text_run(ctx, "Press "),
-        Run::new(key_text("help").unwrap_or("?"), ctx.fg(roles::FOOTER_KEY)),
+        Run::new(ctx.keys.text_of("help"), ctx.fg(roles::FOOTER_KEY)),
         text_run(ctx, " for help"),
     ]
 }

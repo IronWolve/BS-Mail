@@ -46,6 +46,7 @@ pub fn answer(
             | OptionsAction::SetIcons(_)
             | OptionsAction::SetFontSize(_)
             | OptionsAction::SetLineSpacing(_)
+            | OptionsAction::SetLayout(_)
             | OptionsAction::ReloadSettings => {}
         }
     }

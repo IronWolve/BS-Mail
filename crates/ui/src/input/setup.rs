@@ -19,6 +19,9 @@ use crate::setup::link_panel::PanelChoice;
 use crate::setup::providers::registration_page;
 use crate::setup::link_panel_input;
 use crate::setup::SetupAction;
+use crate::setup::settings_input;
+use crate::setup::settings_layout::settings_layout;
+use crate::setup::settings_page::FormPage;
 
 /// What the form says while the provider's registration page opens.
 const REGISTER_FIRST: &str = "Register on the page that just opened, paste the client id above, then connect.";
@@ -136,6 +139,7 @@ impl AppView {
             form.waiting = false;
             form.link = None;
             form.info = None;
+            form.show_problem_row(reason);
             form.notice = Some(reason.to_string());
         }
     }
@@ -156,6 +160,11 @@ impl AppView {
             } => {
                 if form.link.is_some() {
                     link_panel_input::click(grid, pos.col, pos.row)
+                } else if form.page == FormPage::Settings {
+                    match settings_layout(area_of(grid)).and_then(|rects| rects.field_at(pos.col, pos.row)) {
+                        Some(field) => settings_input::click(form, field),
+                        None => Outcome::Ignored,
+                    }
                 } else if form.provider_menu.is_some() {
                     match layout(area_of(grid), form.signin) {
                         Some(rects) => form.menu_click(&rects, pos.col, pos.row),
@@ -241,7 +250,10 @@ impl AppView {
         // the address as it is now.
         form.apply_provider();
         match form.to_account_toml() {
-            Err(problem) => form.notice = Some(problem),
+            Err(problem) => {
+                form.show_problem_row(&problem);
+                form.notice = Some(problem);
+            }
             Ok(text) => {
                 form.notice = None;
                 form.waiting = true;

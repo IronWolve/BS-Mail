@@ -8,17 +8,20 @@ use surface::{Capabilities, Frame, Rect};
 use super::cell_text::{fill_cells, put_text};
 use super::draw_context::DrawContext;
 use super::help_rows::help_rows;
+use crate::keys::KeyMap;
 use crate::theme::roles;
 
 const TITLE: &str = " Keys ";
 const CLOSE_HINT: &str = " any key closes ";
+/// The same, with where keys are changed, when the box is wide enough.
+const REBIND_HINT: &str = " any key closes   change keys in config.toml (the keys table); --print-config lists them ";
 /// The hint when some rows are out of sight and the arrow keys reach them.
 const SCROLL_HINT: &str = " Up Down scroll, other key closes ";
 /// Blank cells between the box edge and the text, and between the columns.
 const PAD: u16 = 2;
 const GAP: u16 = 3;
 
-type Row = (&'static str, &'static str);
+type Row = (String, String);
 
 /// The box for a grid: centered, as large as the rows want, never larger
 /// than the grid leaves room for.
@@ -49,8 +52,8 @@ pub fn help_capacity(rect: Rect) -> usize {
 
 /// The most the help list can scroll on `grid` for a host with
 /// `capabilities`: how many rows are out of sight when it is at the top.
-pub fn help_max_scroll(grid: Rect, capabilities: &Capabilities) -> usize {
-    let rows = help_rows(capabilities);
+pub fn help_max_scroll(grid: Rect, capabilities: &Capabilities, keys: &KeyMap) -> usize {
+    let rows = help_rows(capabilities, keys);
     let rect = help_rect(grid, &rows);
     rows.len().saturating_sub(help_capacity(rect))
 }
@@ -65,7 +68,7 @@ pub fn draw_help(
     capabilities: &Capabilities,
     scroll: usize,
 ) {
-    let rows = help_rows(capabilities);
+    let rows = help_rows(capabilities, ctx.keys);
     let rect = help_rect(grid, &rows);
     if rect.width < 8 || rect.height < 4 {
         return;
@@ -113,7 +116,12 @@ fn draw_frame(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, range: Optio
         None => TITLE.to_string(),
     };
     put_text(frame, clip, left + 2, top, &title, ctx.fg(roles::SECTION_TITLE));
-    let hint = if range.is_some() { SCROLL_HINT } else { CLOSE_HINT };
+    let room = rect.width.saturating_sub(cells(&title) + 8);
+    let hint = match range {
+        Some(_) => SCROLL_HINT,
+        None if cells(REBIND_HINT) <= room => REBIND_HINT,
+        None => CLOSE_HINT,
+    };
     let hint_at = right.saturating_sub(cells(hint) + 2);
     put_text(frame, clip, hint_at, bottom, hint, ctx.fg(roles::FOOTER_TEXT));
 }

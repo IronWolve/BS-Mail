@@ -13,7 +13,7 @@
 pub const MAX_SIGNATURE_CHARS: usize = 2000;
 
 /// The signature the file asks for, cleaned; empty when it has none.
-pub(crate) fn clean_signature(raw: Option<&str>) -> String {
+pub fn clean_signature(raw: Option<&str>) -> String {
     let Some(raw) = raw else {
         return String::new();
     };

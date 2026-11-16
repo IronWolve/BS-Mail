@@ -51,11 +51,11 @@ impl Settings {
         self.names = theme_names(self.dir.as_deref());
         view.set_theme_names(self.names.clone());
         let grid = host.set_text_size(points, spacing);
-        match loaded.problems.first() {
+        match config_io::footer_note(&loaded.problems) {
             Some(first) => {
                 view.set_config_problem(Some(first.clone()));
                 self.owns_note = true;
-                view.options_problem(first);
+                view.options_problem(&first);
             }
             None => {
                 if self.owns_note {
