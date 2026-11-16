@@ -12,6 +12,7 @@ mod config_io;
 mod data_lock;
 mod errors;
 mod fonts;
+mod html_store;
 mod identity;
 mod launch_mode;
 mod link_opener;

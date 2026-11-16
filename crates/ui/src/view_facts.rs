@@ -81,6 +81,10 @@ impl AppView {
     /// while its body is not here yet. The body is borrowed, never copied, so
     /// a long message costs nothing more to scroll for having an attachment.
     pub(crate) fn reader_content(&self) -> Option<ReaderContent<'_>> {
+        // The raw headers or source, while they are what the pane was asked to show.
+        if let Some(raw) = self.reading.raw_of(self.selection.message) {
+            return Some(ReaderContent { lead: vec![raw.heading(), StyledLine::default()], body: raw.lines() });
+        }
         let (_, body) = self.mail.body.as_ref().filter(|(id, _)| Some(*id) == self.selection.message)?;
         let mut lead: Vec<StyledLine> = body
             .attachments

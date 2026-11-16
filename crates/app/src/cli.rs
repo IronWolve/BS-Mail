@@ -74,6 +74,9 @@ pub struct Options {
     /// How many colors the terminal shows, when named; otherwise it is read
     /// from the environment.
     pub color_depth: Option<surface::ColorDepth>,
+    /// A `mailto:` link given on the command line: the composer opens for it
+    /// once the first account is there.
+    pub mailto: Option<String>,
 }
 
 impl Default for Options {
@@ -94,6 +97,7 @@ impl Default for Options {
             smoke: false,
             print: false,
             color_depth: None,
+            mailto: None,
         }
     }
 }
@@ -151,6 +155,7 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
             "--icons" => options.icons = Some(parse_icons(&value(&mut rest, &argument)?)?),
             "--no-color" => options.color = false,
             "--quiet" | "-q" => options.stats = false,
+            link if is_mailto(link) => options.mailto = Some(link.to_string()),
             other => return Err(format!("unknown option {other}; see --help")),
         }
     }
@@ -160,6 +165,12 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
         options.mode = Mode::Terminal;
     }
     Ok(options)
+}
+
+/// Whether an argument is a `mailto:` link, which is the one thing the
+/// program takes that is not a flag.
+fn is_mailto(argument: &str) -> bool {
+    argument.get(..7).is_some_and(|start| start.eq_ignore_ascii_case("mailto:"))
 }
 
 /// The value that follows a flag.

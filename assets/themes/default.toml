@@ -136,6 +136,9 @@ on_accent  = "#04121c"   # dark text on cyan and keycap blocks
 "body.path"              = { fg = "magenta" }
 "body.link"              = { fg = "cyan", underline = true }
 "body.signature"         = { fg = "green" }
+"reader.selection"       = { fg = "text", bg = "blue_sel" }
+"reader.found"           = { fg = "on_accent", bg = "yellow" }
+"reader.found.current"   = { fg = "on_accent", bg = "green_hi", bold = true }
 
 # Key bar and footer.
 "keybar.cap"             = { fg = "on_accent", bg = "keycap", bold = true }

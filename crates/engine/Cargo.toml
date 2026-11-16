@@ -17,6 +17,7 @@ webpki-roots = { workspace = true }
 ring = { workspace = true }
 mail-parser = { workspace = true }
 html2text = { workspace = true }
+html5ever = { workspace = true }
 futures-util = { workspace = true }
 
 [features]

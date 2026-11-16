@@ -65,6 +65,15 @@ pub struct OutgoingMessage {
     pub in_reply_to: Option<MessageId>,
 }
 
+/// Which raw text of a message to read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RawPart {
+    /// The header block as received, up to the blank line.
+    Headers,
+    /// The whole message as received: the headers and every part.
+    Source,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     /// Load the newest page of a folder's envelopes.
@@ -75,6 +84,14 @@ pub enum Command {
     LoadMore { folder: FolderId, have: u32 },
     /// Load and render one message body.
     FetchBody { message: MessageId },
+    /// Read the raw text of a message (its headers, or all of it), for the
+    /// reader to show as it is. The answer is a `RawText`.
+    FetchRaw { message: MessageId, part: RawPart },
+    /// Make a safe copy of a message's HTML part, with scripts, frames and
+    /// everything that loads from the network left out, for the program to
+    /// open in the browser. The answer is an `HtmlPage`; a message with no
+    /// HTML part is answered with a failure.
+    PrepareHtml { message: MessageId },
     /// Change flags on one or more messages.
     SetFlags {
         messages: Vec<MessageId>,

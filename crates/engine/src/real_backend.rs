@@ -49,6 +49,7 @@ mod offline;
 mod online;
 mod poll;
 mod poll_state;
+mod raw_views;
 mod resolve;
 mod retry_ids;
 mod reply_lookup;

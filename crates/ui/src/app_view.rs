@@ -8,7 +8,6 @@ use model::{Event, MailDate, MessageId};
 use surface::{Capabilities, Frame, Rect};
 
 use crate::app_identity::AppIdentity;
-use crate::format::display_width;
 use crate::icons::IconSet;
 use crate::composer::{AddressBook, ComposeForm};
 use crate::composer::EditorBuffer;
@@ -18,6 +17,8 @@ use crate::move_picker::MovePicker;
 use crate::options::OptionsState;
 use crate::options::draw::draw_options;
 use crate::options::host::OptionsHost;
+use crate::composer::MailtoDraft;
+use crate::reader_tools::ReaderTools;
 use crate::search::ActiveSearch;
 use crate::setup::SetupForm;
 use crate::setup::draw::draw_setup;
@@ -25,21 +26,20 @@ use crate::search::draw::draw_search_bar;
 use crate::move_picker::draw::draw_picker;
 use crate::composer::draw::draw_composer;
 use crate::input::memory::InputMemory;
+use crate::view_bands::draw_too_small;
 use crate::input::menus::OpenMenu;
 use crate::input::new_mail::NewMail;
 use crate::input::scrollbars::BarDrag;
 use crate::input::{CommandQueue, Drag};
 use crate::layout::{
-    FolderSpacing, GridSize, Layout, LayoutOptions, LayoutPrefs, MIN_COLS, MIN_ROWS, SectionKind,
-    SidebarContent, compute_layout,
+    FolderSpacing, GridSize, Layout, LayoutOptions, LayoutPrefs, SidebarContent, compute_layout,
 };
 use crate::theme::{Theme, roles};
 use crate::view_state::{
     Focus, MailSnapshot, OverlayKind, Overlays, Place, ScrollState, Selection,
 };
 use crate::widgets::{
-    DrawContext, StatusLine, content_rows, draw_chrome_lines, draw_help, draw_menu, fill_cells, mark_focused,
-    put_text, visible_rows,
+    DrawContext, StatusLine, content_rows, draw_chrome_lines, draw_help, draw_menu, fill_cells, visible_rows,
 };
 
 pub struct AppView {
@@ -129,6 +129,12 @@ pub struct AppView {
     /// The client ids the program holds, which the form fills in for a
     /// provider it knows.
     pub(crate) saved_clients: Vec<crate::setup::SavedClient>,
+    /// What the reading pane does besides showing the message: the selected
+    /// text, the find box, the raw view and the pages for the browser.
+    pub(crate) reading: ReaderTools,
+    /// A mail link the program was started with, waiting for an account to
+    /// write from.
+    pub(crate) pending_mailto: Option<MailtoDraft>,
     /// The Options screen, while it is open.
     pub(crate) options: Option<OptionsState>,
     /// What the program told the Options screen, and what it asked for.
@@ -182,6 +188,8 @@ impl AppView {
             setup_online: false,
             setup_actions: Vec::new(),
             saved_clients: Vec::new(),
+            reading: ReaderTools::default(),
+            pending_mailto: None,
             options: None,
             options_host: OptionsHost::default(),
         }
@@ -221,6 +229,7 @@ impl AppView {
         self.note_send_outcome(&event);
         self.note_addresses(&event);
         self.note_search_event(&event);
+        self.note_reading_event(&event);
         if matches!(event, Event::EnvelopePage { offset: 0, .. }) {
             self.queue.first_page_arrived();
         }
@@ -248,6 +257,7 @@ impl AppView {
             self.apply_restore();
         }
         self.prune_marks();
+        self.try_pending_mailto();
     }
 
     /// How many messages are marked.
@@ -354,33 +364,6 @@ impl AppView {
         }
         frame
     }
-
-    /// Underlines the title of the pane that has focus.
-    fn mark_focus(&self, frame: &mut Frame, layout: &Layout) {
-        let title = match self.focus {
-            Focus::Sidebar => {
-                let kind = if self.account_cursor_row().is_some() { SectionKind::Accounts } else { SectionKind::Folders };
-                layout.sidebar.as_ref().and_then(|sidebar| sidebar.section(kind)).map(|section| section.title)
-            }
-            Focus::List => layout.list.as_ref().map(|list| list.title),
-            Focus::Reader => layout.reader.as_ref().map(|reader| reader.title),
-        };
-        if let Some(title) = title {
-            mark_focused(frame, title);
-        }
-    }
-}
-
-/// The one line shown when the grid is under the minimum size.
-fn draw_too_small(frame: &mut Frame, ctx: &DrawContext<'_>) {
-    let area = frame.area();
-    let text = format!("Window too small (needs {MIN_COLS} x {MIN_ROWS})");
-    let short = "Window too small";
-    let text = if display_width(&text) <= usize::from(area.width) { text } else { short.to_string() };
-    let width = u16::try_from(display_width(&text)).unwrap_or(u16::MAX);
-    let x = area.x + area.width.saturating_sub(width) / 2;
-    let y = area.y + area.height / 2;
-    put_text(frame, area, x, y, &text, ctx.fg(roles::FOOTER_ERROR));
 }
 
 #[cfg(test)]

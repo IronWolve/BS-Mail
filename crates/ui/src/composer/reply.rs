@@ -14,6 +14,12 @@ pub struct Draft {
 }
 
 impl Draft {
+    /// What a `mailto:` link starts a message with: the people it names and
+    /// the subject and text it asks for.
+    pub fn for_link(to: Vec<Address>, cc: Vec<Address>, subject: String, body: String) -> Self {
+        Self { to, cc, subject, body, reply: false }
+    }
+
     /// A reply starts with the cursor in the body, above the quote; a draft
     /// with nobody to send to yet starts at the recipient.
     pub fn is_reply(&self) -> bool {

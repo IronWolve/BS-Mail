@@ -2,7 +2,7 @@
 //! on the same messages: the marked ones when there are any (the replies and
 //! the copies take the selected message alone), and a delete asks first.
 
-use model::Command;
+use model::{Command, RawPart};
 
 use super::action::Action;
 use super::menu_tables::MenuAction;
@@ -11,9 +11,6 @@ use crate::app_view::AppView;
 use crate::input::compose::ComposeKind;
 use crate::view_state::Focus;
 use crate::OptionsAction;
-
-/// What the footer says once something is copied.
-const COPIED_NOTE: &str = "is on the clipboard (if your terminal allows it).";
 
 impl AppView {
     /// Closes the menu and does what entry `index` stands for.
@@ -41,6 +38,11 @@ impl AppView {
             (MenuAction::Spam, _) => self.act(Action::Spam, grid),
             (MenuAction::CopySender, _) => self.copy_sender(),
             (MenuAction::CopySubject, _) => self.copy_subject(),
+            (MenuAction::CopyText, _) => self.copy_message_text(grid),
+            (MenuAction::FindInMessage, _) => self.find_in_message(),
+            (MenuAction::ViewHeaders, _) => self.view_raw(RawPart::Headers),
+            (MenuAction::ViewSource, _) => self.view_raw(RawPart::Source),
+            (MenuAction::OpenInBrowser, _) => self.open_in_browser(),
             (MenuAction::OpenFolder, MenuTarget::Folder(id)) => {
                 self.account_cursor = None;
                 self.focus = Focus::Sidebar;
@@ -49,11 +51,8 @@ impl AppView {
             (MenuAction::SyncNow, MenuTarget::Account(id)) => self.sync_account(id),
             (MenuAction::SyncNow, _) => self.refresh(),
             (MenuAction::EditAccount, MenuTarget::Account(id)) => self.queue_options_action(OptionsAction::EditAccount(id.0)),
-            (MenuAction::OpenLink, MenuTarget::Link(address)) => {
-                self.mail.set_note(Some(format!("Opening {address}")));
-                self.link_requests.push(address);
-            }
-            (MenuAction::CopyLink, MenuTarget::Link(address)) => self.copy_text("The link", address),
+            (MenuAction::OpenLink, MenuTarget::Link(address)) => self.open_link(address),
+            (MenuAction::CopyLink, MenuTarget::Link(address)) => self.put_on_clipboard(Some("the link"), address),
             _ => {}
         }
     }
@@ -67,24 +66,18 @@ impl AppView {
         }
     }
 
-    /// Puts `text` on the clipboard, for the host to take, and says so.
-    fn copy_text(&mut self, what: &str, text: String) {
-        self.mail.set_note(Some(format!("{what} {COPIED_NOTE}")));
-        self.copied_link = Some(text);
-    }
-
     /// The first address the selected message is from.
-    fn copy_sender(&mut self) {
+    pub(crate) fn copy_sender(&mut self) {
         let sender = self.shown_page().and_then(|page| page.envelopes.get(self.selection.message_index)).and_then(|envelope| envelope.from.first());
         if let Some(address) = sender.map(|from| from.email.clone()) {
-            self.copy_text("The sender's address", address);
+            self.put_on_clipboard(Some("the sender's address"), address);
         }
     }
 
-    fn copy_subject(&mut self) {
+    pub(crate) fn copy_subject(&mut self) {
         let subject = self.shown_page().and_then(|page| page.envelopes.get(self.selection.message_index)).map(|envelope| envelope.subject.clone());
         if let Some(subject) = subject {
-            self.copy_text("The subject", subject);
+            self.put_on_clipboard(Some("the subject"), subject);
         }
     }
 }

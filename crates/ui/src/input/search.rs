@@ -11,6 +11,7 @@
 use model::{Command, Event, RequestId};
 use surface::{InputEvent, KeyEvent, LogicalKey, NamedKey};
 
+use super::line_edit::edit_line;
 use crate::app_view::AppView;
 use crate::composer::EditorBuffer;
 use crate::search::ActiveSearch;
@@ -49,22 +50,7 @@ impl AppView {
         match named {
             NamedKey::Escape => self.search_bar = None,
             NamedKey::Enter => self.run_search(),
-            NamedKey::Left if held.ctrl => bar.move_word_left(held.shift),
-            NamedKey::Right if held.ctrl => bar.move_word_right(held.shift),
-            NamedKey::Left => bar.move_left(held.shift),
-            NamedKey::Right => bar.move_right(held.shift),
-            NamedKey::Home => bar.move_line_start(held.shift),
-            NamedKey::End => bar.move_line_end(held.shift),
-            NamedKey::Backspace if held.ctrl => {
-                bar.delete_word_back();
-            }
-            NamedKey::Backspace => {
-                bar.backspace();
-            }
-            NamedKey::Delete => {
-                bar.delete_forward();
-            }
-            _ => return false,
+            other => return edit_line(bar, other, held),
         }
         true
     }

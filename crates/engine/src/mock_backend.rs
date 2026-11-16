@@ -11,7 +11,7 @@ use model::{
 
 use crate::change_refusals::{DELETED_NOT_HERE, move_refusal};
 use crate::mock::mutate::{MoveOutcome, apply_flags, delete_messages, move_messages};
-use crate::mock::search;
+use crate::mock::{raw_view, search};
 use crate::mock::{account_state, select_account};
 use crate::mock::{Fixture, FixtureError};
 
@@ -331,6 +331,9 @@ impl MailBackend for MockBackend {
             // The mock's first page already holds every message it has.
             Command::LoadMore { .. } => Vec::new(),
             Command::FetchBody { message } => self.fetch_body(message),
+            Command::FetchRaw { message, part } => raw_view::raw_event(&self.data, message, part)
+                .map_or_else(|| vec![self.failure("view source", format!("unknown message id: {}", message.0))], |event| vec![event]),
+            Command::PrepareHtml { .. } => vec![self.failure("open in browser", "this message has no HTML part to open".to_owned())],
             Command::SetFlags { messages, change } => self.set_flags(&messages, change),
             Command::Move { messages, to } => self.move_to(&messages, to),
             Command::Delete { messages } => self.delete(&messages),

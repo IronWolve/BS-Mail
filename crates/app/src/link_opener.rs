@@ -12,6 +12,7 @@
 
 use std::ffi::OsStr;
 use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::mpsc::{Receiver, channel};
 use std::thread;
@@ -28,6 +29,10 @@ pub trait LinkOpener {
     /// Starts opening `url`; the result comes later through `poll`.
     fn open(&mut self, url: &str);
 
+    /// Starts opening the page file at `path` in the browser; the result comes
+    /// later through `poll`. Only a page this program wrote itself is opened.
+    fn open_file(&mut self, path: &Path);
+
     /// The result of the last `open`, once, when there is one.
     fn poll(&mut self) -> Option<Result<(), String>>;
 }
@@ -38,6 +43,8 @@ pub struct NoOpener;
 
 impl LinkOpener for NoOpener {
     fn open(&mut self, _url: &str) {}
+
+    fn open_file(&mut self, _path: &Path) {}
 
     fn poll(&mut self) -> Option<Result<(), String>> {
         None
@@ -108,11 +115,23 @@ fn system_launchers() -> Vec<Launcher> {
     }
 }
 
+/// The opener of a run: the system's, which may also open the pages kept in
+/// `html/` of the data folder `data` and no other file.
+pub fn opener_for(data: Option<&Path>) -> Box<dyn LinkOpener> {
+    let opener = SystemOpener::new();
+    Box::new(match data {
+        Some(dir) => opener.with_pages_in(dir.join(crate::html_store::HTML_DIR_NAME)),
+        None => opener,
+    })
+}
+
 /// Opens links with whatever the system has.
 pub struct SystemOpener {
     launchers: Vec<Launcher>,
     settle: Duration,
     waiting: Option<Receiver<Result<(), String>>>,
+    /// The only folder a file is opened from: `html/` in the data folder.
+    pages_dir: Option<PathBuf>,
 }
 
 impl SystemOpener {
@@ -122,7 +141,13 @@ impl SystemOpener {
 
     /// An opener with its own launchers and patience, for tests.
     pub fn with(launchers: Vec<Launcher>, settle: Duration) -> Self {
-        Self { launchers, settle, waiting: None }
+        Self { launchers, settle, waiting: None, pages_dir: None }
+    }
+
+    /// Lets the opener open the page files that are in `dir`, and no others.
+    pub fn with_pages_in(mut self, dir: PathBuf) -> Self {
+        self.pages_dir = Some(dir);
+        self
     }
 }
 
@@ -142,11 +167,55 @@ impl LinkOpener for SystemOpener {
         });
     }
 
+    fn open_file(&mut self, path: &Path) {
+        let (sender, receiver) = channel();
+        self.waiting = Some(receiver);
+        let file = match checked_page(self.pages_dir.as_deref(), path) {
+            Ok(file) => file,
+            Err(reason) => {
+                let _ = sender.send(Err(reason));
+                return;
+            }
+        };
+        let launchers = self.launchers.clone();
+        let settle = self.settle;
+        thread::spawn(move || {
+            let _ = sender.send(try_each(&launchers, &file, settle));
+        });
+    }
+
     fn poll(&mut self) -> Option<Result<(), String>> {
         let answer = self.waiting.as_ref()?.try_recv().ok()?;
         self.waiting = None;
         Some(answer)
     }
+}
+
+/// The path to hand to a launcher for a page file, or why it is refused. It
+/// must be a file named as this program names its pages, found (after links
+/// are followed) inside the pages folder and nowhere else, and its path must
+/// be plain text a launcher cannot take for anything but a path.
+fn checked_page(pages_dir: Option<&Path>, path: &Path) -> Result<String, String> {
+    const REFUSED: &str = "that file is not a page this program made, so it was not opened";
+    let dir = pages_dir.ok_or("there is no folder for pages here, so nothing was opened")?;
+    let dir = dir.canonicalize().map_err(|_| REFUSED.to_string())?;
+    let file = path.canonicalize().map_err(|_| REFUSED.to_string())?;
+    let named_right = file.file_name().and_then(OsStr::to_str).and_then(crate::html_store::page_number).is_some();
+    if file.parent() != Some(dir.as_path()) || !named_right || !file.is_file() {
+        return Err(REFUSED.to_string());
+    }
+    let text = launchable(&file).ok_or_else(|| REFUSED.to_string())?;
+    if text.starts_with('-') || text.chars().any(|ch| ch.is_control()) {
+        return Err(REFUSED.to_string());
+    }
+    Ok(text)
+}
+
+/// The path as text; on Windows without the `\\?\` that canonical paths carry,
+/// which the system's openers do not read.
+fn launchable(file: &Path) -> Option<String> {
+    let text = file.to_str()?;
+    Some(text.strip_prefix(r"\\?\").filter(|rest| !rest.starts_with("UNC")).unwrap_or(text).to_string())
 }
 
 /// An http or https address with nothing in it that a launcher could read as

@@ -32,6 +32,7 @@ on_accent  = "#000000"
 
 [roles]
 "footer.error"           = { underline = true }
+"reader.found.current"   = { underline = true }
 "strip.offline"          = { underline = true }
 "subject.warning"        = { underline = true }
 "subject.tag.alert"      = { underline = true }

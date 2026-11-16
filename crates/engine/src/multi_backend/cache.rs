@@ -30,6 +30,8 @@ impl MemberCache {
             | Event::EnvelopePage { .. }
             | Event::OlderEnvelopes { .. }
             | Event::BodyReady { .. }
+            | Event::RawText { .. }
+            | Event::HtmlPage { .. }
             | Event::FlagsChanged { .. }
             | Event::SearchResults { .. }
             | Event::MessageSent { .. }

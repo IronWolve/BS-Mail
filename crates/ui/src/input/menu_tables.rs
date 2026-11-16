@@ -20,6 +20,11 @@ pub enum MenuAction {
     Spam,
     CopySender,
     CopySubject,
+    CopyText,
+    ViewHeaders,
+    ViewSource,
+    OpenInBrowser,
+    FindInMessage,
     OpenFolder,
     SyncNow,
     EditAccount,
@@ -66,6 +71,11 @@ const MESSAGE_ROWS: &[Row] = &[
     row(Spam, "Spam", 'p'),
     row(CopySender, "Copy sender", 'o'),
     row(CopySubject, "Copy subject", 'b'),
+    row(CopyText, "Copy text", 't'),
+    row(FindInMessage, "Find in message...", 'i'),
+    row(ViewHeaders, "View headers", 'h'),
+    row(ViewSource, "View source", 'v'),
+    row(OpenInBrowser, "Open in browser", 'w'),
 ];
 
 const FOLDER_ROWS: &[Row] = &[row(OpenFolder, "Open", 'o'), row(SyncNow, "Sync now", 's')];

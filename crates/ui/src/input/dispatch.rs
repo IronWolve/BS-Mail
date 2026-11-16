@@ -41,6 +41,9 @@ impl AppView {
         if self.search_bar.is_some() {
             return self.search_input(event, grid);
         }
+        if self.find_is_editing() {
+            return self.find_input(event, grid);
+        }
         if self.menu.is_some() {
             return self.menu_input(event, grid);
         }
@@ -58,6 +61,7 @@ impl AppView {
     fn main_key(&mut self, key: &KeyEvent, grid: (u16, u16)) -> bool {
         let was_dragging = self.dragging_rows();
         self.cancel_row_drag();
+        self.reading.stop_dragging();
         if was_dragging && key.key == LogicalKey::Named(NamedKey::Escape) {
             return true;
         }
@@ -98,6 +102,7 @@ impl AppView {
     /// The commands the backend is due, in order. Call after every input
     /// event and every backend event.
     pub fn take_commands(&mut self) -> Vec<Command> {
+        self.reading.forget_other_than(self.selection.message);
         let mut commands = self.queue.take(&self.selection, &self.mail);
         self.note_own_changes(&commands);
         // Older mail is only asked for while the folder's own list is shown,
@@ -121,7 +126,7 @@ impl AppView {
         if self.account_cursor.is_some() && self.account_cursor_key(action, grid) {
             return;
         }
-        if self.act_on_messages(action, grid) {
+        if self.act_on_reading(action, grid) || self.act_on_messages(action, grid) {
             return;
         }
         match action {
@@ -204,7 +209,7 @@ impl AppView {
             Hit::Account(index) => return self.click_account(index),
             Hit::Sidebar => self.focus = Focus::Sidebar,
             Hit::ListChrome => self.focus = Focus::List,
-            Hit::Reader => self.click_reader(&layout, col, row),
+            Hit::Reader => self.click_reader(&layout, (col, row), modifiers, grid),
             Hit::KeyBar(action) => self.press_button(action, grid),
             Hit::Nothing => return self.footer_span_at(&layout, col, row).is_some_and(|span| self.click_footer(span)),
         }
@@ -227,7 +232,7 @@ impl AppView {
             "invert_marks" => self.act(Action::InvertMarks, grid),
             "next_unread" => self.act(Action::NextUnread, grid),
             "move" => self.act(Action::Move, grid),
-            "search" => self.act(Action::Search, grid),
+            "search" => self.start_search(),
             "sync" => self.act(Action::Sync, grid),
             "help" => self.act(Action::Help, grid),
             "options" => self.act(Action::Options, grid),

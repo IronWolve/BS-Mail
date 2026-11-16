@@ -120,6 +120,9 @@ roles! {
     BODY_PATH = "body.path";
     BODY_LINK = "body.link";
     BODY_SIGNATURE = "body.signature";
+    READER_SELECTION = "reader.selection"; // the text selected with the pointer or Shift and the arrows
+    READER_FOUND = "reader.found"; // a match of the find box
+    READER_FOUND_CURRENT = "reader.found.current"; // the match the find is on
 
     // Key bar and footer.
     KEYBAR_CAP = "keybar.cap";

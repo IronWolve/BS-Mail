@@ -23,12 +23,14 @@ anywhere else.
 | `config.toml` | your settings |
 | `state.toml` | the sizes of the panes and the window |
 | `addresses.txt` | the names and addresses of the people your mail came from, went to or was copied to, and those you sent to, so they can complete as you type a recipient (plain text, one per line, at most 2000, only you can read it; delete the file to forget them) |
+| `html/` | the safe copies of HTML messages you opened in your browser with `b` (`mail-000001.html` and so on; scripts, frames, forms and everything that loads from the network are left out; only you can read them; at most 20 are kept and the ones left from an earlier run are removed when the program starts; not made until you open one) |
 | `oauth_clients.toml` | the client ids (and any client secret) you entered for browser sign-in, kept once per provider |
 | `themes/` | themes you added |
 | `lock` | lets one copy of the program use the folder at a time |
 
 Mail itself is not stored on disk: messages are read from the server when
-shown and kept in memory only. The program writes no log.
+shown and kept in memory only, except the safe copy of an HTML message that you
+ask to open in your browser (the `html/` folder above). The program writes no log.
 
 On Linux and macOS the folders and files are limited to your user. On Windows
 they are not yet protected beyond your account's own folder permissions, and the
@@ -40,7 +42,8 @@ to a place others can read.
 - The mail servers you set up, over TLS.
 - For a browser sign-in, the provider's sign-in service, through your own
   browser and a short-lived listener on this machine.
-- Links you open yourself, in your browser.
+- Links you open yourself, in your browser, and the safe copy of a message you
+  open in your browser (a file on this machine).
 
 It sends nothing to its author: no usage figures, no crash reports, no update
 checks, and it loads no remote images or content from messages.

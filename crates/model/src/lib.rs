@@ -17,7 +17,7 @@ pub mod theme_schema;
 pub use address::Address;
 pub use backend::MailBackend;
 pub use body::{AttachmentInfo, Body, BodyRole, StyledLine, StyledSpan};
-pub use command::{Command, OutgoingMessage, Secret, wipe_text};
+pub use command::{Command, OutgoingMessage, RawPart, Secret, wipe_text};
 pub use envelope::{Envelope, MailDate};
 pub use event::Event;
 pub use flags::{FlagChange, Flags};

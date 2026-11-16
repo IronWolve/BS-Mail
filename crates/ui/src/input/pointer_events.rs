@@ -14,6 +14,7 @@ impl AppView {
             InputEvent::Button { button: PointerButton::Left, state: ButtonState::Pressed, pos, modifiers } => {
                 // A drag whose release never came ends with the next press.
                 self.cancel_row_drag();
+                self.reading.stop_dragging();
                 if self.begin_drag(pos.col, pos.row, grid) {
                     return true;
                 }
@@ -25,9 +26,11 @@ impl AppView {
             }
             InputEvent::Button { button: PointerButton::Left, state: ButtonState::Released, pos, .. } => {
                 let rows = self.drop_rows(*pos, grid);
-                self.end_drag() || rows
+                self.end_drag() || rows || self.end_selection(pos.col, pos.row, grid)
             }
-            InputEvent::PointerMoved { pos, .. } => self.drag_to(*pos, grid) || self.drag_rows_to(*pos, grid),
+            InputEvent::PointerMoved { pos, .. } => {
+                self.drag_to(*pos, grid) || self.drag_rows_to(*pos, grid) || self.drag_selection_to(pos.col, pos.row, grid)
+            }
             InputEvent::Wheel { pos, rows, .. } => self.wheel(pos.col, pos.row, *rows, grid),
             _ => false,
         }

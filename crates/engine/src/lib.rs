@@ -7,6 +7,7 @@ mod account_oauth;
 mod account_signature;
 mod account_smtp;
 mod change_refusals;
+mod html_mail;
 mod imap_session;
 mod loopback_host;
 mod mime_render;

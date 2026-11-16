@@ -16,7 +16,7 @@ use crate::composer::{ComposeForm, Sender};
 use crate::format::{CivilTime, format_pattern};
 
 /// What the footer says when no account allows sending.
-const READ_ONLY_NOTE: &str = "this account is read-only: set read_only = false in its file to send mail";
+pub(super) const READ_ONLY_NOTE: &str = "this account is read-only: set read_only = false in its file to send mail";
 
 /// What the footer says when the message to answer has not arrived yet: its
 /// Reply-To and its text come with its body, and a reply made without them
@@ -93,7 +93,7 @@ impl AppView {
     }
 
     /// The accounts a message can be from, in the order of the account list.
-    fn writable_senders(&self) -> Vec<Sender> {
+    pub(super) fn writable_senders(&self) -> Vec<Sender> {
         self.mail
             .accounts
             .iter()
@@ -104,7 +104,7 @@ impl AppView {
 
     /// Where in `senders` a message about `account` starts: that account, else
     /// the one on screen, else the first.
-    fn sender_of(&self, senders: &[Sender], account: Option<&AccountId>) -> usize {
+    pub(super) fn sender_of(&self, senders: &[Sender], account: Option<&AccountId>) -> usize {
         let position = |id: &AccountId| senders.iter().position(|sender| &sender.account == id);
         account.and_then(position).or_else(|| self.selection.account.as_ref().and_then(position)).unwrap_or(0)
     }

@@ -10,7 +10,7 @@ use ui::layout::{MIN_COLS, MIN_ROWS};
 
 use crate::cli::{Options, SizeChoice, window_grid};
 use crate::errors::AppError;
-use crate::link_opener::SystemOpener;
+use crate::link_opener::opener_for;
 use crate::identity::display_name;
 use crate::screen::Screen;
 use crate::paths::data_dir;
@@ -50,7 +50,7 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
     let mut screen = Screen::new(scene.view, scene.backend, (cols, rows), scene.fixed_now)
         .with_accounts(scene.live.clone())
         .with_settings(scene.settings.clone())
-        .with_link_opener(Box::new(SystemOpener::new()));
+        .with_link_opener(opener_for(data_dir.as_deref()));
     screen = keep_addresses(screen, data_dir.as_ref(), scene.live.is_some());
     if let Some(dir) = data_dir {
         screen = remember(screen, dir, remember_size, remembered);
@@ -100,11 +100,11 @@ fn remember(screen: Screen, dir: PathBuf, size: bool, loaded: Option<state_file:
     }
 }
 
-/// Keeps the address book in the data folder, for a run with real accounts;
-/// mock mail has no addresses worth keeping.
+/// Keeps the address book and the pages of HTML messages for the browser in
+/// the data folder, for a run with real accounts; mock mail has neither.
 fn keep_addresses(screen: Screen, dir: Option<&PathBuf>, real: bool) -> Screen {
     match dir {
-        Some(dir) if real => screen.keep_addresses_in(dir.clone()),
+        Some(dir) if real => screen.keep_addresses_in(dir.clone()).keep_pages_in(dir),
         _ => screen,
     }
 }

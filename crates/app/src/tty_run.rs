@@ -8,7 +8,7 @@ use ui::layout::{MIN_COLS, MIN_ROWS};
 
 use crate::cli::{Options, REF_COLS, REF_ROWS};
 use crate::errors::AppError;
-use crate::link_opener::SystemOpener;
+use crate::link_opener::opener_for;
 use crate::paths::data_dir;
 use crate::screen::Screen;
 use crate::stats::{Shown, Stats};
@@ -33,9 +33,9 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
     let mut screen = Screen::new(scene.view, scene.backend, grid, scene.fixed_now)
         .with_accounts(scene.live.clone())
         .with_settings(scene.settings.clone())
-        .with_link_opener(Box::new(SystemOpener::new()));
+        .with_link_opener(opener_for(data_dir.as_deref()));
     if let (Some(dir), true) = (&data_dir, scene.live.is_some()) {
-        screen = screen.keep_addresses_in(dir.clone());
+        screen = screen.keep_addresses_in(dir.clone()).keep_pages_in(dir);
     }
     if let (Some(dir), Some(state)) = (data_dir, remembered) {
         screen = screen.remember_layout_in(dir, state);

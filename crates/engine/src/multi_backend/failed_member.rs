@@ -3,7 +3,7 @@
 //! and why, and answers every command
 //! for it with the same reason, so the account still shows in the list.
 
-use model::{AccountId, Command, ConnectionState, Event, MailBackend};
+use model::{AccountId, Command, ConnectionState, Event, MailBackend, RawPart};
 
 use super::member::Member;
 
@@ -31,6 +31,9 @@ fn operation_name(command: &Command) -> Option<&'static str> {
         Command::OpenFolder { .. } => Some("open folder"),
         Command::LoadMore { .. } => Some("load older mail"),
         Command::FetchBody { .. } => Some("fetch body"),
+        Command::FetchRaw { part: RawPart::Headers, .. } => Some("view headers"),
+        Command::FetchRaw { part: RawPart::Source, .. } => Some("view source"),
+        Command::PrepareHtml { .. } => Some("open in browser"),
         Command::SetFlags { .. } => Some("set flags"),
         Command::Move { .. } => Some("move"),
         Command::Delete { .. } => Some("delete"),

@@ -4,6 +4,8 @@
 //! screen only asks: the program opens the address (`take_link_requests`) and
 //! reports how that went.
 
+use surface::Modifiers;
+
 use crate::app_view::AppView;
 use crate::layout::Layout;
 use crate::view_state::Focus;
@@ -11,6 +13,13 @@ use crate::widgets::{BodyView, DrawContext, HighlightRules, body_link_at};
 
 /// The start of the note shown while an address is being opened.
 const OPENING: &str = "Opening ";
+
+/// Whether an address in a message is a web address, which the browser opens;
+/// anything else that is marked as an address is a mail address.
+fn is_web_address(address: &str) -> bool {
+    let start = address.get(..8).unwrap_or(address).to_ascii_lowercase();
+    start.starts_with("http://") || start.starts_with("https://")
+}
 
 impl AppView {
     /// The web address under a cell of the reader's body, when there is one,
@@ -29,13 +38,28 @@ impl AppView {
         body_link_at(&ctx, reader.body, &view, col, row)
     }
 
-    /// A click in the reader: it takes focus, and an address under it is
-    /// asked for.
-    pub(crate) fn click_reader(&mut self, layout: &Layout, col: u16, row: u16) {
+    /// A press in the reader: it takes focus. On the find box it is the box's;
+    /// on the text it starts a selection, and on an address it also remembers
+    /// the address, which the release opens when the pointer has not moved
+    /// away (a drag that starts on an address selects).
+    pub(crate) fn click_reader(&mut self, layout: &Layout, (col, row): (u16, u16), modifiers: Modifiers, grid: (u16, u16)) {
         self.focus = Focus::Reader;
-        if let Some(address) = self.link_under(layout, col, row) {
+        if self.click_find_bar(layout, col, row, modifiers.shift, grid) {
+            return;
+        }
+        let address = self.link_under(layout, col, row);
+        self.begin_selection(layout, col, row);
+        self.reading.pending_link = address;
+    }
+
+    /// Opens what a click on an address asks for: a web address in the
+    /// browser, a mail address or a `mailto:` link in the composer.
+    pub(crate) fn open_link(&mut self, address: String) {
+        if is_web_address(&address) {
             self.mail.set_note(Some(format!("{OPENING}{address}")));
             self.link_requests.push(address);
+        } else {
+            self.open_mail_link(&address);
         }
     }
 

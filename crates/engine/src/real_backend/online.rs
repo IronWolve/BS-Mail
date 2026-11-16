@@ -10,6 +10,7 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::time::{Instant, MissedTickBehavior, interval_at};
 
 use super::lifecycle::connection;
+use super::raw_views::operation_of;
 use super::worker::Worker;
 use crate::imap_session::{ImapSession, SessionError};
 
@@ -132,6 +133,14 @@ impl Worker {
             Command::FetchBody { message } => {
                 let body = self.fetch_body(session, message).await;
                 self.settle("fetch body", body)
+            }
+            Command::FetchRaw { message, part } => {
+                let raw = self.fetch_raw(session, message, part).await;
+                self.settle(operation_of(part), raw)
+            }
+            Command::PrepareHtml { message } => {
+                let page = self.prepare_html(session, message).await;
+                self.settle("open in browser", page)
             }
             Command::SyncNow { account } => {
                 let synced = self.sync_now(session, &account).await;

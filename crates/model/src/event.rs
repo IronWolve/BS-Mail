@@ -1,6 +1,7 @@
 //! Events the mail backend sends to the UI.
 
 use crate::body::Body;
+use crate::command::RawPart;
 use crate::envelope::Envelope;
 use crate::flags::Flags;
 use crate::folder::{Account, Folder};
@@ -51,6 +52,22 @@ pub enum Event {
     BodyReady {
         message: MessageId,
         body: Body,
+    },
+    /// The raw text of a message, asked for with `Command::FetchRaw`: control
+    /// characters are already taken out and the text is cut at the ceiling a
+    /// body has, with a last line that says so.
+    RawText {
+        message: MessageId,
+        part: RawPart,
+        text: String,
+    },
+    /// The safe copy of a message's HTML part, asked for with
+    /// `Command::PrepareHtml`, and how many items that load from the network
+    /// (pictures, style sheets, imports) were left out of it.
+    HtmlPage {
+        message: MessageId,
+        html: String,
+        removed: u32,
     },
     FlagsChanged {
         updates: Vec<(MessageId, Flags)>,

@@ -14,16 +14,18 @@ use ui::AppView;
 
 use crate::accounts::Live;
 use crate::clock::system_now;
-use crate::errors::AppError;
+use crate::html_store::HtmlStore;
 use crate::link_opener::{LinkOpener, NoOpener};
 use crate::options_flow::{self, Opened, Settings, is_setting};
 use crate::pump::pump;
 use crate::setup_flow::SetupFlow;
-use crate::state_file::{self, State};
+use crate::state_file::State;
 use crate::ticker::Ticker;
 
 mod addresses;
 mod links;
+mod pages;
+mod remember;
 
 /// How many times mail is moved again after the accounts changed, at most.
 const ROUNDS: usize = 3;
@@ -61,6 +63,10 @@ pub struct Screen {
     links: Box<dyn LinkOpener>,
     /// Where the address book is kept, when this run keeps one.
     addresses: Option<addresses::AddressSave>,
+    /// Where the pages of HTML messages for the browser are written.
+    pages: Option<HtmlStore>,
+    /// How many remote items the page being opened has left out of it.
+    page_removed: Option<u32>,
 }
 
 impl Screen {
@@ -89,6 +95,8 @@ impl Screen {
             settings: Settings::default(),
             links: Box::new(NoOpener),
             addresses: None,
+            pages: None,
+            page_removed: None,
         }
     }
 
@@ -111,64 +119,6 @@ impl Screen {
     pub fn with_accounts(mut self, live: Option<Live>) -> Self {
         self.live = live;
         self
-    }
-
-    /// Remembers the sizes of the bars and the window in `dir`.
-    pub fn remember_in(mut self, dir: PathBuf) -> Self {
-        let current = self.state_now();
-        self.remember = Some((dir, current));
-        self
-    }
-
-    /// Remembers only the bar sizes, starting from what was loaded: for a
-    /// terminal, whose grid is not the window's.
-    pub fn remember_layout_in(mut self, dir: PathBuf, loaded: State) -> Self {
-        self.track_grid = false;
-        self.remember = Some((dir, loaded));
-        self
-    }
-
-    /// What would be remembered now.
-    fn state_now(&self) -> State {
-        let grid = if self.track_grid {
-            Some((self.cols, self.rows))
-        } else {
-            self.remember.as_ref().and_then(|(_, saved)| saved.grid)
-        };
-        let saved_place = self.remember.as_ref().map(|(_, saved)| saved.place.clone()).unwrap_or_default();
-        State {
-            layout: self.view.prefs().clone(),
-            grid,
-            place: self.view.place().over(&saved_place),
-        }
-    }
-
-    /// Keeps the account and folder that are open when they are not the ones
-    /// kept, so a run that ends without a goodbye still comes back to them.
-    fn save_place_when_changed(&mut self) {
-        let changed = self.remember.as_ref().is_some_and(|(_, saved)| self.state_now().place != saved.place);
-        if changed {
-            // A failure waits: closing the program tries again and says so.
-            let _ = self.save_state();
-        }
-    }
-
-    /// Writes what is remembered, when it has changed. Called when a drag
-    /// ends, when the account or folder open changes and when the window
-    /// closes. A write that failed is an error, and
-    /// what was saved before is left as it was; the sizes stay marked as not
-    /// saved, so the next call tries again.
-    pub fn save_state(&mut self) -> Result<(), AppError> {
-        let current = self.state_now();
-        let Some((dir, saved)) = &mut self.remember else {
-            return Ok(());
-        };
-        if current == *saved {
-            return Ok(());
-        }
-        state_file::save(dir, &current).map_err(|error| AppError::State(dir.clone(), error))?;
-        *saved = current;
-        Ok(())
     }
 
     /// Stops the run once `frames` frames have been drawn.

@@ -67,6 +67,63 @@ pub enum Action {
     ContextMenu,
     /// `g`: the next letter names a well-known folder to go to.
     GoTo,
+    /// `Shift` with an arrow, `Home`, `End`, `PageUp` or `PageDown`: select
+    /// text in the reader; in the other panes it moves as the key does alone.
+    Extend(Direction),
+    /// `y`: copy the selected text of the reader, or the whole message when
+    /// none is selected; in the list, the subject.
+    Copy,
+    /// `Y`: copy the sender's address.
+    CopySender,
+    /// `H`: show the message's raw headers in the reader.
+    ViewHeaders,
+    /// `v`: show the message's whole source in the reader.
+    ViewSource,
+    /// `b`: open a safe copy of the message's HTML in the browser.
+    OpenInBrowser,
+}
+
+/// Where a selection key takes the selection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+    Home,
+    End,
+    PageUp,
+    PageDown,
+}
+
+impl Direction {
+    /// The action the same key does without `Shift`.
+    pub fn plain(self) -> Action {
+        match self {
+            Self::Up => Action::Up,
+            Self::Down => Action::Down,
+            Self::Left => Action::Left,
+            Self::Right => Action::Right,
+            Self::Home => Action::First,
+            Self::End => Action::Last,
+            Self::PageUp => Action::PageUp,
+            Self::PageDown => Action::PageDown,
+        }
+    }
+
+    fn of(named: NamedKey) -> Option<Self> {
+        Some(match named {
+            NamedKey::Up => Self::Up,
+            NamedKey::Down => Self::Down,
+            NamedKey::Left => Self::Left,
+            NamedKey::Right => Self::Right,
+            NamedKey::Home => Self::Home,
+            NamedKey::End => Self::End,
+            NamedKey::PageUp => Self::PageUp,
+            NamedKey::PageDown => Self::PageDown,
+            _ => return None,
+        })
+    }
 }
 
 /// The action for a key press, or `None` for a key the screen ignores.
@@ -112,6 +169,11 @@ pub fn action_for(key: &KeyEvent) -> Option<Action> {
         LogicalKey::Char('s') if !held.shift => Some(Action::Sync),
         LogicalKey::Char('g') if !held.shift => Some(Action::GoTo),
         LogicalKey::Char('.') => Some(Action::ContextMenu),
+        LogicalKey::Char('y') if !held.shift => Some(Action::Copy),
+        LogicalKey::Char('Y') => Some(Action::CopySender),
+        LogicalKey::Char('H') => Some(Action::ViewHeaders),
+        LogicalKey::Char('v') if !held.shift => Some(Action::ViewSource),
+        LogicalKey::Char('b') if !held.shift => Some(Action::OpenInBrowser),
         LogicalKey::Char('1') => Some(Action::FocusPane(Focus::Sidebar)),
         LogicalKey::Char('2') => Some(Action::FocusPane(Focus::List)),
         LogicalKey::Char('3') => Some(Action::FocusPane(Focus::Reader)),
@@ -120,6 +182,9 @@ pub fn action_for(key: &KeyEvent) -> Option<Action> {
 }
 
 fn named_action(named: NamedKey, shift: bool) -> Option<Action> {
+    if shift && let Some(direction) = Direction::of(named) {
+        return Some(Action::Extend(direction));
+    }
     Some(match named {
         NamedKey::Tab if shift => Action::FocusPrevious,
         NamedKey::Tab => Action::FocusNext,

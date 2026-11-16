@@ -576,6 +576,7 @@ dependencies = [
  "async-imap",
  "futures-util",
  "html2text",
+ "html5ever",
  "mail-parser",
  "model",
  "ring",

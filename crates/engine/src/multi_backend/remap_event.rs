@@ -49,6 +49,8 @@ pub(super) fn remap_event(slot: Slot, event: Event) -> Mapped<Event> {
             message: message_id(slot, message)?,
             body,
         },
+        Event::RawText { message, part, text } => Event::RawText { message: message_id(slot, message)?, part, text },
+        Event::HtmlPage { message, html, removed } => Event::HtmlPage { message: message_id(slot, message)?, html, removed },
         Event::FlagsChanged { updates } => Event::FlagsChanged {
             updates: updates
                 .into_iter()

@@ -9,6 +9,7 @@ pub mod cell_text;
 pub mod chrome_lines;
 pub mod context_menu;
 pub mod draw_context;
+pub mod find_bar;
 pub mod focus_mark;
 pub mod folder_tree;
 pub mod footer;
@@ -49,7 +50,10 @@ pub use key_bar::{button_at, button_span_at, draw_key_bar};
 pub use list_header::{column_align, column_label, draw_list_header};
 pub use list_rows::{ListRowsView, column_label_for, draw_list_rows};
 pub use list_title::draw_list_title;
-pub use reader_body::{BodyView, body_link_at, draw_reader_body, visual_len};
+pub use reader_body::{
+    BodyPos, BodyText, BodyView, Highlights, Match, body_link_at, body_pos_at, body_text, draw_highlights, draw_reader_body,
+    visual_len,
+};
 pub use reader_headers::draw_reader_headers;
 pub use reader_title::{ReaderTitleData, draw_reader_title};
 pub use scrollbar::{draw_scrollbar, first_for_top, thumb_span};

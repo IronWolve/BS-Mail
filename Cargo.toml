@@ -67,6 +67,8 @@ ring = { version = "0.17.14", default-features = false }
 mail-parser = "0.11"
 # Stage 5: HTML bodies to wrapped text with numbered link references (engine).
 html2text = { version = "0.17", default-features = false }
+# Open in browser: the HTML parser the text converter above already uses, driven directly to build the safe copy of an HTML message (engine).
+html5ever = "0.40"
 # Stage 5: consuming the IMAP client's response streams (engine).
 futures-util = { version = "0.3", default-features = false }
 # Stage 5: the local time zone, so Today and Yesterday turn over at local midnight (app).

@@ -74,6 +74,14 @@ pub(super) fn plan(command: Command, slot_of: SlotOf<'_>) -> Plan {
             Some((slot, message)) => Plan::to(slot, Command::FetchBody { message }),
             None => Plan::not_an_id(),
         },
+        Command::FetchRaw { message, part } => match decode_message(message) {
+            Some((slot, message)) => Plan::to(slot, Command::FetchRaw { message, part }),
+            None => Plan::not_an_id(),
+        },
+        Command::PrepareHtml { message } => match decode_message(message) {
+            Some((slot, message)) => Plan::to(slot, Command::PrepareHtml { message }),
+            None => Plan::not_an_id(),
+        },
         Command::SetFlags { messages, change } => {
             split_by_slot(messages, |messages| Command::SetFlags { messages, change })
         }

@@ -2,6 +2,7 @@
 
 use model::Command;
 
+use super::raw_views::operation_of;
 use super::unsupported::{
     OFFLINE_CHANGE_REASON, change_operation, unavailable_operation, unavailable_reason,
 };
@@ -45,6 +46,8 @@ impl Worker {
             // A search is asked again by the person, never replayed; nor is a
             // request for older mail, which the list asks for again.
             Command::Search { .. } => ("search", false),
+            Command::FetchRaw { part, .. } => (operation_of(part), false),
+            Command::PrepareHtml { .. } => ("open in browser", false),
             Command::LoadMore { .. } => ("load older mail", false),
             _ => ("sync", false),
         };

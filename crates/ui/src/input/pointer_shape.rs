@@ -68,7 +68,7 @@ impl AppView {
         match self.hit(layout, col, row) {
             Hit::Message(_) | Hit::Folder(_) | Hit::KeyBar(_) => true,
             Hit::Account(_) => self.account_row_switches(layout, col, row),
-            Hit::Reader => self.link_under(layout, col, row).is_some(),
+            Hit::Reader => self.link_under(layout, col, row).is_some() || self.over_find_word(layout, col, row),
             Hit::Nothing => self.footer_span_at(layout, col, row).is_some(),
             Hit::Sidebar | Hit::ListChrome => false,
         }

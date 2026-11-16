@@ -59,7 +59,7 @@ pub fn help_text() -> String {
     format!(
         "{} {} - a mail client.\n\
          \n\
-         Usage: {name} [options]\n\
+         Usage: {name} [options] [mailto:address]\n\
          \n\
          Where it draws (default: a window when started on its own, this\n\
          terminal when started from one):\n  \
@@ -83,6 +83,7 @@ pub fn help_text() -> String {
          --no-color         write the symbols without any color\n  \
          --quiet, -q        leave out the stats block\n  \
          --print-config     print every setting as it is now, as TOML\n  \
+         mailto:<address>   start a new message to this address (and with the subject and text\n                     of the link, when it has them) once the first account is there\n  \
          --version, -V      print the version\n  \
          --help, -h         print this text\n\
          \n\

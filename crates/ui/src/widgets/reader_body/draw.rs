@@ -13,7 +13,7 @@ use crate::widgets::scrollbar::draw_scrollbar;
 use crate::widgets::DrawContext;
 
 /// Cells between the body's left edge and its text.
-const TEXT_AT: u16 = 1;
+pub(super) const TEXT_AT: u16 = 1;
 /// Cells the text keeps free: the blank on the left and the scrollbar's
 /// column on the right.
 const SIDE_CELLS: u16 = 2;
@@ -64,7 +64,7 @@ fn role_name(role: BodyRole) -> &'static str {
 
 /// The width lines wrap at: the body less its side cells, or the configured
 /// wrap column when that is narrower.
-fn wrap_width(ctx: &DrawContext<'_>, rect: Rect) -> u16 {
+pub(super) fn wrap_width(ctx: &DrawContext<'_>, rect: Rect) -> u16 {
     let room = rect.width.saturating_sub(SIDE_CELLS);
     match ctx.config.reader.wrap {
         0 => room,
@@ -75,21 +75,22 @@ fn wrap_width(ctx: &DrawContext<'_>, rect: Rect) -> u16 {
 /// The wrapped lines of the body: highlighted when the options ask for it and
 /// cut to the width. The last body's lines are kept, so scrolling and drawing
 /// one body again and again does the work once.
-fn wrapped(ctx: &DrawContext<'_>, rect: Rect, view: &BodyView<'_>) -> Wrapped {
+pub(super) fn wrapped(ctx: &DrawContext<'_>, rect: Rect, view: &BodyView<'_>) -> Wrapped {
     let width = wrap_width(ctx, rect);
     let highlight = ctx.config.reader.highlight_body;
     let key = fingerprint(view.lead, view.lines, width, highlight, &view.rules, view.app_name);
     if let Some(kept) = cache::remembered(key) {
         return kept;
     }
-    let made = std::rc::Rc::new(wrap_all(view, width, highlight));
+    let made = std::rc::Rc::new(wrap_all(view, width, highlight, key));
     cache::remember(key, &made);
     made
 }
 
-fn wrap_all(view: &BodyView<'_>, width: u16, highlight: bool) -> WrappedBody {
+fn wrap_all(view: &BodyView<'_>, width: u16, highlight: bool, key: u64) -> WrappedBody {
     let mut rows = Vec::new();
     let mut links = Vec::new();
+    let mut continued = Vec::new();
     for line in view.lead.iter().chain(view.lines) {
         let spans: Vec<StyledSpan> = if highlight {
             highlight_line(line, &view.rules, view.app_name)
@@ -98,9 +99,11 @@ fn wrap_all(view: &BodyView<'_>, width: u16, highlight: bool) -> WrappedBody {
             // colouring off: nothing else is.
             highlight_line(line, &LINKS_ONLY, view.app_name)
         };
-        rows.extend(wrap_line_linked(&spans, width, &mut links));
+        let wrapped = wrap_line_linked(&spans, width, &mut links);
+        continued.extend((0..wrapped.len()).map(|at| at > 0));
+        rows.extend(wrapped);
     }
-    WrappedBody { rows, links }
+    WrappedBody { rows, links, continued, key }
 }
 
 /// How many visual lines the body wraps to, which is the most it can scroll.

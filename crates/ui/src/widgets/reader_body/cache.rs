@@ -23,6 +23,12 @@ pub(super) struct WrappedBody {
     pub rows: Vec<Vec<Piece>>,
     /// The addresses, which the pieces' `link` indexes point into.
     pub links: Vec<String>,
+    /// For each row: whether it carries on the line of the row before it
+    /// (the line was too long and wrapped), not the start of a line.
+    pub continued: Vec<bool>,
+    /// What the rows were made from (see `fingerprint`): another number means
+    /// another text, width or setting.
+    pub key: u64,
 }
 
 impl WrappedBody {

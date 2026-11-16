@@ -86,6 +86,7 @@ impl AppView {
                 rules: HighlightRules::default(),
             };
             draw_reader_body(frame, ctx, reader.body, &view);
+            self.draw_reading_marks(frame, ctx, reader.body, &view);
         }
     }
 }

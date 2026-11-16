@@ -164,6 +164,13 @@ impl ComposeForm {
         form
     }
 
+    /// The same message with these people in Bcc, which counts as how it started.
+    pub fn with_bcc(mut self, bcc: &[Address]) -> Self {
+        self.bcc = EditorBuffer::single_line(&format(bcc));
+        self.started_with = self.fingerprint();
+        self
+    }
+
     pub fn focused(&mut self) -> &mut EditorBuffer {
         match self.focus {
             Field::From => &mut self.from_line,

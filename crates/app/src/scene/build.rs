@@ -45,6 +45,9 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
     let icons = options.icons.unwrap_or_else(|| icon_kind(loaded.config.appearance.icons));
     engine::set_body_preference(loaded.config.reader.prefer);
     let mut view = AppView::new(identity(), loaded.theme, loaded.config, IconSet::new(icons));
+    if let Some(link) = &options.mailto {
+        view.start_with_mailto(link);
+    }
     // What is wrong with an account comes before what is wrong with a setting.
     let note_is_about_settings = scanned.problems.is_empty() && !loaded.problems.is_empty();
     let problems: Vec<String> = scanned.problems.iter().cloned().chain(loaded.problems).collect();
@@ -57,19 +60,26 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
     scene.window = window;
     scene.settings = Settings::start(options, data.as_deref(), font, note_is_about_settings);
     scene.view.set_theme_names(scene.settings.theme_names().to_vec());
-    if let Some(live) = &scene.live {
-        scene.view.set_accounts(live.summaries());
-        // The addresses seen so far complete recipients; mock mail keeps none.
-        if let Some(dir) = data.as_deref() {
-            scene.view.set_address_book(address_file::load(dir));
-        }
-    }
+    start_with_accounts(&mut scene, data.as_deref());
     // With no account the program starts on the empty screen, which says where
     // to add one; the form opens only when `--setup` asks for it.
     if options.setup {
         scene.view.open_setup();
     }
     Ok(scene)
+}
+
+/// What a run with real accounts has that mock mail does not: the account
+/// summaries for the Options screen and the addresses seen so far, which
+/// complete recipients.
+fn start_with_accounts(scene: &mut Scene, data: Option<&Path>) {
+    let Some(live) = &scene.live else {
+        return;
+    };
+    scene.view.set_accounts(live.summaries());
+    if let Some(dir) = data {
+        scene.view.set_address_book(address_file::load(dir));
+    }
 }
 
 /// The lock on the folder this run keeps its accounts in; a second copy is

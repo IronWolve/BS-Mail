@@ -39,6 +39,8 @@ pub(super) fn classify(event: &Event) -> Class {
         Event::EnvelopePage { .. }
         | Event::OlderEnvelopes { .. }
         | Event::BodyReady { .. }
+        | Event::RawText { .. }
+        | Event::HtmlPage { .. }
         | Event::FlagsChanged { .. }
         | Event::SearchResults { .. } => Class::Answer,
         Event::MessageSent { .. } | Event::OpFailed { .. } => Class::Notice,
