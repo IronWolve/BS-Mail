@@ -2,6 +2,8 @@
 
 use surface::{KeyEvent, LogicalKey, NamedKey};
 
+use crate::view_state::Focus;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     FocusNext,
@@ -56,13 +58,30 @@ pub enum Action {
     PreviousMessage,
     /// `N`: show the next unread message.
     NextUnread,
+    /// `1` `2` `3`: focus the sidebar, the list or the reader.
+    FocusPane(Focus),
+    /// `Ctrl+u` and `Ctrl+d`: half a page up or down in the pane that has focus.
+    HalfPageUp,
+    HalfPageDown,
+    /// `.` and the Menu key: the context menu of the selected item.
+    ContextMenu,
+    /// `g`: the next letter names a well-known folder to go to.
+    GoTo,
 }
 
 /// The action for a key press, or `None` for a key the screen ignores.
-/// Shortcuts with `Ctrl`, `Alt` or the logo key are never read here: they
-/// belong to the window and to the commands that come later.
+/// Shortcuts with `Ctrl`, `Alt` or the logo key are never read here, except
+/// `Ctrl+u` and `Ctrl+d`: the rest belong to the window and to the commands
+/// that come later.
 pub fn action_for(key: &KeyEvent) -> Option<Action> {
     let held = key.modifiers;
+    if held.ctrl && !held.alt && !held.meta && !held.shift {
+        return match key.key {
+            LogicalKey::Char('u') => Some(Action::HalfPageUp),
+            LogicalKey::Char('d') => Some(Action::HalfPageDown),
+            _ => None,
+        };
+    }
     if held.ctrl || held.alt || held.meta {
         return None;
     }
@@ -91,6 +110,11 @@ pub fn action_for(key: &KeyEvent) -> Option<Action> {
         LogicalKey::Char('p') if !held.shift => Some(Action::PreviousMessage),
         LogicalKey::Char('N') => Some(Action::NextUnread),
         LogicalKey::Char('s') if !held.shift => Some(Action::Sync),
+        LogicalKey::Char('g') if !held.shift => Some(Action::GoTo),
+        LogicalKey::Char('.') => Some(Action::ContextMenu),
+        LogicalKey::Char('1') => Some(Action::FocusPane(Focus::Sidebar)),
+        LogicalKey::Char('2') => Some(Action::FocusPane(Focus::List)),
+        LogicalKey::Char('3') => Some(Action::FocusPane(Focus::Reader)),
         LogicalKey::Char(_) => None,
     }
 }
@@ -109,7 +133,9 @@ fn named_action(named: NamedKey, shift: bool) -> Option<Action> {
         NamedKey::Right => Action::Right,
         NamedKey::Left => Action::Left,
         NamedKey::Delete => Action::Delete,
+        NamedKey::Menu => Action::ContextMenu,
         NamedKey::Function(2) => Action::Compose,
+        NamedKey::Function(10) if shift => Action::ContextMenu,
         NamedKey::Function(10) => Action::Options,
         NamedKey::Escape | NamedKey::Backspace => Action::Back,
         _ => return None,

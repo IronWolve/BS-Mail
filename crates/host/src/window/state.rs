@@ -174,6 +174,11 @@ impl<'a> WindowState<'a> {
         self.clipboard.text()
     }
 
+    /// The text of the primary selection, for a middle-button paste (Linux).
+    pub fn primary_text(&mut self) -> Option<String> {
+        self.clipboard.primary_text()
+    }
+
     /// Borderless full screen, on and off.
     pub fn toggle_full_screen(&mut self) {
         let Some(window) = &self.window else {

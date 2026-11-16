@@ -56,10 +56,10 @@ impl AppView {
         let showing = self.account_rows_showing(&layout).max(1);
         match action {
             Action::Down => self.account_cursor = Some((row + 1).min(showing - 1)),
-            Action::PageDown | Action::Last => self.account_cursor = Some(showing - 1),
+            Action::PageDown | Action::HalfPageDown | Action::Last => self.account_cursor = Some(showing - 1),
             Action::Up if row > 0 => self.account_cursor = Some(row - 1),
             Action::Up => self.account_cursor = None,
-            Action::PageUp | Action::First => {
+            Action::PageUp | Action::HalfPageUp | Action::First => {
                 self.account_cursor = None;
                 return false;
             }

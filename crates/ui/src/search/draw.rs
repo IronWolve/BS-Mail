@@ -2,56 +2,49 @@
 
 use surface::{CursorRequest, CursorShape, Frame, Rect};
 
+use super::geometry::{CANCEL_WORDS, GO_WORDS, HINT, PROMPT, SearchParts, search_parts, text_skip};
+pub use super::geometry::search_rect;
 use crate::composer::EditorBuffer;
-use crate::composer::graphemes::{cells_between, count, list};
+use crate::composer::graphemes::{cells_between, list};
 use crate::theme::roles;
 use crate::widgets::help_overlay::overlaps;
 use crate::widgets::{DrawContext, fill_cells, put_text};
 
-const WIDTH: u16 = 72;
 const TITLE: &str = " Search ";
-const HINT: &str = " Enter searches   Esc cancels ";
-const PROMPT: &str = "/ ";
-
-/// The box for a grid: centered and three rows high.
-pub fn search_rect(grid: Rect) -> Rect {
-    let width = WIDTH.min(grid.width.saturating_sub(2));
-    let height = 3.min(grid.height);
-    Rect::new(
-        grid.x + (grid.width - width) / 2,
-        grid.y + grid.height.saturating_sub(height) / 4,
-        width,
-        height,
-    )
-}
 
 pub fn draw_search_bar(frame: &mut Frame, ctx: &DrawContext<'_>, grid: Rect, query: &EditorBuffer) {
-    let rect = search_rect(grid);
-    if rect.width < 14 || rect.height < 3 {
+    let Some(parts) = search_parts(grid) else {
         return;
-    }
+    };
+    let rect = parts.rect;
     frame.effects.retain(|effect| !overlaps(effect.area(), rect));
     fill_cells(frame, rect, ctx.full(roles::MENU_BASE));
     draw_frame(frame, ctx, rect);
-    let inner = Rect::new(rect.x + 1, rect.y + 1, rect.width - 2, 1);
-    let prompt_cells = u16::try_from(PROMPT.len()).unwrap_or(2);
+    draw_buttons(frame, ctx, &parts);
+    let inner = parts.line;
     put_text(frame, inner, inner.x + 1, inner.y, PROMPT, ctx.fg(roles::LIST_HINT_KEY));
-    let room = usize::from(inner.width.saturating_sub(prompt_cells + 2));
     let line = &query.lines()[0];
     let col = query.cursor().col;
-    let mut skip = 0;
-    while cells_between(line, skip, col) >= room && skip < count(line) {
-        skip += 1;
-    }
+    let skip = text_skip(line, col, parts.room);
     let text: String = list(line).into_iter().skip(skip).collect();
-    put_text(frame, inner, inner.x + 1 + prompt_cells, inner.y, &text, ctx.fg(roles::MENU_BASE));
-    let caret = inner.x + 1 + prompt_cells + u16::try_from(cells_between(line, skip, col)).unwrap_or(0);
+    put_text(frame, inner, parts.text_x, inner.y, &text, ctx.fg(roles::MENU_BASE));
+    let caret = parts.text_x + u16::try_from(cells_between(line, skip, col)).unwrap_or(0);
     if caret < inner.right() {
         frame.cursor = Some(CursorRequest {
             col: caret,
             row: inner.y,
             shape: CursorShape::Bar,
         });
+    }
+}
+
+/// The two buttons on the bottom border: the key as a keycap, the word beside it.
+fn draw_buttons(frame: &mut Frame, ctx: &DrawContext<'_>, parts: &SearchParts) {
+    for (rect, words) in [(parts.go, GO_WORDS), (parts.cancel, CANCEL_WORDS)] {
+        let key_cells = u16::try_from(words.find(' ').unwrap_or(0)).unwrap_or(0);
+        let cap = &words[..usize::from(key_cells)];
+        put_text(frame, parts.rect, rect.x, rect.y, cap, ctx.full(roles::KEYBAR_CAP));
+        put_text(frame, parts.rect, rect.x + key_cells, rect.y, &words[usize::from(key_cells)..], ctx.fg(roles::KEYBAR_LABEL));
     }
 }
 

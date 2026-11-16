@@ -100,6 +100,8 @@ impl AppView {
             Action::Down => self.scroll.reader.saturating_add(1),
             Action::PageUp => self.scroll.reader.saturating_sub(height.saturating_sub(1).max(1)),
             Action::PageDown => self.scroll.reader.saturating_add(height.saturating_sub(1).max(1)),
+            Action::HalfPageUp => self.scroll.reader.saturating_sub((height / 2).max(1)),
+            Action::HalfPageDown => self.scroll.reader.saturating_add((height / 2).max(1)),
             Action::First => 0,
             Action::Last => last,
             _ => self.scroll.reader,

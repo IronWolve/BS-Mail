@@ -15,6 +15,8 @@ pub fn step(action: Action, current: usize, len: usize, page: usize) -> usize {
         Action::Down => current.saturating_add(1),
         Action::PageUp => current.saturating_sub(page),
         Action::PageDown => current.saturating_add(page),
+        Action::HalfPageUp => current.saturating_sub((page / 2).max(1)),
+        Action::HalfPageDown => current.saturating_add((page / 2).max(1)),
         Action::First => 0,
         Action::Last => last,
         _ => current,

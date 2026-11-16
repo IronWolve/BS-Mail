@@ -4,7 +4,7 @@
 //! selection needs are worked out afterwards by `AppView::take_commands`.
 
 use model::Command;
-use surface::{ButtonState, InputEvent, PointerButton};
+use surface::{ButtonState, InputEvent, KeyEvent, LogicalKey, Modifiers, NamedKey};
 
 use super::action::{Action, action_for};
 use super::compose::ComposeKind;
@@ -36,44 +36,40 @@ impl AppView {
             return self.delete_prompt_input(event, grid);
         }
         if self.picker.is_some() {
-            return self.picker_input(event);
+            return self.picker_input(event, grid);
         }
         if self.search_bar.is_some() {
-            return self.search_input(event);
+            return self.search_input(event, grid);
+        }
+        if self.menu.is_some() {
+            return self.menu_input(event, grid);
         }
         if self.overlays.is_open() {
             return self.input_over_overlay(event, grid);
         }
         match event {
-            InputEvent::Key(key) => match action_for(key) {
-                Some(action) => {
-                    self.act(action, grid);
-                    true
-                }
-                None => false,
-            },
-            InputEvent::Button {
-                button: PointerButton::Left,
-                state: ButtonState::Pressed,
-                pos,
-                ..
-            } => {
-                if self.begin_drag(pos.col, pos.row, grid) {
-                    return true;
-                }
-                self.click(pos.col, pos.row, grid)
+            InputEvent::Key(key) => self.main_key(key, grid),
+            _ => self.pointer_event(event, grid),
+        }
+    }
+
+    /// A key on the main screen. A drag of rows that is going ends with it,
+    /// and Escape only ends that; the letter after `g` is the folder's.
+    fn main_key(&mut self, key: &KeyEvent, grid: (u16, u16)) -> bool {
+        let was_dragging = self.dragging_rows();
+        self.cancel_row_drag();
+        if was_dragging && key.key == LogicalKey::Named(NamedKey::Escape) {
+            return true;
+        }
+        if self.memory.go_pending {
+            return self.go_key(key);
+        }
+        match action_for(key) {
+            Some(action) => {
+                self.act(action, grid);
+                true
             }
-            InputEvent::Button { button: PointerButton::Right, state: ButtonState::Pressed, pos, .. } => {
-                self.copy_link_at(pos.col, pos.row, grid)
-            }
-            InputEvent::Button {
-                button: PointerButton::Left,
-                state: ButtonState::Released,
-                ..
-            } => self.end_drag(),
-            InputEvent::PointerMoved { pos, .. } => self.drag_to(*pos, grid),
-            InputEvent::Wheel { pos, rows, .. } => self.wheel(pos.col, pos.row, *rows, grid),
-            _ => false,
+            None => was_dragging,
         }
     }
 
@@ -121,7 +117,7 @@ impl AppView {
         }
     }
 
-    fn act(&mut self, action: Action, grid: (u16, u16)) {
+    pub(crate) fn act(&mut self, action: Action, grid: (u16, u16)) {
         if self.account_cursor.is_some() && self.account_cursor_key(action, grid) {
             return;
         }
@@ -161,6 +157,11 @@ impl AppView {
             Action::ReplyAll => self.start_compose(ComposeKind::ReplyAll),
             Action::Forward => self.start_compose(ComposeKind::Forward),
             Action::EditAsNew => self.start_compose(ComposeKind::EditAsNew),
+            Action::FocusPane(focus) => self.change_focus(focus),
+            Action::ContextMenu => {
+                self.open_menu_for_focus(grid);
+            }
+            Action::GoTo => self.begin_go_to(),
             movement => {
                 let layout = self.layout(grid.0, grid.1);
                 match self.focus {
@@ -190,35 +191,28 @@ impl AppView {
         self.move_message(direction, &layout);
     }
 
-    fn click(&mut self, col: u16, row: u16, grid: (u16, u16)) -> bool {
+    pub(super) fn click(&mut self, col: u16, row: u16, modifiers: Modifiers, grid: (u16, u16)) -> bool {
         self.account_cursor = None;
+        self.cancel_go_to();
         let layout = self.layout(grid.0, grid.1);
         match self.hit(&layout, col, row) {
             Hit::Folder(index) => {
                 self.focus = Focus::Sidebar;
                 self.select_folder_row(index);
             }
-            Hit::Message(index) => {
-                // A second click on the draft that is selected goes on with it.
-                let again = self.focus == Focus::List && index == self.selection.message_index && self.selected_is_draft();
-                self.focus = Focus::List;
-                self.select_message(index, &layout);
-                if again {
-                    self.start_compose(ComposeKind::Draft);
-                }
-            }
+            Hit::Message(index) => self.press_message(index, (col, row), modifiers, &layout),
             Hit::Account(index) => return self.click_account(index),
             Hit::Sidebar => self.focus = Focus::Sidebar,
             Hit::ListChrome => self.focus = Focus::List,
             Hit::Reader => self.click_reader(&layout, col, row),
             Hit::KeyBar(action) => self.press_button(action, grid),
-            Hit::Nothing => return false,
+            Hit::Nothing => return self.footer_span_at(&layout, col, row).is_some_and(|span| self.click_footer(span)),
         }
         true
     }
 
     /// A click on a key bar button does what its key does.
-    fn press_button(&mut self, action: &str, grid: (u16, u16)) {
+    pub(super) fn press_button(&mut self, action: &str, grid: (u16, u16)) {
         match action {
             "compose" => self.act(Action::Compose, grid),
             "reply" => self.act(Action::Reply, grid),
@@ -242,7 +236,7 @@ impl AppView {
         }
     }
 
-    fn wheel(&mut self, col: u16, row: u16, rows: i16, grid: (u16, u16)) -> bool {
+    pub(super) fn wheel(&mut self, col: u16, row: u16, rows: i16, grid: (u16, u16)) -> bool {
         if rows == 0 {
             return false;
         }
@@ -267,7 +261,7 @@ impl AppView {
         true
     }
 
-    fn hit(&self, layout: &Layout, col: u16, row: u16) -> Hit {
+    pub(crate) fn hit(&self, layout: &Layout, col: u16, row: u16) -> Hit {
         let rows = visible_rows(&self.mail.folders);
         let spacing = layout.sidebar.as_ref().map(|sidebar| sidebar.spacing);
         let offsets = spacing.map(|spacing| row_offsets(&rows, spacing)).unwrap_or_default();
@@ -291,7 +285,7 @@ impl AppView {
         self.mail.page.as_ref().filter(|page| page.folder == folder)
     }
 
-    fn list_first(&self, layout: &Layout) -> usize {
+    pub(crate) fn list_first(&self, layout: &Layout) -> usize {
         let visible = layout.list.as_ref().map_or(0, |list| usize::from(list.rows.height));
         let total = self.shown_page().map_or(0, |page| page.envelopes.len());
         self.list_view_first(visible, total)

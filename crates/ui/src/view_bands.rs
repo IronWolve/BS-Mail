@@ -5,7 +5,9 @@ use surface::Frame;
 
 use crate::app_view::AppView;
 use crate::layout::Layout;
-use crate::widgets::{DrawContext, FooterData, StripData, draw_account_strip, draw_banner, draw_footer, draw_key_bar};
+use crate::widgets::{
+    DrawContext, FooterData, MailboxSummary, StripData, draw_account_strip, draw_banner, draw_footer, draw_key_bar,
+};
 
 impl AppView {
     pub(crate) fn draw_bands(&self, frame: &mut Frame, ctx: &DrawContext<'_>, layout: &Layout) {
@@ -26,15 +28,19 @@ impl AppView {
             draw_key_bar(frame, ctx, rect, &self.config.key_bar.buttons);
         }
         if let Some(rect) = layout.footer {
-            let data = FooterData {
-                identity: &self.identity,
-                connection: self.connection(),
-                mailbox: mailbox.as_ref(),
-                status: &self.mail.status,
-                error: self.mail.error.as_deref().or(self.config_problem.as_deref()),
-                notice: self.new_mail_notice(),
-            };
-            draw_footer(frame, ctx, rect, &data);
+            draw_footer(frame, ctx, rect, &self.footer_data(mailbox.as_ref()));
+        }
+    }
+
+    /// What the footer shows now.
+    pub(crate) fn footer_data<'a>(&'a self, mailbox: Option<&'a MailboxSummary>) -> FooterData<'a> {
+        FooterData {
+            identity: &self.identity,
+            connection: self.connection(),
+            mailbox,
+            status: &self.mail.status,
+            error: self.mail.error.as_deref().or(self.config_problem.as_deref()),
+            notice: self.new_mail_notice(),
         }
     }
 }

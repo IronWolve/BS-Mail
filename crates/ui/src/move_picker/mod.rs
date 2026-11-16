@@ -3,6 +3,7 @@
 //! modules.
 
 pub mod draw;
+pub mod rows;
 pub mod state;
 
 pub use state::MovePicker;

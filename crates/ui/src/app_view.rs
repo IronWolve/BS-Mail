@@ -24,6 +24,8 @@ use crate::setup::draw::draw_setup;
 use crate::search::draw::draw_search_bar;
 use crate::move_picker::draw::draw_picker;
 use crate::composer::draw::draw_composer;
+use crate::input::memory::InputMemory;
+use crate::input::menus::OpenMenu;
 use crate::input::new_mail::NewMail;
 use crate::input::scrollbars::BarDrag;
 use crate::input::{CommandQueue, Drag};
@@ -36,8 +38,8 @@ use crate::view_state::{
     Focus, MailSnapshot, OverlayKind, Overlays, Place, ScrollState, Selection,
 };
 use crate::widgets::{
-    DrawContext, StatusLine, content_rows, draw_chrome_lines, draw_help, fill_cells, mark_focused, put_text,
-    visible_rows,
+    DrawContext, StatusLine, content_rows, draw_chrome_lines, draw_help, draw_menu, fill_cells, mark_focused,
+    put_text, visible_rows,
 };
 
 pub struct AppView {
@@ -70,6 +72,13 @@ pub struct AppView {
     pub(crate) new_mail: Option<NewMail>,
     /// The last time the caller's clock was told (see `tick`).
     pub(crate) last_tick_ms: u64,
+    /// The caller's clock as of the last input (see `set_clock`), for telling
+    /// a double-click from two clicks.
+    pub(crate) clock_ms: u64,
+    /// The context menu, while one is open.
+    pub(crate) menu: Option<OpenMenu>,
+    /// What the pointer and the keys left behind for the next input.
+    pub(crate) memory: InputMemory,
     /// When the program last sent a change of mail, on that clock.
     pub(crate) own_change_ms: Option<u64>,
     /// The message being written, when the composer is open.
@@ -80,8 +89,8 @@ pub struct AppView {
     pub(crate) quit_requested: bool,
     /// Web addresses the user clicked, for the program to open in a browser.
     pub(crate) link_requests: Vec<String>,
-    /// A web address the user copied with the right button, for the host to
-    /// put on the clipboard.
+    /// Text the user copied from a menu (a link, a sender, a subject), for the
+    /// host to put on the clipboard.
     pub(crate) copied_link: Option<String>,
     /// The letter of a command key just pressed, whose text is still to come:
     /// a window and a terminal both report a printable key as the key and
@@ -149,6 +158,9 @@ impl AppView {
             restore: None,
             new_mail: None,
             last_tick_ms: 0,
+            clock_ms: 0,
+            menu: None,
+            memory: InputMemory::default(),
             own_change_ms: None,
             composer: None,
             addresses: AddressBook::default(),
@@ -321,6 +333,7 @@ impl AppView {
             self.draw_reader(&mut frame, &ctx, reader);
         }
         self.mark_focus(&mut frame, &layout);
+        self.draw_hover(&mut frame, &ctx, &layout);
         if let Some(form) = &self.composer {
             draw_composer(&mut frame, &ctx, layout.main, form);
         }
@@ -332,6 +345,9 @@ impl AppView {
         }
         if let Some(bar) = &self.search_bar {
             draw_search_bar(&mut frame, &ctx, area, bar);
+        }
+        if let Some(open) = &self.menu {
+            draw_menu(&mut frame, &ctx, area, &open.menu);
         }
         if self.overlays.open == Some(OverlayKind::Help) {
             draw_help(&mut frame, &ctx, area, &self.capabilities, self.overlays.help_scroll);

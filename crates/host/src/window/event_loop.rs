@@ -13,7 +13,7 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::window::WindowId;
 
 use crate::font::FontSet;
-use crate::input::{WheelCarry, key_event, modifiers, pointer_button, typed_text};
+use crate::input::{WheelCarry, key_event, middle_paste, modifiers, pointer_button, typed_text};
 
 use super::create::create_window;
 use super::options::WindowOptions;
@@ -199,15 +199,17 @@ impl WindowApp<'_, '_> {
         let Some(button) = pointer_button(button) else {
             return;
         };
-        let event = InputEvent::Button {
-            button,
-            state: match state {
-                ElementState::Pressed => ButtonState::Pressed,
-                ElementState::Released => ButtonState::Released,
-            },
-            pos: self.cell(),
-            modifiers: self.modifiers,
+        let state = match state {
+            ElementState::Pressed => ButtonState::Pressed,
+            ElementState::Released => ButtonState::Released,
         };
+        // On Linux a middle press pastes the primary selection, as in every
+        // other program there; the screen has no other use for that button.
+        if let Some(paste) = middle_paste(button, state, || self.state.primary_text()) {
+            self.deliver(event_loop, paste);
+            return;
+        }
+        let event = InputEvent::Button { button, state, pos: self.cell(), modifiers: self.modifiers };
         self.deliver(event_loop, event);
     }
 

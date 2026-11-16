@@ -4,4 +4,4 @@ pub mod keyboard;
 pub mod pointer;
 
 pub use keyboard::{key_event, modifiers, modifiers_for, typed_text};
-pub use pointer::{WheelCarry, pointer_button};
+pub use pointer::{WheelCarry, middle_paste, pointer_button};

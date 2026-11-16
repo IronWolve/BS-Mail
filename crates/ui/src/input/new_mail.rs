@@ -35,6 +35,11 @@ impl AppView {
         self.new_mail.as_ref().map(|notice| notice.text.as_str())
     }
 
+    /// The account the notice of new mail is about, while there is one.
+    pub(crate) fn new_mail_account(&self) -> Option<AccountId> {
+        self.new_mail.as_ref().map(|notice| notice.account.clone())
+    }
+
     /// For an `AccountUnread` event not yet applied: the account and by how
     /// many its Inbox unread count has gone up since the count the program
     /// held. Nothing for the first count of an account, or a fall.

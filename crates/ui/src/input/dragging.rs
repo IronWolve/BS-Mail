@@ -1,9 +1,8 @@
 //! Dragging a bar with the pointer, and the pointer shape that invites it.
 
-use surface::{CellPosition, PointerShape};
+use surface::CellPosition;
 
 use super::drag::{DragSize, divider_at, size_for};
-use super::hit::account_at;
 use crate::app_view::AppView;
 
 impl AppView {
@@ -37,37 +36,5 @@ impl AppView {
     pub(crate) fn end_drag(&mut self) -> bool {
         let bar = self.bar_drag.take().is_some();
         self.drag.take().is_some() || bar
-    }
-
-    /// The pointer to show at a position: the resize pointer on a bar, and
-    /// the one for the bar being dragged for as long as the drag lasts, even
-    /// when the pointer has run ahead of it.
-    pub fn pointer_shape(&self, col: u16, row: u16, grid: (u16, u16)) -> PointerShape {
-        if self.setup.is_some() {
-            return PointerShape::Arrow;
-        }
-        if self.options.is_some() {
-            return self.options_pointer_shape(col, row, grid);
-        }
-        if let Some(drag) = self.drag {
-            return drag.shape();
-        }
-        let layout = self.layout(grid.0, grid.1);
-        if let Some(drag) = divider_at(&layout, col, row) {
-            return drag.shape();
-        }
-        let on_link = self.mail_is_free() && self.link_under(&layout, col, row).is_some();
-        if on_link || self.account_row_switches(&layout, col, row) { PointerShape::Hand } else { PointerShape::Arrow }
-    }
-
-    /// Whether a click here would switch to another account: on a row of the
-    /// sidebar's accounts that is not the one showing, with nothing open over
-    /// the mail.
-    fn account_row_switches(&self, layout: &crate::layout::Layout, col: u16, row: u16) -> bool {
-        let free = self.composer.is_none() && self.picker.is_none() && self.search_bar.is_none() && !self.overlays.is_open();
-        let Some(index) = account_at(layout, self.mail.accounts.len(), col, row) else {
-            return false;
-        };
-        free && self.mail.accounts.get(index).is_some_and(|account| self.selection.account.as_ref() != Some(&account.id))
     }
 }

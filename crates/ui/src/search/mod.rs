@@ -3,6 +3,7 @@
 //! modules.
 
 pub mod draw;
+pub mod geometry;
 pub mod state;
 
 pub use state::ActiveSearch;

@@ -3,7 +3,7 @@
 //! Send and Cancel buttons act, and a click on a row of the From list or the
 //! address matches takes it.
 
-use surface::{ButtonState, InputEvent, PointerButton, Rect};
+use surface::{ButtonState, InputEvent, PointerButton, PointerShape, Rect};
 
 use super::buttons::{Pressed, button_at};
 use super::draw::{ComposerRects, LABEL_CELLS, buttons_for, horizontal_skip, layout};
@@ -35,6 +35,25 @@ pub fn handle_pointer(form: &mut ComposeForm, event: &InputEvent, main: Rect) ->
         InputEvent::Wheel { pos, rows, .. } => wheel(form, &rects, (pos.col, pos.row), *rows),
         _ => Outcome::Ignored,
     }
+}
+
+/// The pointer to show over cell `at` while the composer fills `main`: a hand
+/// over its buttons and the rows of an open list, the text pointer over a
+/// field and the body.
+pub fn pointer_shape(form: &ComposeForm, main: Rect, at: (u16, u16)) -> PointerShape {
+    let Some(rects) = layout(main) else {
+        return PointerShape::Arrow;
+    };
+    let on_button = buttons_for(&rects, form).and_then(|found| button_at(&found, at.0, at.1)).is_some();
+    let on_row = open_popup(form, &rects, main).is_some_and(|open| row_at(&open, at.0, at.1).is_some());
+    if on_button || on_row {
+        return PointerShape::Hand;
+    }
+    if at.1 == rects.from.y && at.0 >= rects.from.x && at.0 < rects.from.right() {
+        return if form.can_choose_sender() { PointerShape::Hand } else { PointerShape::Arrow };
+    }
+    let on_field = rects.fields.iter().any(|rect| inside(*rect, at));
+    if on_field || inside(rects.body, at) { PointerShape::Text } else { PointerShape::Arrow }
 }
 
 fn inside(rect: Rect, (col, row): (u16, u16)) -> bool {

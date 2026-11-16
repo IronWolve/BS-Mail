@@ -13,7 +13,7 @@ pub mod graphemes;
 pub mod history;
 pub mod input;
 pub mod mouse;
-mod pointer_moves;
+pub(crate) mod pointer_moves;
 pub mod popup;
 pub mod reply;
 pub mod sender;

@@ -46,7 +46,7 @@ impl Bar {
         (total > visible && visible > 0).then_some(Self { target, col, rows, first, visible, total })
     }
 
-    fn holds(&self, col: u16, row: u16) -> bool {
+    pub(crate) fn holds(&self, col: u16, row: u16) -> bool {
         col == self.col && row >= self.rows.y && row < self.rows.bottom()
     }
 }

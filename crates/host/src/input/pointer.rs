@@ -3,7 +3,7 @@
 //! A wheel that reports pixels is added up until it has turned a whole row,
 //! so a touchpad scrolls smoothly instead of jumping a row per flick.
 
-use surface::PointerButton;
+use surface::{ButtonState, InputEvent, PointerButton};
 use winit::event::{MouseButton, MouseScrollDelta};
 
 /// The button, or `None` for one the screen has no use for.
@@ -17,6 +17,21 @@ pub fn pointer_button(button: MouseButton) -> Option<PointerButton> {
         MouseButton::Other(_) => return None,
     };
     Some(button)
+}
+
+/// A press of the middle button pastes the primary selection into a text
+/// field (the habit of X11 and Wayland): the paste event it is, when `primary`
+/// has text. Every other press and release, and a middle press with nothing
+/// selected, is not one. `primary` is only asked for a middle press.
+pub fn middle_paste(
+    button: PointerButton,
+    state: ButtonState,
+    primary: impl FnOnce() -> Option<String>,
+) -> Option<InputEvent> {
+    if button != PointerButton::Middle || state != ButtonState::Pressed {
+        return None;
+    }
+    primary().filter(|text| !text.is_empty()).map(InputEvent::Paste)
 }
 
 /// Pixel-precise scrolling, kept until it adds up to whole rows and columns.

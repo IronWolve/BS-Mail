@@ -1,7 +1,8 @@
 //! Web addresses in the message being read: a click on one asks for it to be
-//! opened in the user's browser, a right click copies it, and the pointer
-//! turns into a hand over one. The screen only asks: the program opens the
-//! address (`take_link_requests`) and reports how that went.
+//! opened in the user's browser, a right click opens the menu with Open and
+//! Copy link (see `menus`), and the pointer turns into a hand over one. The
+//! screen only asks: the program opens the address (`take_link_requests`) and
+//! reports how that went.
 
 use crate::app_view::AppView;
 use crate::layout::Layout;
@@ -38,21 +39,16 @@ impl AppView {
         }
     }
 
-    /// A right click on an address copies it for the host to put on the
-    /// clipboard. Returns whether there was one.
-    pub(crate) fn copy_link_at(&mut self, col: u16, row: u16, grid: (u16, u16)) -> bool {
-        let layout = self.layout(grid.0, grid.1);
-        let Some(address) = self.link_under(&layout, col, row) else {
-            return false;
-        };
-        self.mail.set_note(Some("The link is on the clipboard (if your terminal allows it).".to_string()));
-        self.copied_link = Some(address);
-        true
-    }
-
     /// Whether nothing is open over the mail, so a click on it is for the mail.
     pub(crate) fn mail_is_free(&self) -> bool {
-        self.composer.is_none() && self.picker.is_none() && self.search_bar.is_none() && !self.overlays.is_open()
+        self.setup.is_none()
+            && self.options.is_none()
+            && self.composer.is_none()
+            && self.picker.is_none()
+            && self.search_bar.is_none()
+            && self.delete_prompt.is_none()
+            && self.menu.is_none()
+            && !self.overlays.is_open()
     }
 
     /// The addresses the user clicked, in order, once, for the program to open.

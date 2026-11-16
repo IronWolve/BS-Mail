@@ -149,10 +149,17 @@ fn plan_row(rect: Rect, actions: &[String]) -> Option<Row> {
 /// The action of the button at column `col` of the key bar in `rect`, for a
 /// click. Cells between buttons belong to none.
 pub fn button_at(rect: Rect, actions: &[String], col: u16) -> Option<&'static str> {
+    button_span_at(rect, actions, col).map(|(action, _, _)| action)
+}
+
+/// As `button_at`, with where the button starts and how many cells it covers
+/// (its keycap and its label), for the highlight under the pointer.
+pub fn button_span_at(rect: Rect, actions: &[String], col: u16) -> Option<(&'static str, u16, u16)> {
     let row = plan_row(rect, actions)?;
     row.placed.iter().enumerate().find_map(|(index, button)| {
         let x = row.area.x.saturating_add(row.spread.starts[index]);
-        (col >= x && col < x.saturating_add(button.width())).then_some(button.button.action)
+        let width = button.width();
+        (col >= x && col < x.saturating_add(width)).then_some((button.button.action, x, width))
     })
 }
 

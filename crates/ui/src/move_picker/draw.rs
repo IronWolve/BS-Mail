@@ -4,6 +4,7 @@
 use model::Folder;
 use surface::{CursorRequest, CursorShape, Frame, Rect};
 
+use super::rows::rows_span;
 use super::state::MovePicker;
 use crate::format::{ELLIPSIS_CHAR, display_width, truncate};
 use crate::theme::roles;
@@ -41,7 +42,7 @@ pub fn draw_picker(frame: &mut Frame, ctx: &DrawContext<'_>, grid: Rect, picker:
     draw_frame(frame, ctx, rect, picker.targets.len());
     let inner = Rect::new(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2);
     draw_prompt(frame, ctx, inner, picker);
-    draw_rows(frame, ctx, inner, picker, &candidates);
+    draw_rows(frame, ctx, (rect, inner), picker, &candidates);
 }
 
 fn draw_frame(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, count: usize) {
@@ -87,14 +88,12 @@ fn draw_prompt(frame: &mut Frame, ctx: &DrawContext<'_>, inner: Rect, picker: &M
     }
 }
 
-fn draw_rows(frame: &mut Frame, ctx: &DrawContext<'_>, inner: Rect, picker: &MovePicker, candidates: &[&Folder]) {
-    let top = inner.y + 2;
-    let room = usize::from(inner.bottom().saturating_sub(top));
+fn draw_rows(frame: &mut Frame, ctx: &DrawContext<'_>, (rect, inner): (Rect, Rect), picker: &MovePicker, candidates: &[&Folder]) {
+    let (top, room, first) = rows_span(rect, picker.cursor);
     if candidates.is_empty() {
         put_text(frame, inner, inner.x + 2, top, "no folder matches", ctx.fg(roles::FOOTER_TEXT));
         return;
     }
-    let first = picker.cursor.saturating_sub(room.saturating_sub(1));
     for (line, folder) in candidates.iter().enumerate().skip(first).take(room) {
         let y = top + u16::try_from(line - first).unwrap_or(0);
         let selected = line == picker.cursor;

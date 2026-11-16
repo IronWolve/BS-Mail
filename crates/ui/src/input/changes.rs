@@ -30,7 +30,7 @@ impl AppView {
     }
 
     /// The envelopes of the messages a change acts on.
-    fn target_envelopes(&self) -> Vec<&Envelope> {
+    pub(crate) fn target_envelopes(&self) -> Vec<&Envelope> {
         let ids = self.targets();
         let folder = self.selection.folder;
         let Some(page) = folder.and_then(|f| self.mail.page.as_ref().filter(|p| p.folder == f)) else {
@@ -55,6 +55,39 @@ impl AppView {
         self.auto_marked = self.current_selected_id();
         self.read_timer = None;
         self.queue.push(set_flags_for(ids, FlagChange { seen: Some(make_seen), ..FlagChange::default() }));
+    }
+
+    /// A click on the unread cell of a row: that message alone is made read
+    /// if it is unread, unread if it is read.
+    pub(crate) fn toggle_read_of(&mut self, id: MessageId) {
+        let Some(seen) = self.envelope_of(id).map(|envelope| envelope.flags.seen) else {
+            return;
+        };
+        if !self.changes_allowed_or_note() {
+            return;
+        }
+        // The user's own choice wins over the timer for the message open.
+        if self.selection.message == Some(id) {
+            self.auto_marked = Some(id);
+            self.read_timer = None;
+        }
+        self.queue.push(set_flags(id, FlagChange { seen: Some(!seen), ..FlagChange::default() }));
+    }
+
+    /// A click on the star cell of a row: that message alone is starred if it
+    /// is not, unstarred if it is.
+    pub(crate) fn toggle_star_of(&mut self, id: MessageId) {
+        let Some(flagged) = self.envelope_of(id).map(|envelope| envelope.flags.flagged) else {
+            return;
+        };
+        if !self.changes_allowed_or_note() {
+            return;
+        }
+        self.queue.push(set_flags(id, FlagChange { flagged: Some(!flagged), ..FlagChange::default() }));
+    }
+
+    fn envelope_of(&self, id: MessageId) -> Option<&Envelope> {
+        self.shown_page()?.envelopes.iter().find(|envelope| envelope.id == id)
     }
 
     /// Starred when any target is not, otherwise unstarred.
@@ -134,6 +167,7 @@ impl AppView {
     /// milliseconds; the caller calls this a few times a second.
     pub fn tick(&mut self, now_ms: u64) {
         self.last_tick_ms = now_ms;
+        self.set_clock(now_ms);
         self.expire_new_mail(now_ms);
         if self.options.is_some() || self.composer.is_some() || self.setup.is_some() || self.overlays.is_open() {
             // Mail that is hidden behind the Options screen, the composer, the

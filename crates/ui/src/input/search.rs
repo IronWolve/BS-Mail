@@ -27,14 +27,14 @@ impl AppView {
     }
 
     /// Input while the box is open. Returns whether the screen changed.
-    pub(crate) fn search_input(&mut self, event: &InputEvent) -> bool {
+    pub(crate) fn search_input(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
         match event {
             InputEvent::Key(key) => self.search_key(key),
             InputEvent::Text(text) | InputEvent::Paste(text) => {
                 let clean: String = text.chars().filter(|ch| !ch.is_control()).collect();
                 self.search_bar.as_mut().is_some_and(|bar| bar.insert_text(&clean))
             }
-            _ => false,
+            _ => self.search_pointer(event, grid),
         }
     }
 
@@ -70,7 +70,7 @@ impl AppView {
     }
 
     /// Asks for the search; an empty query ends the one showing instead.
-    fn run_search(&mut self) {
+    pub(crate) fn run_search(&mut self) {
         let Some(bar) = self.search_bar.take() else {
             return;
         };

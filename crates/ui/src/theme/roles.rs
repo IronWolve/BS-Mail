@@ -1,7 +1,7 @@
 //! Role names as constants, so a widget never types a role as a bare string.
 //!
 //! `ALL` lists every role a widget may ask for; a theme must define each one.
-//! Six are reserved: no widget asks for them yet (marked `not drawn yet`
+//! Three are reserved: no widget asks for them yet (marked `not drawn yet`
 //! below), so a theme that changes them changes no frame.
 //! A role is named for its place and meaning (`list.selected`), never for its
 //! color. A child name (`list.date.recent`) starts from its parent's style.
@@ -20,7 +20,7 @@ roles! {
     BASE = "base";
     BORDER = "border";
     BORDER_FOCUSED = "border.focused";
-    BORDER_HOVER = "border.hover"; // not drawn yet
+    BORDER_HOVER = "border.hover"; // a bar under the pointer
     BORDER_DRAG = "border.drag"; // not drawn yet
     BORDER_RULE = "border.rule";
     SEPARATOR = "separator";
@@ -82,7 +82,7 @@ roles! {
     LIST_HEADER_BAR = "list.header.bar";
     LIST_ROW = "list.row";
     LIST_ROW_UNREAD = "list.row.unread"; // not drawn yet
-    LIST_ROW_HOVER = "list.row.hover"; // not drawn yet
+    LIST_ROW_HOVER = "list.row.hover"; // a message row under the pointer
     LIST_SELECTED = "list.selected";
     LIST_MARKED = "list.marked"; // not drawn yet: a marked row reverses its number cell
     LIST_FLAG_UNREAD = "list.flag.unread";
@@ -124,7 +124,7 @@ roles! {
     // Key bar and footer.
     KEYBAR_CAP = "keybar.cap";
     KEYBAR_LABEL = "keybar.label";
-    KEYBAR_HOVER = "keybar.hover"; // not drawn yet
+    KEYBAR_HOVER = "keybar.hover"; // a key bar button or footer item under the pointer
     FOOTER_SLASHES = "footer.slashes";
     FOOTER_TEXT = "footer.text";
     FOOTER_OK = "footer.ok";

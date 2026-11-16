@@ -30,7 +30,8 @@ impl AppView {
     pub fn handle_input(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
         // The notice of new mail stays only until the next key.
         let cleared = matches!(event, InputEvent::Key(_)) && self.new_mail.take().is_some();
-        self.handle_unnoticed_input(event, grid) || cleared
+        let lit = self.track_hover(event, grid);
+        self.handle_unnoticed_input(event, grid) || cleared || lit
     }
 
     fn handle_unnoticed_input(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {

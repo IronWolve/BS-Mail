@@ -317,6 +317,9 @@ impl EventSink for Screen {
             }
             _ => {}
         }
+        // Two presses are a double-click by the time between them, which the
+        // wake-ups a few times a second are too coarse to tell.
+        self.view.set_clock(u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX));
         let used = self.view.handle_input(&event, (self.cols, self.rows));
         if self.view.wants_quit() {
             return Flow::Quit;

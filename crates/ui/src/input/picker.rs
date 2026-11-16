@@ -32,7 +32,7 @@ impl AppView {
     /// a search holds mail from several folders, so the folder shown says
     /// nothing about where a message is; its own folder does. Mail whose
     /// folder cannot be told is taken to be in the folder shown.
-    fn folder_all_are_in(&self, ids: &[MessageId]) -> Option<FolderId> {
+    pub(crate) fn folder_all_are_in(&self, ids: &[MessageId]) -> Option<FolderId> {
         let shown = self.mail.page.as_ref().map(|page| page.envelopes.as_slice()).unwrap_or_default();
         let mut folders = shown.iter().filter(|envelope| ids.contains(&envelope.id)).map(|envelope| envelope.folder);
         let Some(first) = folders.next() else {
@@ -43,7 +43,7 @@ impl AppView {
 
     /// Input while the picker is open. Everything is the picker's: nothing
     /// reaches the screen underneath. Returns whether the screen changed.
-    pub(crate) fn picker_input(&mut self, event: &InputEvent) -> bool {
+    pub(crate) fn picker_input(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
         match event {
             InputEvent::Key(key) => self.picker_key(key),
             InputEvent::Text(text) | InputEvent::Paste(text) => {
@@ -52,7 +52,7 @@ impl AppView {
                 }
                 true
             }
-            _ => false,
+            _ => self.picker_pointer(event, grid),
         }
     }
 
@@ -79,7 +79,7 @@ impl AppView {
 
     /// Asks for the move to the highlighted folder, and moves the selection
     /// to the nearest message that stays so the user keeps their place.
-    fn finish_move(&mut self) {
+    pub(crate) fn finish_move(&mut self) {
         let Some(picker) = self.picker.take() else {
             return;
         };
@@ -88,11 +88,18 @@ impl AppView {
             self.picker = Some(picker);
             return;
         };
-        self.select_neighbor_outside(&picker.targets);
+        self.move_targets(picker.targets, destination);
+    }
+
+    /// Asks for `targets` to move to `destination`, with the selection moved to
+    /// the nearest message that stays, the marks cleared and the rows hidden
+    /// until the backend says they moved.
+    pub(crate) fn move_targets(&mut self, targets: Vec<MessageId>, destination: FolderId) {
+        self.select_neighbor_outside(&targets);
         self.clear_marks();
-        self.mail.relocated.extend(&picker.targets);
+        self.mail.relocated.extend(&targets);
         self.queue.push(Command::Move {
-            messages: picker.targets,
+            messages: targets,
             to: destination,
         });
     }

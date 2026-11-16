@@ -7,6 +7,7 @@ pub mod banner;
 pub mod body_highlight;
 pub mod cell_text;
 pub mod chrome_lines;
+pub mod context_menu;
 pub mod draw_context;
 pub mod focus_mark;
 pub mod folder_tree;
@@ -35,15 +36,16 @@ pub use cell_text::{
     Align, Run, cut_runs, fill_cells, put_aligned, put_cut, put_runs, put_runs_cut, put_text,
 };
 pub use chrome_lines::draw_chrome_lines;
+pub use context_menu::{Menu, MenuEntry, draw_menu};
 pub use draw_context::DrawContext;
 pub use focus_mark::mark_focused;
 pub use folder_tree::{
     FolderRowInfo, FolderTreeView, content_rows, draw_folder_tree, row_offsets, visible_rows,
 };
-pub use footer::{FooterData, draw_footer};
+pub use footer::{FooterData, FooterItem, FooterSpan, draw_footer, footer_item_at};
 pub use gauge::draw_gauge;
 pub use help_overlay::{draw_help, help_capacity, help_max_scroll};
-pub use key_bar::{button_at, draw_key_bar};
+pub use key_bar::{button_at, button_span_at, draw_key_bar};
 pub use list_header::{column_align, column_label, draw_list_header};
 pub use list_rows::{ListRowsView, column_label_for, draw_list_rows};
 pub use list_title::draw_list_title;

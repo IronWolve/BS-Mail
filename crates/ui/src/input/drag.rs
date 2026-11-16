@@ -45,6 +45,27 @@ pub fn divider_at(layout: &Layout, col: u16, row: u16) -> Option<Drag> {
     (on_col && down).then_some(Drag::SplitColumns)
 }
 
+/// The cells of bar `drag`, as one cell wide or high rectangle.
+pub fn divider_rect(layout: &Layout, drag: Drag) -> Option<Rect> {
+    match drag {
+        Drag::Sidebar => {
+            let sidebar = layout.sidebar.as_ref()?.rect;
+            Some(Rect::new(sidebar.right(), sidebar.y, 1, sidebar.height))
+        }
+        Drag::SplitRows => {
+            let (list, reader) = (layout.list.as_ref()?.rect, layout.reader.as_ref()?.rect);
+            (reader.y > list.y).then(|| Rect::new(list.x, list.bottom(), list.width, 1))
+        }
+        Drag::SplitColumns => {
+            let (list, reader) = (layout.list.as_ref()?.rect, layout.reader.as_ref()?.rect);
+            if reader.y > list.y {
+                return None;
+            }
+            Some(Rect::new(reader.x.checked_sub(1)?, list.y, 1, list.height))
+        }
+    }
+}
+
 /// The list's share of the main area, in permille, that puts the divider at
 /// `first` cells from the main area's start out of `total`. The smallest
 /// share that rounds back to `first`, so a drag lands exactly where the
