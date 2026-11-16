@@ -40,6 +40,16 @@ impl Keys {
         writer.finish().ok()
     }
 
+    /// The keys that match every message, `ALL`.
+    pub fn all() -> Keys {
+        Keys { parts: vec![Part::Text("ALL".to_owned())], needs_charset: false }
+    }
+
+    /// The keys that match the messages not read yet, `UNSEEN`.
+    pub fn unseen() -> Keys {
+        Keys { parts: vec![Part::Text("UNSEEN".to_owned())], needs_charset: false }
+    }
+
     /// The pieces, in order.
     pub fn parts(&self) -> &[Part] {
         &self.parts

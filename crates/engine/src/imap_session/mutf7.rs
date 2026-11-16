@@ -1,6 +1,6 @@
 //! Mailbox names in modified UTF-7 (RFC 3501, section 5.1.3): decoded for
-//! display, and encoded for the day a folder is made or renamed. Commands
-//! about folders that exist keep using the name exactly as the server sent it.
+//! display, and encoded for a folder that is made or renamed. Commands about
+//! folders that exist keep using the name exactly as the server sent it.
 
 /// The name as people read it. Malformed runs are left as they came.
 pub fn decode(name: &str) -> String {
@@ -42,8 +42,6 @@ pub fn decode(name: &str) -> String {
 /// A name as the server wants it written, the reverse of `decode`: printable
 /// ASCII stays, `&` becomes `&-`, and every other run of characters becomes
 /// `&`, the UTF-16BE text in base64 (`,` for `/`, no padding), and `-`.
-// Not used yet: it is for the folder actions, which are not built.
-#[allow(dead_code)]
 pub fn encode(name: &str) -> String {
     let mut out = String::with_capacity(name.len());
     let mut run: Vec<u16> = Vec::new();
@@ -64,7 +62,6 @@ pub fn encode(name: &str) -> String {
 }
 
 /// Writes the pending non-ASCII characters as one `&...-` run.
-#[allow(dead_code)]
 fn end_run(out: &mut String, run: &mut Vec<u16>) {
     if run.is_empty() {
         return;

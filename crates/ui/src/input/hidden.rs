@@ -12,6 +12,7 @@ impl AppView {
     pub(crate) fn input_while_hidden(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
         match event {
             _ if self.delete_prompt.is_some() => self.delete_prompt_input(event, grid),
+            _ if self.ask.is_some() => self.ask_input(event, grid),
             InputEvent::Button { state: ButtonState::Released, .. } => self.end_drag(),
             _ => false,
         }

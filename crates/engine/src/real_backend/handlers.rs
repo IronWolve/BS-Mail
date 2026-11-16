@@ -51,8 +51,11 @@ impl Worker {
         session: &mut ImapSession,
     ) -> Result<Vec<Folder>, SessionError> {
         let listed = session.list_folders().await?;
+        self.state.set_delimiter(listed.iter().find_map(|folder| folder.delimiter.clone().filter(|d| !d.is_empty())));
         let state = &mut self.state;
-        Ok(build_tree(&self.account, listed, &mut |path| state.folder_id(path)))
+        let tree = build_tree(&self.account, listed, &self.config.folders, &mut |path| state.folder_id(path));
+        self.tell_unmatched_roles(&tree.missing);
+        Ok(tree.folders)
     }
 
     /// The newest page of a folder.
@@ -61,6 +64,9 @@ impl Worker {
         session: &mut ImapSession,
         folder: FolderId,
     ) -> Result<Vec<Event>, SessionError> {
+        if self.state.folder(folder).is_some_and(|known| known.role.is_virtual()) {
+            return self.open_saved_search(session, folder).await;
+        }
         let Some(path) = self.state.folder_path(folder).map(str::to_owned) else {
             let reason = format!("unknown folder id: {}", folder.0);
             return Ok(vec![self.sink.failure("open folder", reason)]);

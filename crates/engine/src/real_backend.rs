@@ -1,6 +1,7 @@
 //! The real mail backend: reads a mailbox over IMAP and, only when the
 //! account says so (`read_only = false`), changes mail on the server: flags,
-//! moves and deletes. It also sends mail through the account's SMTP server
+//! tags, moves and deletes, and the folder actions (making, renaming and
+//! deleting a folder, marking a folder read, emptying the Trash or Spam). It also sends mail through the account's SMTP server
 //! and then saves a copy in the Sent folder. A read-only account never sends
 //! anything that could change the server and never sends mail.
 //!
@@ -34,17 +35,21 @@
 mod answered;
 mod backoff;
 mod bounded_join;
+mod bulk_changes;
 mod change_flags;
 mod change_lost;
 mod change_relocate;
 mod change_rules;
+mod change_tags;
 mod changes;
+mod folder_changes;
 mod handlers;
 mod host_info;
 mod in_flight;
 mod inbox;
 mod lifecycle;
 mod listed_ids;
+mod named_roles;
 mod offline;
 mod online;
 mod poll;
@@ -54,6 +59,7 @@ mod resolve;
 mod retry_ids;
 mod reply_lookup;
 mod save_sent;
+mod saved_searches;
 mod sent_queue;
 mod search;
 mod search_folders;

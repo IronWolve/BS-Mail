@@ -12,6 +12,9 @@ use super::slots::{Slot, decode_folder, decode_message};
 /// Why a move across accounts is refused.
 pub(super) const CROSS_ACCOUNT_MOVE: &str = "mail cannot be moved between accounts";
 
+/// Why a new folder whose parent is in another account is refused.
+const CROSS_ACCOUNT_FOLDER: &str = "a folder cannot be made inside another account's folder";
+
 /// Why a command naming an id that this numbering never produced is refused.
 const NOT_AN_ID: &str = "that is not an id of any account's mail";
 
@@ -88,7 +91,17 @@ pub(super) fn plan(command: Command, slot_of: SlotOf<'_>) -> Plan {
         Command::Delete { messages } => {
             split_by_slot(messages, |messages| Command::Delete { messages })
         }
+        Command::SetTag { messages, tag, on } => {
+            split_by_slot(messages, |messages| Command::SetTag { messages, tag: tag.clone(), on })
+        }
         Command::Move { messages, to } => plan_move(messages, to),
+        Command::CreateFolder { account, parent, name } => plan_create_folder(account, parent, name, slot_of),
+        Command::RenameFolder { folder, name } => {
+            on_folder(folder, |folder| Command::RenameFolder { folder, name })
+        }
+        Command::DeleteFolder { folder } => on_folder(folder, |folder| Command::DeleteFolder { folder }),
+        Command::MarkAllRead { folder } => on_folder(folder, |folder| Command::MarkAllRead { folder }),
+        Command::EmptyFolder { folder } => on_folder(folder, |folder| Command::EmptyFolder { folder }),
         Command::Send { message } => plan_send(message, slot_of),
         Command::Search {
             request,
@@ -136,6 +149,30 @@ fn plan_move(messages: Vec<MessageId>, to: FolderId) -> Plan {
         }
     }
     Plan::to(slot, Command::Move { messages: local, to: target })
+}
+
+/// A command about one folder goes to the member that owns it, with the
+/// folder's own id.
+fn on_folder(folder: FolderId, make: impl FnOnce(FolderId) -> Command) -> Plan {
+    match decode_folder(folder) {
+        Some((slot, local)) => Plan::to(slot, make(local)),
+        None => Plan::not_an_id(),
+    }
+}
+
+/// A new folder goes to the member of the account it is made in; its parent,
+/// when it has one, must belong to that member too, or nothing is sent.
+fn plan_create_folder(account: AccountId, parent: Option<FolderId>, name: String, slot_of: SlotOf<'_>) -> Plan {
+    let Some(slot) = slot_of(&account) else {
+        return Plan::unknown_account("new folder", &account);
+    };
+    let parent = match parent.map(decode_folder) {
+        None => None,
+        Some(Some((owner, local))) if owner == slot => Some(local),
+        Some(Some(_)) => return Plan::refused("new folder", CROSS_ACCOUNT_FOLDER),
+        Some(None) => return Plan::not_an_id(),
+    };
+    Plan::to(slot, Command::CreateFolder { account, parent, name })
 }
 
 /// A send goes to the member of the message's account. A refusal is named

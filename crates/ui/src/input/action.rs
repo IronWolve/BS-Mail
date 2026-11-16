@@ -65,6 +65,13 @@ pub enum Action {
     HalfPageDown,
     /// `.` and the Menu key: the context menu of the selected item.
     ContextMenu,
+    /// `t`: the tag picker for the marked messages, or the selected one.
+    Tag,
+    /// `+`: set the alert mark on them, or clear it when they all have it.
+    ToggleAlert,
+    /// `F`: the next letter names a folder action (new, rename, delete, mark
+    /// all read, empty).
+    FolderKeys,
     /// `g`: the next letter names a well-known folder to go to.
     GoTo,
     /// `Shift` with an arrow, `Home`, `End`, `PageUp` or `PageDown`: select
@@ -169,6 +176,9 @@ pub fn action_for(key: &KeyEvent) -> Option<Action> {
         LogicalKey::Char('s') if !held.shift => Some(Action::Sync),
         LogicalKey::Char('g') if !held.shift => Some(Action::GoTo),
         LogicalKey::Char('.') => Some(Action::ContextMenu),
+        LogicalKey::Char('t') if !held.shift => Some(Action::Tag),
+        LogicalKey::Char('+') => Some(Action::ToggleAlert),
+        LogicalKey::Char('F') => Some(Action::FolderKeys),
         LogicalKey::Char('y') if !held.shift => Some(Action::Copy),
         LogicalKey::Char('Y') => Some(Action::CopySender),
         LogicalKey::Char('H') => Some(Action::ViewHeaders),

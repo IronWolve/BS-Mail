@@ -70,7 +70,7 @@ pub fn field_term(name: &str, value: &str) -> Result<Term, SearchError> {
 pub fn quick_term(name: &str) -> Result<Term, SearchError> {
     status(name).map(Term::Is).map_err(|_| {
         SearchError::new(format!(
-            "the quick filter \":{name}\" is not known; use :unread or :starred (or is:unread, is:starred), \
+            "the quick filter \":{name}\" is not known; use :unread, :starred or :alert (or is:unread, is:starred, is:alert), \
              or put it in quotes to search for the text"
         ))
     })
@@ -97,8 +97,9 @@ fn status(value: &str) -> Result<Status, SearchError> {
         "starred" | "flagged" => Ok(Status::Flagged),
         "answered" => Ok(Status::Answered),
         "draft" => Ok(Status::Draft),
+        "alert" => Ok(Status::Alert),
         _ => Err(SearchError::new(format!(
-            "is: knows unread, read, starred, flagged, answered and draft; \"{value}\" is not one of them"
+            "is: knows unread, read, starred, flagged, answered, draft and alert; \"{value}\" is not one of them"
         ))),
     }
 }

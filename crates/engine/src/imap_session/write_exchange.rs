@@ -1,8 +1,9 @@
 //! The one place a changing command is sent and its answer read.
 //!
 //! Before anything is written the session checks that the account allows
-//! changes, that a mailbox is open for changes, and that the server offers
-//! the extension the command needs. The answer is read to the command's own
+//! changes, that a mailbox is open for changes (except for the commands about
+//! a mailbox as a whole), and that the server offers the extension the
+//! command needs. The answer is read to the command's own
 //! tagged line and its status is checked: a refusal is an error, never an
 //! empty success. Flags the server reports back for a STORE are collected.
 //!
@@ -39,6 +40,8 @@ pub(super) struct FlagRow {
     /// Absent when the server left the UID out; such a row is not used.
     pub uid: Option<u32>,
     pub flags: Flags,
+    /// The free-form keywords the message carries (its tags).
+    pub tags: Vec<String>,
 }
 
 impl ImapSession {
@@ -65,7 +68,9 @@ impl ImapSession {
         if command.has_literal() {
             return Err(SessionError::Refused("this command needs its own sending path".to_owned()));
         }
-        self.require_writable_mailbox()?;
+        if !command.is_about_a_mailbox() {
+            self.require_writable_mailbox()?;
+        }
         self.require_extension(command.needs())?;
         let line = command.line()?;
         self.exchange(&line).await
@@ -194,7 +199,8 @@ fn flag_row(attributes: &[AttributeValue<'_>]) -> FlagRow {
         }
     }
     let flags: Vec<Flag<'_>> = names.into_iter().map(Flag::from).collect();
-    FlagRow { uid, flags: map_flags(&flags).0 }
+    let (flags, tags) = map_flags(&flags);
+    FlagRow { uid, flags, tags }
 }
 
 #[cfg(test)]

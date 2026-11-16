@@ -3,10 +3,13 @@
 //! rest of the module map.
 
 pub mod account_config;
+mod account_folders;
 mod account_oauth;
+mod account_security;
 mod account_signature;
 mod account_smtp;
 mod change_refusals;
+mod folder_rules;
 mod html_mail;
 mod imap_session;
 mod loopback_host;
@@ -25,6 +28,7 @@ mod sign_in_advice;
 mod text_clean;
 
 pub use account_config::{AccountConfig, ConfigError, Security, SmtpAuth, SmtpSettings, Trust};
+pub use account_folders::FolderPaths;
 pub use account_oauth::{AuthKind, OAuthSettings, token_file_in};
 pub use mime_render::{body_preference, set_body_preference};
 pub use mock::{Fixture, FixtureError};

@@ -4,6 +4,7 @@
 
 pub mod app_identity;
 pub mod app_view;
+pub mod ask;
 pub mod borders;
 pub mod composer;
 pub mod format;
@@ -19,6 +20,7 @@ pub mod setup;
 pub mod theme;
 pub mod view_bands;
 pub mod view_facts;
+pub mod view_overlays;
 pub mod view_panes;
 pub mod view_sidebar;
 pub mod view_state;
@@ -30,3 +32,6 @@ pub use composer::AddressBook;
 pub use options::{AccountSummary, OptionsAction, OptionsPaths};
 pub use reader_tools::HtmlPage;
 pub use setup::{AccountPrefill, SavedClient};
+
+#[cfg(test)]
+include!("lib.tests.rs");

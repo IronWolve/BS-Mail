@@ -72,6 +72,11 @@ pub enum Event {
     FlagsChanged {
         updates: Vec<(MessageId, Flags)>,
     },
+    /// The tags (free-form keywords, without the server's own marks) the
+    /// server now reports for messages, after `Command::SetTag`.
+    TagsChanged {
+        updates: Vec<(MessageId, Vec<String>)>,
+    },
     ConnectionState {
         account: AccountId,
         state: ConnectionState,

@@ -61,7 +61,12 @@ impl AppView {
     /// Whether letters go into a text box, so they are never read as the
     /// keys that close the program.
     pub fn takes_text(&self) -> bool {
-        self.composer.is_some() || self.setup.is_some() || self.search_bar.is_some()
+        self.composer.is_some()
+            || self.setup.is_some()
+            || self.search_bar.is_some()
+            || self.picker.is_some()
+            || self.find_is_editing()
+            || self.ask_takes_text()
     }
 
     /// The account file text the user asked to try, once.

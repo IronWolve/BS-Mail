@@ -51,12 +51,8 @@ pub(super) fn remap_event(slot: Slot, event: Event) -> Mapped<Event> {
         },
         Event::RawText { message, part, text } => Event::RawText { message: message_id(slot, message)?, part, text },
         Event::HtmlPage { message, html, removed } => Event::HtmlPage { message: message_id(slot, message)?, html, removed },
-        Event::FlagsChanged { updates } => Event::FlagsChanged {
-            updates: updates
-                .into_iter()
-                .map(|(message, flags)| Ok((message_id(slot, message)?, flags)))
-                .collect::<Mapped<_>>()?,
-        },
+        Event::FlagsChanged { updates } => Event::FlagsChanged { updates: remap_updates(slot, updates)? },
+        Event::TagsChanged { updates } => Event::TagsChanged { updates: remap_updates(slot, updates)? },
         Event::SearchResults { request, total, envelopes, incomplete } => {
             let envelopes = remap_envelopes(slot, envelopes)?;
             Event::SearchResults { request, total, envelopes, incomplete }
@@ -76,6 +72,11 @@ pub(super) fn remap_event(slot: Slot, event: Event) -> Mapped<Event> {
 
 fn folder_id(slot: Slot, id: FolderId) -> Mapped<FolderId> {
     encode_folder(slot, id).ok_or(OutOfRange)
+}
+
+/// The updates of an event that names messages, each with its own data.
+fn remap_updates<T>(slot: Slot, updates: Vec<(MessageId, T)>) -> Mapped<Vec<(MessageId, T)>> {
+    updates.into_iter().map(|(message, data)| Ok((message_id(slot, message)?, data))).collect()
 }
 
 fn message_id(slot: Slot, id: MessageId) -> Mapped<MessageId> {

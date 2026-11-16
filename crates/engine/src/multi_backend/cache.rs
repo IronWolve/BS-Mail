@@ -33,6 +33,7 @@ impl MemberCache {
             | Event::RawText { .. }
             | Event::HtmlPage { .. }
             | Event::FlagsChanged { .. }
+            | Event::TagsChanged { .. }
             | Event::SearchResults { .. }
             | Event::MessageSent { .. }
             | Event::OpFailed { .. } => {}

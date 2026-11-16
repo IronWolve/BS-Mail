@@ -42,6 +42,7 @@ pub(super) fn classify(event: &Event) -> Class {
         | Event::RawText { .. }
         | Event::HtmlPage { .. }
         | Event::FlagsChanged { .. }
+        | Event::TagsChanged { .. }
         | Event::SearchResults { .. } => Class::Answer,
         Event::MessageSent { .. } | Event::OpFailed { .. } => Class::Notice,
     }

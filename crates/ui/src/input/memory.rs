@@ -35,4 +35,6 @@ pub struct InputMemory {
     pub row_drag: Option<RowDrag>,
     /// `g` was pressed and its letter is awaited.
     pub go_pending: bool,
+    /// `F` was pressed and the letter of a folder action is awaited.
+    pub folder_pending: bool,
 }

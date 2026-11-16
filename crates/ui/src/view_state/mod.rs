@@ -2,6 +2,7 @@
 //! mail data the regions draw. This file only declares and re-exports them.
 
 pub mod focus;
+pub mod known_tags;
 pub mod mail_snapshot;
 pub mod overlays;
 pub mod page_merge;

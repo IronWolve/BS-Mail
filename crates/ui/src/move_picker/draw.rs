@@ -39,13 +39,17 @@ pub fn draw_picker(frame: &mut Frame, ctx: &DrawContext<'_>, grid: Rect, picker:
     }
     frame.effects.retain(|effect| !overlaps(effect.area(), rect));
     fill_cells(frame, rect, ctx.full(roles::MENU_BASE));
-    draw_frame(frame, ctx, rect, picker.targets.len());
+    let count = picker.targets.len();
+    let title = if count == 1 { " Move 1 message to ".to_string() } else { format!(" Move {count} messages to ") };
+    draw_frame(frame, ctx, rect, (&title, HINT));
     let inner = Rect::new(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2);
-    draw_prompt(frame, ctx, inner, picker);
+    draw_filter_line(frame, ctx, inner, &picker.filter);
     draw_rows(frame, ctx, (rect, inner), picker, &candidates);
 }
 
-fn draw_frame(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, count: usize) {
+/// The border of a picker box with its title on the top edge and its hint on
+/// the bottom edge. The tag picker draws the same box.
+pub(crate) fn draw_frame(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, (title, hint): (&str, &str)) {
     let border = ctx.fg(roles::MENU_BORDER);
     let set = ctx.borders;
     let (left, right) = (rect.x, rect.right() - 1);
@@ -65,16 +69,15 @@ fn draw_frame(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, count: usize
     put(frame, right, top, set.top_right);
     put(frame, left, bottom, set.bottom_left);
     put(frame, right, bottom, set.bottom_right);
-    let title = if count == 1 { " Move 1 message to ".to_string() } else { format!(" Move {count} messages to ") };
-    put_text(frame, rect, left + 2, top, &title, ctx.fg(roles::SECTION_TITLE));
-    let hint_at = right.saturating_sub(u16::try_from(HINT.chars().count()).unwrap_or(0) + 1);
-    put_text(frame, rect, hint_at, bottom, HINT, ctx.fg(roles::FOOTER_TEXT));
+    put_text(frame, rect, left + 2, top, title, ctx.fg(roles::SECTION_TITLE));
+    let hint_at = right.saturating_sub(u16::try_from(hint.chars().count()).unwrap_or(0) + 1);
+    put_text(frame, rect, hint_at, bottom, hint, ctx.fg(roles::FOOTER_TEXT));
 }
 
 /// The typed text after a prompt mark, then a rule; the caret sits after the
 /// last typed letter.
-fn draw_prompt(frame: &mut Frame, ctx: &DrawContext<'_>, inner: Rect, picker: &MovePicker) {
-    let text = format!("> {}", picker.filter);
+pub(crate) fn draw_filter_line(frame: &mut Frame, ctx: &DrawContext<'_>, inner: Rect, filter: &str) {
+    let text = format!("> {filter}");
     put_text(frame, inner, inner.x + 1, inner.y, &text, ctx.fg(roles::MENU_BASE));
     let rule = ctx.borders.horizontal.to_string().repeat(usize::from(inner.width));
     put_text(frame, inner, inner.x, inner.y + 1, &rule, ctx.fg(roles::MENU_BORDER));

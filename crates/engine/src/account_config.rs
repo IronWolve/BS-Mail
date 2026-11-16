@@ -31,6 +31,7 @@
 //! save_sent = true           # true | false                (default true)
 //!
 //! signature = "Alex Rivera\nacme.example"  # optional; \n starts a new line
+//! folders = { trash = "Papierkorb" }       # optional; see `account_folders.rs`
 //! ```
 //!
 //! `signature` is the text the composer puts under the cursor of a new
@@ -67,35 +68,13 @@ use std::path::{Path, PathBuf};
 use model::{Secret, wipe_text};
 use serde::Deserialize;
 
+use crate::account_folders::FolderPaths;
 use crate::account_oauth::{AuthKind, OAuthSettings, RawOAuth, token_file_in};
 use crate::account_signature::clean_signature;
 use crate::account_smtp::RawSmtp;
+pub use crate::account_security::{Security, Trust};
 pub use crate::account_smtp::{SmtpAuth, SmtpSettings};
 pub use crate::loopback_host::is_loopback_host;
-
-/// How the connection is protected.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Security {
-    /// TLS from the first byte (port 993).
-    #[default]
-    Implicit,
-    /// A plain connection upgraded with STARTTLS before any sign-in.
-    Starttls,
-    /// No TLS. Loopback hosts only.
-    None,
-}
-
-/// How the server's certificate is judged.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Trust {
-    /// Check it against the bundled root certificates.
-    #[default]
-    Verify,
-    /// Accept any certificate. Loopback hosts only.
-    Any,
-}
 
 /// How often the program checks for new mail when the file says nothing.
 pub const DEFAULT_POLL_SECONDS: u32 = 60;
@@ -129,6 +108,9 @@ pub struct AccountConfig {
     /// The text the composer puts under a new message, lines joined with a
     /// newline; empty for none. See `account_signature`.
     pub signature: String,
+    /// The folders the file names as Sent, Drafts, Trash, Archive and Spam,
+    /// which win over the guessed roles. See `account_folders`.
+    pub folders: FolderPaths,
     /// The folder this account keeps what it must not lose in: its sign-in
     /// tokens and the copies of sent mail not yet saved on the server. `None`
     /// for text parsed in memory, which has no folder of its own.
@@ -201,6 +183,8 @@ struct RawAccount {
     save_sent: Option<bool>,
     poll_seconds: Option<u32>,
     signature: Option<String>,
+    #[serde(default)]
+    folders: FolderPaths,
 }
 
 /// Reads an optional text value of the file straight into a `Secret`, so the
@@ -317,6 +301,7 @@ impl AccountConfig {
             poll_seconds: resolve_poll_seconds(raw.poll_seconds),
             oauth,
             signature: clean_signature(raw.signature.as_deref()),
+            folders: raw.folders.checked()?,
             state_dir: None,
         };
         config.validate()?;

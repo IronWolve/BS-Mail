@@ -108,6 +108,7 @@ fn has_status(envelope: &Envelope, status: Status) -> bool {
         Status::Flagged => flags.flagged,
         Status::Answered => flags.answered,
         Status::Draft => flags.draft,
+        Status::Alert => flags.alert,
     }
 }
 

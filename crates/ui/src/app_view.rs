@@ -11,8 +11,9 @@ use crate::app_identity::AppIdentity;
 use crate::icons::IconSet;
 use crate::composer::{AddressBook, ComposeForm};
 use crate::composer::EditorBuffer;
+use crate::ask::Ask;
 use crate::delete_prompt::DeletePrompt;
-use crate::delete_prompt::draw::draw_delete_prompt;
+use crate::input::done_note::DoneNote;
 use crate::move_picker::MovePicker;
 use crate::options::OptionsState;
 use crate::options::draw::draw_options;
@@ -22,9 +23,6 @@ use crate::reader_tools::ReaderTools;
 use crate::search::ActiveSearch;
 use crate::setup::SetupForm;
 use crate::setup::draw::draw_setup;
-use crate::search::draw::draw_search_bar;
-use crate::move_picker::draw::draw_picker;
-use crate::composer::draw::draw_composer;
 use crate::input::memory::InputMemory;
 use crate::view_bands::draw_too_small;
 use crate::input::menus::OpenMenu;
@@ -36,10 +34,10 @@ use crate::layout::{
 };
 use crate::theme::{Theme, roles};
 use crate::view_state::{
-    Focus, MailSnapshot, OverlayKind, Overlays, Place, ScrollState, Selection,
+    Focus, MailSnapshot, Overlays, Place, ScrollState, Selection,
 };
 use crate::widgets::{
-    DrawContext, StatusLine, content_rows, draw_chrome_lines, draw_help, draw_menu, fill_cells, visible_rows,
+    DrawContext, StatusLine, content_rows, draw_chrome_lines, fill_cells, visible_rows,
 };
 
 pub struct AppView {
@@ -103,6 +101,10 @@ pub struct AppView {
     pub(crate) picker: Option<MovePicker>,
     /// The question before mail is deleted, while it is open.
     pub(crate) delete_prompt: Option<DeletePrompt>,
+    /// The box of a folder action or of the tags, while one is open.
+    pub(crate) ask: Option<Ask>,
+    /// The word that waits for the backend's answer (see `done_note`).
+    pub(crate) done_note: Option<DoneNote>,
     /// The account row the keyboard cursor is on, once the sidebar's cursor
     /// has run on past the last folder.
     pub(crate) account_cursor: Option<usize>,
@@ -177,6 +179,8 @@ impl AppView {
             marked: BTreeSet::new(),
             picker: None,
             delete_prompt: None,
+            ask: None,
+            done_note: None,
             account_cursor: None,
             moved_note: None,
             search_bar: None,
@@ -235,6 +239,7 @@ impl AppView {
         }
         let (folder, message) = (self.selection.folder, self.selection.message);
         let done = self.settle_moved_note(&event);
+        let said = self.settle_done_note(&event);
         let lists = matches!(event, Event::AccountList(_) | Event::FolderList { .. });
         let rise = self.unread_rise(&event);
         self.mail.apply(event, &mut self.selection);
@@ -243,6 +248,9 @@ impl AppView {
         }
         if done.is_some() {
             self.mail.set_note(done);
+        }
+        if said.is_some() {
+            self.mail.done_text = said;
         }
         // A folder list that no longer has the open folder moves the
         // selection to another one: nothing of the old folder stays shown.
@@ -344,24 +352,7 @@ impl AppView {
         }
         self.mark_focus(&mut frame, &layout);
         self.draw_hover(&mut frame, &ctx, &layout);
-        if let Some(form) = &self.composer {
-            draw_composer(&mut frame, &ctx, layout.main, form);
-        }
-        if let Some(picker) = &self.picker {
-            draw_picker(&mut frame, &ctx, area, picker, &self.mail.folders);
-        }
-        if let Some(prompt) = &self.delete_prompt {
-            draw_delete_prompt(&mut frame, &ctx, area, prompt);
-        }
-        if let Some(bar) = &self.search_bar {
-            draw_search_bar(&mut frame, &ctx, area, bar);
-        }
-        if let Some(open) = &self.menu {
-            draw_menu(&mut frame, &ctx, area, &open.menu);
-        }
-        if self.overlays.open == Some(OverlayKind::Help) {
-            draw_help(&mut frame, &ctx, area, &self.capabilities, self.overlays.help_scroll);
-        }
+        self.draw_modals(&mut frame, &ctx, &layout, &self.capabilities);
         frame
     }
 }

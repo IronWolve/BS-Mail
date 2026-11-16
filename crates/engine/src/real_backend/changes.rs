@@ -1,4 +1,5 @@
-//! Carrying out a flag change, a move or a delete, and reporting it.
+//! Carrying out a flag change, a move, a delete, a tag, a folder action or a
+//! change to every message of a folder, and reporting it.
 //!
 //! Every change follows the same path: the message ids are resolved to exact
 //! UIDs, each folder is opened for changes and its UIDVALIDITY checked against
@@ -23,6 +24,8 @@ const FOLDER_CHANGED: &str = "the folder changed on the server, so nothing was d
 pub(super) struct Tally {
     /// New flags of messages, as the server reported them.
     pub updates: Vec<(MessageId, Flags)>,
+    /// New tags of messages, as the server reported them.
+    pub tags: Vec<(MessageId, Vec<String>)>,
     /// Folders whose contents or flags changed, each once.
     pub touched: Vec<FolderId>,
     /// Messages left or arrived in a folder: pages are read again.
@@ -117,6 +120,14 @@ impl Worker {
             }
             Command::Move { messages, to } => self.move_messages(session, &messages, to, &mut tally).await,
             Command::Delete { messages } => self.delete_messages(session, &messages, &mut tally).await,
+            Command::SetTag { messages, tag, on } => self.set_tag(session, &messages, (&tag, on), &mut tally).await,
+            Command::CreateFolder { account, parent, name } => {
+                self.create_folder(session, (&account, parent, &name), &mut tally).await
+            }
+            Command::RenameFolder { folder, name } => self.rename_folder(session, folder, &name, &mut tally).await,
+            Command::DeleteFolder { folder } => self.delete_folder(session, folder, &mut tally).await,
+            Command::MarkAllRead { folder } => self.mark_all_read(session, folder, &mut tally).await,
+            Command::EmptyFolder { folder } => self.empty_folder(session, folder, &mut tally).await,
             _ => return Ok(()),
         };
         let finished = match done {
@@ -175,8 +186,16 @@ impl Worker {
         Ok(())
     }
 
-    /// Tells the screen the flags the server confirmed.
+    /// Tells the screen the tags the server confirmed.
+    fn send_tag_updates(&mut self, tally: &mut Tally) {
+        if !tally.tags.is_empty() {
+            self.sink.send(Event::TagsChanged { updates: std::mem::take(&mut tally.tags) });
+        }
+    }
+
+    /// Tells the screen the flags and tags the server confirmed.
     pub(super) fn send_flag_updates(&mut self, tally: &mut Tally) {
+        self.send_tag_updates(tally);
         if tally.updates.is_empty() {
             return;
         }

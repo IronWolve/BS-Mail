@@ -15,6 +15,7 @@ impl AppView {
                 // A drag whose release never came ends with the next press.
                 self.cancel_row_drag();
                 self.reading.stop_dragging();
+                self.cancel_folder_keys();
                 if self.begin_drag(pos.col, pos.row, grid) {
                     return true;
                 }

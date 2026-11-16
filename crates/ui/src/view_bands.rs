@@ -43,7 +43,7 @@ impl AppView {
             connection: self.connection(),
             mailbox,
             status: &self.mail.status,
-            error: self.mail.error.as_deref().or(self.config_problem.as_deref()),
+            error: self.mail.error.as_deref().or(self.mail.setup_problem.as_deref()).or(self.mail.done_text.as_deref()).or(self.config_problem.as_deref()),
             notice: self.new_mail_notice(),
         }
     }

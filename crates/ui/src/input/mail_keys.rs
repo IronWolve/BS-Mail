@@ -1,5 +1,6 @@
-//! The keys that act on messages, as one table: read and star, delete, the
-//! marks, the moves (picker, Archive, Spam) and stepping through the list.
+//! The keys that act on messages, as one table: read and star, the alert mark
+//! and tags, delete, the marks, the moves (picker, Archive, Spam), the folder
+//! keys and stepping through the list.
 //! Each only calls the feature's own file; none talks to the backend here.
 
 use super::action::Action;
@@ -22,6 +23,9 @@ impl AppView {
             Action::NextMessage => self.show_neighbor(Action::Down, grid),
             Action::PreviousMessage => self.show_neighbor(Action::Up, grid),
             Action::NextUnread => self.show_next_unread(grid),
+            Action::Tag => self.start_tag(),
+            Action::ToggleAlert => self.toggle_alert(),
+            Action::FolderKeys => self.begin_folder_keys(),
             _ => return false,
         }
         true

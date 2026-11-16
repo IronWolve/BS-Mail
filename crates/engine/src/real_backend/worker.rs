@@ -71,6 +71,9 @@ pub(super) struct Worker {
     pub(super) no_sent_told: bool,
     /// The session just ended on the save of a sent copy that was cut off.
     pub(super) copy_cut_off: bool,
+    /// The person was told, in this run, which folders of the account file
+    /// are not on the server.
+    pub(super) roles_told: bool,
 }
 
 /// How a pause between connection attempts ended.
@@ -110,6 +113,7 @@ impl Worker {
             sends,
             no_sent_told: false,
             copy_cut_off: false,
+            roles_told: false,
         }
     }
 

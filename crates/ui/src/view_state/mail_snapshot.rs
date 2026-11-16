@@ -1,6 +1,6 @@
 //! The mail data the regions draw, kept up to date from backend events.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use model::{
     Account, AccountId, Body, Envelope, Event, Folder, FolderId, MessageId, SyncStatus,
@@ -60,6 +60,15 @@ pub struct MailSnapshot {
     /// Folders the user opened or closed, which a fresh folder list must not
     /// undo.
     pub expanded_by_user: std::collections::HashMap<FolderId, bool>,
+    /// The tags seen on each account's mail (see `known_tags`).
+    pub known_tags: HashMap<AccountId, BTreeSet<String>>,
+    /// A problem with an account's setup, which no later success ends: the
+    /// footer keeps it under any other failure (see `note_failure`).
+    pub setup_problem: Option<String>,
+    /// What the footer says of a folder action or a tag that is done ("Made
+    /// the folder Notes"): the page that follows does not end it, a failure or
+    /// the next key does (see `done_note`).
+    pub done_text: Option<String>,
 }
 
 impl MailSnapshot {
@@ -190,6 +199,7 @@ impl MailSnapshot {
             }
         };
         selection.page_loaded(folder, &envelopes);
+        self.remember_tags(selection.account.as_ref(), &envelopes);
         self.clear_failure(selection.account.as_ref());
         self.page = Some(ListPage { folder, offset, total, envelopes });
     }
@@ -236,7 +246,7 @@ impl MailSnapshot {
 
     /// Ends the failure shown when it is about `account`, or is a note that
     /// is not about any. `None` is for an answer with no account in view.
-    fn clear_failure(&mut self, account: Option<&AccountId>) {
+    pub(super) fn clear_failure(&mut self, account: Option<&AccountId>) {
         if self.error_account.is_none() || self.error_account.as_ref() == account {
             self.set_note(None);
         }
@@ -252,6 +262,14 @@ impl MailSnapshot {
             }
             None => format!("{operation}: {reason}"),
         };
+        self.done_text = None;
+        if operation == "folders" {
+            // The account file names a folder the server does not have: said
+            // once, and kept, because the next page or body would end a
+            // failure before it could be read.
+            self.setup_problem = Some(text);
+            return;
+        }
         self.error = Some(text);
         self.error_account = account;
         if operation == "move" || operation == "delete" {
@@ -262,6 +280,7 @@ impl MailSnapshot {
     /// A page of older mail. It only means something next to the list it
     /// follows: the same folder, still open.
     fn apply_older(&mut self, folder: FolderId, total: u32, envelopes: Vec<Envelope>, selection: &Selection) {
+        self.remember_tags(selection.account.as_ref(), &envelopes);
         let Some(page) = self.page.as_mut().filter(|page| page.folder == folder) else {
             return;
         };
@@ -298,6 +317,7 @@ impl MailSnapshot {
                     }
                 }
             }
+            Event::TagsChanged { updates } => self.apply_tags(updates, selection),
             _ => {}
         }
     }

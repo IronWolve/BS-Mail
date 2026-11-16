@@ -1,12 +1,12 @@
 //! IMAP flags and keywords to the model's flags and tags.
 
 use async_imap::types::Flag;
-use model::Flags;
+use model::{BOOKKEEPING_KEYWORDS, Flags};
 
 /// Keywords the server or other clients set for their own bookkeeping; they
 /// are not tags the user sees. (`$Forwarded` is not among them: it is the
 /// forwarded mark.)
-const BOOKKEEPING: [&str; 5] = ["nonjunk", "junk", "notjunk", "mdnsent", "phishing"];
+const BOOKKEEPING: [&str; 5] = BOOKKEEPING_KEYWORDS;
 
 /// The flags of one message and the free-form keywords it carries.
 pub fn map_flags(flags: &[Flag<'_>]) -> (Flags, Vec<String>) {

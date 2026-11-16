@@ -43,6 +43,8 @@ pub enum Status {
     Flagged,
     Answered,
     Draft,
+    /// The alert marker, the `$Important` keyword.
+    Alert,
 }
 
 /// A calendar day, already checked to exist.

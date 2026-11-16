@@ -104,7 +104,7 @@ impl Worker {
         targets.extend(inbox.filter(|id| Some(*id) != open));
         let mut found = Found::default();
         for id in targets {
-            let Some((path, listed)) = self.state.folder(id).map(|f| (f.path.clone(), (f.unread, f.total))) else {
+            let Some((path, listed)) = self.state.folder(id).filter(|f| !f.role.is_virtual()).map(|f| (f.path.clone(), (f.unread, f.total))) else {
                 continue;
             };
             let counts = match session.status_for_check(&path).await {

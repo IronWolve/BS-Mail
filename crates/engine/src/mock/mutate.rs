@@ -134,7 +134,7 @@ fn touch(touched: &mut Vec<FolderId>, folder: FolderId) {
 }
 
 /// Shifts a folder's counts and those of its ancestors, never below zero.
-fn adjust_counts(data: &mut Fixture, folder: FolderId, unread: i64, total: i64) {
+pub(super) fn adjust_counts(data: &mut Fixture, folder: FolderId, unread: i64, total: i64) {
     let mut next = Some(folder);
     // The bound keeps a malformed (cyclic) tree from looping forever.
     for _ in 0..data.folders.len() {

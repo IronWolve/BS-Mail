@@ -1,5 +1,6 @@
 //! Which folder is the Inbox, Sent, Drafts, Archive, Spam or Trash: the
-//! server's SPECIAL-USE attributes first, common names as a fallback.
+//! folders the account file names first, then the server's SPECIAL-USE
+//! attributes, with common names as a fallback.
 //!
 //! "Bin" is not among the names for the Trash. Servers that call their Trash
 //! "Bin" mark it, and a person's own folder with that name must never become
@@ -9,6 +10,7 @@ use model::FolderRole;
 
 use super::mutf7;
 use super::raw_folder::RawFolder;
+use crate::account_folders::FolderPaths;
 
 /// Roles that can be told apart by a name; the first folder to claim a role
 /// keeps it.
@@ -69,6 +71,34 @@ pub fn assign_roles(folders: &[RawFolder]) -> Vec<FolderRole> {
         }
     }
     roles
+}
+
+/// A role the account file names that no usable folder answers to: the role
+/// and the path as the file wrote it.
+pub type Unmatched = (FolderRole, String);
+
+/// `assign_roles`, then the folders the account file names laid over the
+/// guess: a named role goes to the folder with that path (as the server writes
+/// it or as people read it) and to no other. A named path that is not on the
+/// server, or is the Inbox, leaves the guess for that role alone and is
+/// returned, for the person to be told.
+pub fn assign_roles_named(folders: &[RawFolder], named: &FolderPaths) -> (Vec<FolderRole>, Vec<Unmatched>) {
+    let mut roles = assign_roles(folders);
+    let mut unmatched = Vec::new();
+    for (role, path) in named.named() {
+        let found = folders.iter().position(|folder| {
+            !folder.path.eq_ignore_ascii_case("INBOX") && (folder.path == path || mutf7::decode(&folder.path) == path)
+        });
+        let Some(at) = found else {
+            unmatched.push((role, path.to_owned()));
+            continue;
+        };
+        for held in roles.iter_mut().filter(|held| **held == role) {
+            *held = FolderRole::Plain;
+        }
+        roles[at] = role;
+    }
+    (roles, unmatched)
 }
 
 fn claimed(roles: &[FolderRole], role: FolderRole) -> bool {

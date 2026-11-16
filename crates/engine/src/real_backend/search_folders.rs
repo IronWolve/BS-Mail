@@ -12,13 +12,15 @@ pub(super) struct Target {
 }
 
 /// The folders to search, Inbox first and the rest in the order of the
-/// folder tree. Without `folder:` terms that is every folder except Trash
+/// folder tree. The saved searches (Starred, Alerts) are not mailboxes and
+/// are never searched. Without `folder:` terms that is every folder except Trash
 /// and Spam; with them, every folder whose path or name contains each of
 /// the texts (any letter case), the Trash and Spam folders included when
 /// they match.
 pub(super) fn choose(folders: &[Folder], filters: &[String]) -> Vec<Target> {
     let mut chosen: Vec<&Folder> = folders
         .iter()
+        .filter(|folder| !folder.role.is_virtual())
         .filter(|folder| {
             if filters.is_empty() {
                 !matches!(folder.role, FolderRole::Trash | FolderRole::Spam)

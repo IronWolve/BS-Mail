@@ -5,20 +5,13 @@
 //! says (and starts on Keep), and a click on a button does the same. Nothing
 //! else reaches the screen underneath.
 
-use surface::{ButtonState, InputEvent, KeyEvent, LogicalKey, NamedKey, PointerButton, Rect};
+use surface::{InputEvent, Rect};
 
+use super::question::{Step, question_step, refuses};
 use crate::app_view::AppView;
-use crate::delete_prompt::draw::{button_at, confirm_label, prompt_rects};
-use crate::delete_prompt::{Choice, DeletePrompt};
+use crate::delete_prompt::draw::confirm_label;
+use crate::delete_prompt::{Choice, DeletePrompt, draw::KEEP};
 use model::{Command, MessageId};
-
-/// The keys that answer the question with no: `n` and Escape.
-fn refuses(key: &KeyEvent) -> bool {
-    !key.modifiers.ctrl
-        && !key.modifiers.alt
-        && !key.modifiers.meta
-        && matches!(key.key, LogicalKey::Char('n' | 'N') | LogicalKey::Named(NamedKey::Escape))
-}
 
 impl AppView {
     /// How many of `ids` a delete would remove for good: the ones whose own folder
@@ -57,37 +50,18 @@ impl AppView {
                 _ => false,
             };
         }
-        match event {
-            InputEvent::Key(key) => self.delete_prompt_key(key),
-            InputEvent::Button { button: PointerButton::Left, state: ButtonState::Pressed, pos, .. } => {
-                let area = Rect::new(0, 0, grid.0, grid.1);
-                let confirm = confirm_label(self.delete_prompt.as_ref().map_or(0, |prompt| prompt.for_good));
-                let choice = prompt_rects(area, confirm).and_then(|rects| button_at(&rects, pos.col, pos.row));
-                match choice {
-                    Some(choice) => self.answer_delete_prompt(choice),
-                    None => return false,
-                }
-                true
-            }
-            _ => false,
-        }
-    }
-
-    fn delete_prompt_key(&mut self, key: &KeyEvent) -> bool {
-        if key.modifiers.ctrl || key.modifiers.alt || key.modifiers.meta {
+        let Some(prompt) = self.delete_prompt.as_ref() else {
             return false;
-        }
-        let focus = self.delete_prompt.as_ref().map_or(Choice::Keep, |prompt| prompt.focus);
-        match key.key {
-            LogicalKey::Char('y' | 'Y') => self.answer_delete_prompt(Choice::Delete),
-            LogicalKey::Char('n' | 'N') | LogicalKey::Named(NamedKey::Escape) => self.answer_delete_prompt(Choice::Keep),
-            LogicalKey::Named(NamedKey::Enter) => self.answer_delete_prompt(focus),
-            LogicalKey::Named(NamedKey::Left | NamedKey::Right | NamedKey::Tab) => {
+        };
+        let labels = (confirm_label(prompt.for_good), KEEP);
+        match question_step(event, Rect::new(0, 0, grid.0, grid.1), labels, prompt.focus) {
+            Some(Step::Pick(choice)) => self.answer_delete_prompt(choice),
+            Some(Step::Toggle) => {
                 if let Some(prompt) = self.delete_prompt.as_mut() {
                     prompt.toggle();
                 }
             }
-            _ => return false,
+            None => return false,
         }
         true
     }

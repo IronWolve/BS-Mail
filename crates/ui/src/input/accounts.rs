@@ -45,6 +45,7 @@ impl AppView {
         self.mail.page = None;
         self.mail.body = None;
         self.mail.set_note(None);
+        self.mail.done_text = None;
         self.mail.relocated.clear();
         self.mail.status = SyncStatus::default();
         self.mail.changes_refused = false;
@@ -57,6 +58,8 @@ impl AppView {
         self.search_bar = None;
         self.marked.clear();
         self.picker = None;
+        self.ask = None;
+        self.done_note = None;
         self.account_cursor = None;
         self.moved_note = None;
         self.read_timer = None;
@@ -85,6 +88,8 @@ impl AppView {
         self.search_bar = None;
         self.marked.clear();
         self.picker = None;
+        self.ask = None;
+        self.done_note = None;
         self.account_cursor = None;
         self.moved_note = None;
         self.composer = None;

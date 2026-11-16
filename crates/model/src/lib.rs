@@ -10,7 +10,9 @@ pub mod envelope;
 pub mod event;
 pub mod flags;
 pub mod folder;
+pub mod folder_rules;
 pub mod ids;
+pub mod names;
 pub mod sync_status;
 pub mod theme_schema;
 
@@ -22,5 +24,7 @@ pub use envelope::{Envelope, MailDate};
 pub use event::Event;
 pub use flags::{FlagChange, Flags};
 pub use folder::{Account, Folder, FolderRole};
+pub use folder_rules::{holds_folders, not_emptiable, protected, saved_search_refusal};
 pub use ids::{AccountId, FolderId, MessageId, RequestId, ThreadId, Uid};
+pub use names::{BOOKKEEPING_KEYWORDS, MAX_FOLDER_NAME, MAX_TAG, check_folder_name, check_tag};
 pub use sync_status::{ConnectionState, Quota, SyncState, SyncStatus};

@@ -102,6 +102,7 @@ const fn status_key(status: Status) -> &'static str {
         Status::Flagged => "FLAGGED",
         Status::Answered => "ANSWERED",
         Status::Draft => "DRAFT",
+        Status::Alert => "KEYWORD $Important",
     }
 }
 

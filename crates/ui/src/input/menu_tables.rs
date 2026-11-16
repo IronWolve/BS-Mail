@@ -3,6 +3,8 @@
 //! Each row has the words, and the letter that chooses it, which is a letter
 //! of the words (a test keeps the letters unique within a menu).
 
+use model::FolderRole;
+
 use crate::widgets::context_menu::{Menu, MenuEntry};
 
 /// What choosing an entry does.
@@ -16,6 +18,8 @@ pub enum MenuAction {
     Move,
     ToggleRead,
     ToggleStar,
+    ToggleAlert,
+    Tag,
     Archive,
     Spam,
     CopySender,
@@ -26,6 +30,12 @@ pub enum MenuAction {
     OpenInBrowser,
     FindInMessage,
     OpenFolder,
+    NewFolder,
+    NewTopFolder,
+    RenameFolder,
+    DeleteFolder,
+    MarkAllRead,
+    EmptyFolder,
     SyncNow,
     EditAccount,
     OpenLink,
@@ -67,6 +77,8 @@ const MESSAGE_ROWS: &[Row] = &[
     row(Move, "Move...", 'm'),
     row(ToggleRead, "Mark read", 'k'),
     row(ToggleStar, "Star", 's'),
+    row(ToggleAlert, "Alert", 'l'),
+    row(Tag, "Tag...", 'g'),
     row(Archive, "Archive", 'c'),
     row(Spam, "Spam", 'p'),
     row(CopySender, "Copy sender", 'o'),
@@ -78,7 +90,16 @@ const MESSAGE_ROWS: &[Row] = &[
     row(OpenInBrowser, "Open in browser", 'w'),
 ];
 
-const FOLDER_ROWS: &[Row] = &[row(OpenFolder, "Open", 'o'), row(SyncNow, "Sync now", 's')];
+const FOLDER_ROWS: &[Row] = &[
+    row(OpenFolder, "Open", 'o'),
+    row(SyncNow, "Sync now", 's'),
+    row(NewFolder, "New subfolder...", 'n'),
+    row(NewTopFolder, "New top-level folder...", 't'),
+    row(RenameFolder, "Rename...", 'r'),
+    row(DeleteFolder, "Delete...", 'd'),
+    row(MarkAllRead, "Mark all read", 'm'),
+    row(EmptyFolder, "Empty", 'e'),
+];
 
 const ACCOUNT_ROWS: &[Row] = &[row(EditAccount, "Edit account", 'e'), row(SyncNow, "Sync now", 's')];
 
@@ -101,6 +122,11 @@ pub struct MenuFacts {
     pub all_seen: bool,
     /// Every one of them is starred: the entry then unstars.
     pub all_flagged: bool,
+    /// Every one of them has the alert mark: the entry then clears it.
+    pub all_alert: bool,
+    /// For a folder menu, the role of the folder pointed at, which decides
+    /// which of the actions apply to it.
+    pub folder: Option<FolderRole>,
     /// How many messages are marked; the menu says so in its title.
     pub marked: usize,
 }
@@ -110,13 +136,36 @@ fn label(row: &Row, facts: &MenuFacts) -> &'static str {
     match (row.action, facts.all_seen, facts.all_flagged) {
         (ToggleRead, true, _) => "Mark unread",
         (ToggleStar, _, true) => "Unstar",
+        (ToggleAlert, ..) if facts.all_alert => "Clear alert",
+        (EmptyFolder, ..) if facts.folder == Some(FolderRole::Spam) => "Empty Spam",
+        (EmptyFolder, ..) => "Empty Trash",
         _ => row.label,
+    }
+}
+
+/// Whether a row of the folder menu applies to the folder pointed at: a saved
+/// search (Starred, Alerts) only opens, syncs and gives a place for a new
+/// top-level folder; the special folders are not renamed or deleted; only the
+/// Trash and Spam are emptied.
+fn applies(row: &Row, facts: &MenuFacts) -> bool {
+    let Some(role) = facts.folder else {
+        return true;
+    };
+    match row.action {
+        NewFolder | MarkAllRead => !role.is_virtual(),
+        RenameFolder | DeleteFolder => !role.is_special(),
+        EmptyFolder => matches!(role, FolderRole::Trash | FolderRole::Spam),
+        _ => true,
     }
 }
 
 /// The menu of `kind`, opened at `anchor`.
 pub fn build_menu(kind: MenuKind, facts: &MenuFacts, anchor: (u16, u16)) -> Menu<MenuAction> {
-    let entries = rows(kind).iter().map(|row| MenuEntry::new(row.action, label(row, facts), row.hotkey)).collect();
+    let entries = rows(kind)
+        .iter()
+        .filter(|row| applies(row, facts))
+        .map(|row| MenuEntry::new(row.action, label(row, facts), row.hotkey))
+        .collect();
     let title = (facts.marked > 0 && matches!(kind, MenuKind::Message | MenuKind::Reader)).then(|| format!("{} marked", facts.marked));
     Menu::new(anchor, title, entries)
 }

@@ -20,6 +20,9 @@ impl AppView {
     /// Reacts to one input event on a `cols` x `rows` grid, once the text a
     /// command key brought with it has been set aside (see `paired_text`).
     pub(crate) fn dispatch_input(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
+        if matches!(event, InputEvent::Key(_)) {
+            self.mail.done_text = None;
+        }
         if self.setup.is_none() && self.options.is_none() && self.layout(grid.0, grid.1).too_small {
             return self.input_while_hidden(event, grid);
         }
@@ -37,6 +40,9 @@ impl AppView {
         }
         if self.picker.is_some() {
             return self.picker_input(event, grid);
+        }
+        if self.ask.is_some() {
+            return self.ask_input(event, grid);
         }
         if self.search_bar.is_some() {
             return self.search_input(event, grid);
@@ -67,6 +73,9 @@ impl AppView {
         }
         if self.memory.go_pending {
             return self.go_key(key);
+        }
+        if self.memory.folder_pending {
+            return self.folder_key(key);
         }
         match action_for(key) {
             Some(action) => {
@@ -199,6 +208,7 @@ impl AppView {
     pub(super) fn click(&mut self, col: u16, row: u16, modifiers: Modifiers, grid: (u16, u16)) -> bool {
         self.account_cursor = None;
         self.cancel_go_to();
+        self.cancel_folder_keys();
         let layout = self.layout(grid.0, grid.1);
         match self.hit(&layout, col, row) {
             Hit::Folder(index) => {
@@ -232,6 +242,8 @@ impl AppView {
             "invert_marks" => self.act(Action::InvertMarks, grid),
             "next_unread" => self.act(Action::NextUnread, grid),
             "move" => self.act(Action::Move, grid),
+            "tag" => self.act(Action::Tag, grid),
+            "alert" => self.act(Action::ToggleAlert, grid),
             "search" => self.start_search(),
             "sync" => self.act(Action::Sync, grid),
             "help" => self.act(Action::Help, grid),

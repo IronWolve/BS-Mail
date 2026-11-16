@@ -59,6 +59,7 @@ impl AppView {
             && self.options.is_none()
             && self.composer.is_none()
             && self.picker.is_none()
+            && self.ask.is_none()
             && self.search_bar.is_none()
             && !self.find_is_editing()
     }

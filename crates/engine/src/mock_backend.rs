@@ -15,6 +15,8 @@ use crate::mock::{raw_view, search};
 use crate::mock::{account_state, select_account};
 use crate::mock::{Fixture, FixtureError};
 
+mod folder_commands;
+
 /// What a message with no fixture body shows when it is opened.
 const PLACEHOLDER_BODY: &str = "(The mock fixture holds no body for this message.)";
 
@@ -114,6 +116,9 @@ impl MockBackend {
     /// page when the fixture holds only a sample; a folder with no messages
     /// is empty.
     fn envelope_page(&self, folder: FolderId) -> Event {
+        if let Some(role) = self.data.folders.iter().find(|entry| entry.id == folder).map(|entry| entry.role).filter(|role| role.is_virtual()) {
+            return self.saved_search_page(folder, role);
+        }
         let mut envelopes: Vec<Envelope> = self
             .data
             .messages
@@ -337,6 +342,12 @@ impl MailBackend for MockBackend {
             Command::SetFlags { messages, change } => self.set_flags(&messages, change),
             Command::Move { messages, to } => self.move_to(&messages, to),
             Command::Delete { messages } => self.delete(&messages),
+            change @ (Command::SetTag { .. }
+            | Command::CreateFolder { .. }
+            | Command::RenameFolder { .. }
+            | Command::DeleteFolder { .. }
+            | Command::MarkAllRead { .. }
+            | Command::EmptyFolder { .. }) => self.change_command(change),
             Command::Search {
                 request,
                 account,

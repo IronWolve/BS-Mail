@@ -52,12 +52,18 @@ impl AppView {
         MenuFacts {
             all_seen: !targets.is_empty() && targets.iter().all(|envelope| envelope.flags.seen),
             all_flagged: !targets.is_empty() && targets.iter().all(|envelope| envelope.flags.flagged),
+            all_alert: !targets.is_empty() && targets.iter().all(|envelope| envelope.flags.alert),
             marked: self.marked.len(),
+            folder: None,
         }
     }
 
     fn open_menu(&mut self, kind: MenuKind, target: MenuTarget, anchor: (u16, u16)) {
-        let facts = if matches!(target, MenuTarget::Selected) { self.menu_facts() } else { MenuFacts::default() };
+        let facts = match &target {
+            MenuTarget::Selected => self.menu_facts(),
+            MenuTarget::Folder(id) => MenuFacts { folder: self.mail.folder(*id).map(|folder| folder.role), ..MenuFacts::default() },
+            _ => MenuFacts::default(),
+        };
         self.menu = Some(OpenMenu { menu: build_menu(kind, &facts, anchor), target });
     }
 

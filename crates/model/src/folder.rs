@@ -34,6 +34,19 @@ pub enum FolderRole {
     Plain,
 }
 
+impl FolderRole {
+    /// A folder the program relies on or that is not a mailbox: it cannot be
+    /// renamed or deleted, because mail is sent, filed and deleted by its role.
+    pub fn is_special(self) -> bool {
+        self != Self::Plain
+    }
+
+    /// A saved search shown among the folders, not a mailbox on the server.
+    pub fn is_virtual(self) -> bool {
+        matches!(self, Self::Starred | Self::Alerts)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Folder {
     pub id: FolderId,
@@ -48,3 +61,6 @@ pub struct Folder {
     pub total: u32,
     pub expanded: bool,
 }
+
+#[cfg(test)]
+include!("folder.tests.rs");

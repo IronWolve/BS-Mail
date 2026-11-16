@@ -9,8 +9,10 @@ use model::FolderRole;
 pub(crate) const DELETED_NOT_HERE: &str = "the deleted flag is not changed this way; use delete";
 
 /// Why a delete is refused on an account with no Trash folder. It never
-/// becomes a removal for good.
-pub(crate) const NO_TRASH: &str = "this account has no Trash folder; nothing was deleted";
+/// becomes a removal for good. It names the key of the account file that says
+/// which folder is the Trash.
+pub(crate) const NO_TRASH: &str = "this account has no Trash folder; nothing was deleted. \
+     Name one in the account file: folders = { trash = \"<the folder's path on the server>\" }";
 
 /// Why a move to a Starred or Alerts folder is refused.
 pub(crate) const SAVED_SEARCH: &str = "that folder is a saved search, not a mailbox; nothing was moved";

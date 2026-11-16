@@ -29,6 +29,9 @@ pub struct SessionState {
     folder_ids: HashMap<String, FolderId>,
     folders: Vec<Folder>,
     validity: HashMap<FolderId, u32>,
+    /// The server's separator between a folder and the one inside it, as the
+    /// last listing gave it; `None` for a flat namespace or before any listing.
+    delimiter: Option<String>,
     messages: HashMap<(FolderId, Uid), MessageId>,
     keys: HashMap<MessageId, (FolderId, Uid)>,
 }
@@ -60,9 +63,47 @@ impl SessionState {
         self.folders.iter().find(|folder| folder.id == id)
     }
 
-    /// The server's name for a folder in the current listing.
+    /// The server's name for a folder in the current listing. A saved search
+    /// (Starred, Alerts) is not a mailbox and has none, so no command ever
+    /// carries its name to the server.
     pub fn folder_path(&self, id: FolderId) -> Option<&str> {
-        self.folder(id).map(|folder| folder.path.as_str())
+        self.folder(id).filter(|folder| !folder.role.is_virtual()).map(|folder| folder.path.as_str())
+    }
+
+    /// The separator the server uses between a folder and the one inside it.
+    pub fn delimiter(&self) -> Option<&str> {
+        self.delimiter.as_deref()
+    }
+
+    pub fn set_delimiter(&mut self, delimiter: Option<String>) {
+        self.delimiter = delimiter;
+    }
+
+    /// A folder was renamed on the server: it and every folder inside it keep
+    /// their ids under their new names, so what the screen holds (the open
+    /// folder, the messages shown) stays valid.
+    pub fn rename_folder_paths(&mut self, from: &str, to: &str) {
+        let separator = self.delimiter.clone().unwrap_or_default();
+        let moved: Vec<(String, FolderId)> = self
+            .folder_ids
+            .iter()
+            .filter(|(path, _)| {
+                path.as_str() == from
+                    || (!separator.is_empty() && path.strip_prefix(from).is_some_and(|rest| rest.starts_with(separator.as_str())))
+            })
+            .map(|(path, id)| (path.clone(), *id))
+            .collect();
+        for (path, id) in moved {
+            self.folder_ids.remove(&path);
+            self.folder_ids.insert(format!("{to}{}", &path[from.len()..]), id);
+        }
+    }
+
+    /// A folder was deleted on the server: nothing known about its messages
+    /// stays, so a folder made later under the same name starts clean.
+    pub fn forget_folder(&mut self, id: FolderId) {
+        self.validity.remove(&id);
+        self.forget_messages(id);
     }
 
     /// The current listing.

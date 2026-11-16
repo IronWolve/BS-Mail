@@ -9,6 +9,7 @@ mod convert_mail;
 mod fixture_error;
 mod fixture_load;
 mod fixture_schema;
+pub(crate) mod folder_actions;
 pub(crate) mod mutate;
 pub(crate) mod raw_view;
 pub(crate) mod search;

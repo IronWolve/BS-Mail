@@ -11,6 +11,7 @@ use tokio::time::{Instant, MissedTickBehavior, interval_at};
 
 use super::lifecycle::connection;
 use super::raw_views::operation_of;
+use super::unsupported::change_operation;
 use super::worker::Worker;
 use crate::imap_session::{ImapSession, SessionError};
 
@@ -150,9 +151,7 @@ impl Worker {
                 let found = self.search(session, request, &account, &query).await;
                 self.settle_search(found)
             }
-            change @ (Command::SetFlags { .. } | Command::Move { .. } | Command::Delete { .. }) => {
-                self.change(session, change).await
-            }
+            change if change_operation(&change).is_some() => self.change(session, change).await,
             Command::Send { message } => self.send_online(session, message).await,
             other => {
                 self.answer_offline(other);

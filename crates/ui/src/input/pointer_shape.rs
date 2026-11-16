@@ -10,7 +10,8 @@ use super::drag::divider_at;
 use super::hit::{Hit, account_at};
 use crate::app_view::AppView;
 use crate::composer::mouse::pointer_shape as composer_shape;
-use crate::delete_prompt::draw::{button_at as prompt_button_at, confirm_label, prompt_rects};
+use crate::ask::Ask;
+use crate::delete_prompt::draw::{button_at as prompt_button_at, confirm_label, prompt_rects, prompt_rects_for};
 use crate::layout::Layout;
 
 fn hand_if(over: bool) -> PointerShape {
@@ -40,6 +41,16 @@ impl AppView {
         }
         if self.picker.is_some() {
             return hand_if(self.picker_row_under(col, row, grid));
+        }
+        if let Some(ask) = &self.ask {
+            return match ask {
+                Ask::Name(_) => self.name_pointer_shape(col, row, grid),
+                Ask::Tag(_) => hand_if(self.tag_row_under(col, row, grid)),
+                Ask::Confirm(prompt) => {
+                    let rects = prompt_rects_for(Rect::new(0, 0, grid.0, grid.1), prompt.yes, prompt.no);
+                    hand_if(rects.and_then(|rects| prompt_button_at(&rects, col, row)).is_some())
+                }
+            };
         }
         if self.search_bar.is_some() {
             return self.search_pointer_shape(col, row, grid);

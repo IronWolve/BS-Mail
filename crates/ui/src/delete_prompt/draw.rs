@@ -41,14 +41,19 @@ pub fn confirm_label(for_good: usize) -> &'static str {
 /// The box for a grid whose first button reads `confirm`, or `None` when the
 /// grid is too small for it.
 pub fn prompt_rects(grid: Rect, confirm: &str) -> Option<PromptRects> {
+    prompt_rects_for(grid, confirm, KEEP)
+}
+
+/// The box for a question whose buttons read `confirm` and `keep`.
+pub fn prompt_rects_for(grid: Rect, confirm: &str, keep: &str) -> Option<PromptRects> {
     let width = WIDTH.min(grid.width.saturating_sub(2));
-    if width < cells(confirm) + cells(KEEP) + 6 || grid.height < HEIGHT {
+    if width < cells(confirm) + cells(keep) + 6 || grid.height < HEIGHT {
         return None;
     }
     let frame = Rect::new(grid.x + (grid.width - width) / 2, grid.y + (grid.height - HEIGHT) / 3, width, HEIGHT);
     let row = frame.y + 4;
     let delete = Rect::new(frame.x + 3, row, cells(confirm), 1);
-    let keep = Rect::new(delete.right() + 3, row, cells(KEEP), 1);
+    let keep = Rect::new(delete.right() + 3, row, cells(keep), 1);
     Some(PromptRects { frame, delete, keep })
 }
 
@@ -64,23 +69,45 @@ pub fn button_at(rects: &PromptRects, col: u16, row: u16) -> Option<Choice> {
     }
 }
 
+/// The words of a question box and which button has focus.
+pub struct BoxText<'a> {
+    pub title: &'a str,
+    pub question: &'a str,
+    pub warning: &'a str,
+    /// The button that does it, and the one that keeps things as they are.
+    pub confirm: &'a str,
+    pub keep: &'a str,
+    pub focus: Choice,
+}
+
 pub fn draw_delete_prompt(frame: &mut Frame, ctx: &DrawContext<'_>, grid: Rect, prompt: &DeletePrompt) {
-    let confirm = confirm_label(prompt.for_good);
-    let Some(rects) = prompt_rects(grid, confirm) else {
+    let to_trash = prompt.targets.len().saturating_sub(prompt.for_good);
+    let text = BoxText {
+        title: TITLE,
+        question: &question(prompt.for_good, to_trash),
+        warning: warning(prompt.for_good, to_trash),
+        confirm: confirm_label(prompt.for_good),
+        keep: KEEP,
+        focus: prompt.focus,
+    };
+    draw_box(frame, ctx, grid, &text);
+}
+
+/// The question box over the middle of the screen: its title, the question in
+/// the warning colour, the line under it and the two buttons.
+pub fn draw_box(frame: &mut Frame, ctx: &DrawContext<'_>, grid: Rect, text: &BoxText<'_>) {
+    let Some(rects) = prompt_rects_for(grid, text.confirm, text.keep) else {
         return;
     };
     let rect = rects.frame;
     frame.effects.retain(|effect| !overlaps(effect.area(), rect));
     fill_cells(frame, rect, ctx.full(roles::MENU_BASE));
-    draw_border(frame, ctx, rect);
-    let to_trash = prompt.targets.len().saturating_sub(prompt.for_good);
-    let question = question(prompt.for_good, to_trash);
-    let warning = warning(prompt.for_good, to_trash);
+    draw_border(frame, ctx, rect, text.title);
     let inner = Rect::new(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2);
-    put_text(frame, inner, inner.x + 2, rect.y + 2, &question, ctx.fg(roles::FOOTER_ERROR).add_modifier(Modifier::BOLD));
-    put_text(frame, inner, inner.x + 2, rect.y + 3, warning, ctx.fg(roles::MENU_BASE));
-    draw_button(frame, ctx, rects.delete, confirm, prompt.focus == Choice::Delete);
-    draw_button(frame, ctx, rects.keep, KEEP, prompt.focus == Choice::Keep);
+    put_text(frame, inner, inner.x + 2, rect.y + 2, text.question, ctx.fg(roles::FOOTER_ERROR).add_modifier(Modifier::BOLD));
+    put_text(frame, inner, inner.x + 2, rect.y + 3, text.warning, ctx.fg(roles::MENU_BASE));
+    draw_button(frame, ctx, rects.delete, text.confirm, text.focus == Choice::Delete);
+    draw_button(frame, ctx, rects.keep, text.keep, text.focus == Choice::Keep);
 }
 
 /// What is asked: how many messages move to the Trash and how many are
@@ -108,7 +135,7 @@ pub(super) fn warning(for_good: usize, to_trash: usize) -> &'static str {
     }
 }
 
-fn draw_border(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect) {
+fn draw_border(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, title: &str) {
     let border = ctx.fg(roles::MENU_BORDER);
     let set = ctx.borders;
     let (left, right, top, bottom) = (rect.x, rect.right() - 1, rect.y, rect.bottom() - 1);
@@ -125,7 +152,7 @@ fn draw_border(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect) {
     put(frame, right, top, set.top_right);
     put(frame, left, bottom, set.bottom_left);
     put(frame, right, bottom, set.bottom_right);
-    put_text(frame, rect, left + 2, top, TITLE, ctx.fg(roles::SECTION_TITLE));
+    put_text(frame, rect, left + 2, top, title, ctx.fg(roles::SECTION_TITLE));
     let hint_at = right.saturating_sub(cells(HINT) + 1);
     put_text(frame, rect, hint_at, bottom, HINT, ctx.fg(roles::FOOTER_TEXT));
 }

@@ -102,6 +102,32 @@ pub enum Command {
         to: FolderId,
     },
     Delete { messages: Vec<MessageId> },
+    /// Add a tag (an IMAP keyword) to the messages, or take it off them. The
+    /// answer is a `TagsChanged`. A tag the engine cannot send (see
+    /// `check_tag`) is refused with a failure.
+    SetTag {
+        messages: Vec<MessageId>,
+        tag: String,
+        on: bool,
+    },
+    /// Make a folder named `name`, inside `parent` or at the top when there is
+    /// none. The folder list is sent again once the server has made it.
+    CreateFolder {
+        account: AccountId,
+        parent: Option<FolderId>,
+        name: String,
+    },
+    /// Give a folder another name (it stays where it is in the tree). The
+    /// special folders are refused.
+    RenameFolder { folder: FolderId, name: String },
+    /// Remove a folder and the messages in it for good. The special folders
+    /// and a folder that holds other folders are refused.
+    DeleteFolder { folder: FolderId },
+    /// Mark every unread message of a folder read.
+    MarkAllRead { folder: FolderId },
+    /// Remove every message of a Trash or Spam folder for good. Any other
+    /// folder is refused.
+    EmptyFolder { folder: FolderId },
     Send { message: OutgoingMessage },
     Search {
         request: RequestId,

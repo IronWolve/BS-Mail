@@ -1,6 +1,7 @@
 //! The commands the backend does not carry out. Unlock is never available
-//! yet; changing mail (flags, move, delete) and sending mail are
-//! refused while the account is read-only and served when it is not.
+//! yet; changing mail (flags, tags, move, delete, the folder actions) and
+//! sending mail are refused while the account is read-only and served when it
+//! is not.
 
 use model::Command;
 
@@ -24,6 +25,12 @@ pub fn change_operation(command: &Command) -> Option<&'static str> {
         Command::SetFlags { .. } => Some("set flags"),
         Command::Move { .. } => Some("move"),
         Command::Delete { .. } => Some("delete"),
+        Command::SetTag { .. } => Some("tag"),
+        Command::CreateFolder { .. } => Some("new folder"),
+        Command::RenameFolder { .. } => Some("rename folder"),
+        Command::DeleteFolder { .. } => Some("delete folder"),
+        Command::MarkAllRead { .. } => Some("mark all read"),
+        Command::EmptyFolder { .. } => Some("empty folder"),
         _ => None,
     }
 }
