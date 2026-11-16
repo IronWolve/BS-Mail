@@ -10,7 +10,7 @@ use surface::{Capabilities, Frame, Rect};
 use crate::app_identity::AppIdentity;
 use crate::format::display_width;
 use crate::icons::IconSet;
-use crate::composer::ComposeForm;
+use crate::composer::{AddressBook, ComposeForm};
 use crate::composer::EditorBuffer;
 use crate::delete_prompt::DeletePrompt;
 use crate::delete_prompt::draw::draw_delete_prompt;
@@ -36,8 +36,7 @@ use crate::view_state::{
     Focus, MailSnapshot, OverlayKind, Overlays, Place, ScrollState, Selection,
 };
 use crate::widgets::{
-    DrawContext, FooterData, StatusLine, StripData, content_rows, draw_account_strip, draw_banner,
-    draw_chrome_lines, draw_footer, draw_help, draw_key_bar, fill_cells, mark_focused, put_text,
+    DrawContext, StatusLine, content_rows, draw_chrome_lines, draw_help, fill_cells, mark_focused, put_text,
     visible_rows,
 };
 
@@ -75,6 +74,8 @@ pub struct AppView {
     pub(crate) own_change_ms: Option<u64>,
     /// The message being written, when the composer is open.
     pub(crate) composer: Option<ComposeForm>,
+    /// The addresses seen and written to, for completing recipients.
+    pub(crate) addresses: AddressBook,
     /// The user clicked Quit; the program closes it, the screen cannot.
     pub(crate) quit_requested: bool,
     /// Web addresses the user clicked, for the program to open in a browser.
@@ -150,6 +151,7 @@ impl AppView {
             last_tick_ms: 0,
             own_change_ms: None,
             composer: None,
+            addresses: AddressBook::default(),
             quit_requested: false,
             link_requests: Vec::new(),
             copied_link: None,
@@ -205,6 +207,7 @@ impl AppView {
     /// Stores what one backend event carries for the regions.
     pub fn apply_event(&mut self, event: Event) {
         self.note_send_outcome(&event);
+        self.note_addresses(&event);
         self.note_search_event(&event);
         if matches!(event, Event::EnvelopePage { offset: 0, .. }) {
             self.queue.first_page_arrived();
@@ -348,36 +351,6 @@ impl AppView {
         };
         if let Some(title) = title {
             mark_focused(frame, title);
-        }
-    }
-
-    fn draw_bands(&self, frame: &mut Frame, ctx: &DrawContext<'_>, layout: &Layout) {
-        let mailbox = self.mailbox_summary();
-        if let Some(rect) = layout.banner {
-            draw_banner(frame, ctx, rect, &self.identity);
-        }
-        if let Some(rect) = layout.strip {
-            let data = StripData {
-                account: self.selected_account(),
-                mailbox: mailbox.as_ref(),
-                host: self.mail.host.as_ref(),
-                connection: self.connection(),
-            };
-            draw_account_strip(frame, ctx, rect, &data);
-        }
-        if let Some(rect) = layout.key_bar {
-            draw_key_bar(frame, ctx, rect, &self.config.key_bar.buttons);
-        }
-        if let Some(rect) = layout.footer {
-            let data = FooterData {
-                identity: &self.identity,
-                connection: self.connection(),
-                mailbox: mailbox.as_ref(),
-                status: &self.mail.status,
-                error: self.mail.error.as_deref().or(self.config_problem.as_deref()),
-                notice: self.new_mail_notice(),
-            };
-            draw_footer(frame, ctx, rect, &data);
         }
     }
 }

@@ -11,7 +11,9 @@ pub(super) enum Class {
     Swallowed,
     /// Forwarded once, from whichever member says it first.
     Host,
-    /// Kept, and always forwarded, so every account's dot stays live.
+    /// Kept, and always forwarded: what the screen shows or uses about every
+    /// account, not only the one on screen (its dot, whether it may send, its
+    /// signature).
     Connection,
     /// About the account on screen: kept always, forwarded only from the
     /// active member.
@@ -28,9 +30,10 @@ pub(super) fn classify(event: &Event) -> Class {
     match event {
         Event::AccountList(_) | Event::AccountUnread { .. } => Class::Swallowed,
         Event::HostInfo { .. } => Class::Host,
-        Event::ConnectionState { .. } => Class::Connection,
+        Event::ConnectionState { .. } | Event::ChangesAllowed { .. } | Event::AccountSignature { .. } => {
+            Class::Connection
+        }
         Event::FolderList { .. }
-        | Event::ChangesAllowed { .. }
         | Event::Quota { .. }
         | Event::SyncProgress { .. } => Class::Status,
         Event::EnvelopePage { .. }

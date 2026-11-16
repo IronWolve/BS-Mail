@@ -1,5 +1,6 @@
 //! A stand-in for an account whose file could not be used. It tells the
-//! screen once that the account is offline and why, and answers every command
+//! screen once that the account is offline, that nothing can be sent from it,
+//! and why, and answers every command
 //! for it with the same reason, so the account still shows in the list.
 
 use model::{AccountId, Command, ConnectionState, Event, MailBackend};
@@ -58,6 +59,12 @@ impl MailBackend for FailedBackend {
                 account: self.id.clone(),
                 state: ConnectionState::Offline,
             },
+            // Nothing can be sent from an account that is not running, so the
+            // composer does not offer it.
+            Event::ChangesAllowed {
+                account: self.id.clone(),
+                allowed: false,
+            },
             self.failure("account"),
         ]
     }
@@ -65,8 +72,8 @@ impl MailBackend for FailedBackend {
 
 impl Member {
     /// A member for an account that could not be started. At start it reports
-    /// `ConnectionState::Offline` and one failure named `account` with
-    /// `reason`; every command for it is then answered with a failure
+    /// `ConnectionState::Offline`, that changes are not allowed and one
+    /// failure named `account` with `reason`; every command for it is then answered with a failure
     /// carrying the same reason.
     pub fn failed(
         id: AccountId,

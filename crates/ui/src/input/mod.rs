@@ -5,8 +5,10 @@
 pub mod account_cursor;
 pub mod accounts;
 pub mod action;
+pub mod addresses;
 pub mod changes;
 pub mod compose;
+mod compose_start;
 pub mod command_queue;
 pub mod delete_prompt;
 pub mod dispatch;

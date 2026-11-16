@@ -67,11 +67,18 @@ impl AppView {
     /// Forgets all mail state: accounts, folders, list, message, selection,
     /// scroll, search, marks and anything open over them. For when the
     /// account changed or was removed; the backend's next account list
-    /// selects again. The name of the machine stays.
+    /// selects again. The name of the machine stays, and so do the facts
+    /// each account told about itself (read-only, signature).
     pub fn clear_mail(&mut self) {
+        // What was said about every account stays: an account that keeps
+        // running does not say it again.
         let host = self.mail.host.take();
+        let read_only = std::mem::take(&mut self.mail.read_only);
+        let signatures = std::mem::take(&mut self.mail.signatures);
         self.mail = MailSnapshot::default();
         self.mail.host = host;
+        self.mail.read_only = read_only;
+        self.mail.signatures = signatures;
         self.selection = Selection::default();
         self.scroll = ScrollState::default();
         self.search = None;

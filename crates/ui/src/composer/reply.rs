@@ -1,5 +1,5 @@
-//! Starting a message from another one: a reply, a reply to everyone, or a
-//! forward.
+//! Starting a message from another one: a reply, a reply to everyone, a
+//! forward, a copy to edit as a new message, or a draft to go on writing.
 
 use model::{Address, Body, Envelope};
 
@@ -84,6 +84,20 @@ pub fn forward(original: &Original<'_>) -> Draft {
         subject: prefixed("Fwd:", &envelope.subject),
         body: format!("{head}\n{}\n", original.text),
         ..Draft::default()
+    }
+}
+
+/// A copy of the message as a new one to edit: its recipients, subject and
+/// text as they are, with no signature added and no message to answer. The
+/// cursor starts in the body unless there is nobody to send to yet.
+pub fn edit_as_new(original: &Original<'_>) -> Draft {
+    let envelope = original.envelope;
+    Draft {
+        to: envelope.to.clone(),
+        cc: envelope.cc.clone(),
+        subject: envelope.subject.clone(),
+        body: original.text.clone(),
+        reply: !(envelope.to.is_empty() && envelope.cc.is_empty()),
     }
 }
 

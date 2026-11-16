@@ -1,5 +1,7 @@
 //! The mail data the regions draw, kept up to date from backend events.
 
+use std::collections::{HashMap, HashSet};
+
 use model::{
     Account, AccountId, Body, Envelope, Event, Folder, FolderId, MessageId, SyncStatus,
 };
@@ -48,6 +50,13 @@ pub struct MailSnapshot {
     /// The account does not let the program change mail. A backend that
     /// never says so is taken to allow it.
     pub changes_refused: bool,
+    /// The accounts that said they do not let the program change mail, shown
+    /// or not. An account that never said so is taken to allow it. The
+    /// composer writes only from the others.
+    pub read_only: HashSet<AccountId>,
+    /// The signature each account's file asks for; an account with none has
+    /// no entry.
+    pub signatures: HashMap<AccountId, String>,
     /// Folders the user opened or closed, which a fresh folder list must not
     /// undo.
     pub expanded_by_user: std::collections::HashMap<FolderId, bool>,
@@ -60,6 +69,17 @@ impl MailSnapshot {
 
     pub fn account(&self, id: &AccountId) -> Option<&Account> {
         self.accounts.iter().find(|account| &account.id == id)
+    }
+
+    /// Whether mail may be written from the account: it did not say it is
+    /// read-only.
+    pub fn may_send_from(&self, id: &AccountId) -> bool {
+        !self.read_only.contains(id)
+    }
+
+    /// The account's signature, or an empty text for none.
+    pub fn signature_of(&self, id: &AccountId) -> &str {
+        self.signatures.get(id).map_or("", String::as_str)
     }
 
     /// Stores what `event` carries for the regions and moves the selection
@@ -77,10 +97,8 @@ impl MailSnapshot {
                     entry.unread = Some(unread);
                 }
             }
-            Event::ChangesAllowed { account, allowed } => {
-                if is_shown(selection, &account) {
-                    self.changes_refused = !allowed;
-                }
+            note @ (Event::ChangesAllowed { .. } | Event::AccountSignature { .. }) => {
+                self.apply_account_facts(note, selection);
             }
             Event::HostInfo { host_name, system } => {
                 self.host = Some(HostSummary {
@@ -118,6 +136,32 @@ impl MailSnapshot {
                 }
             }
             other => self.apply_list_event(other, selection),
+        }
+    }
+
+    /// What an account says about itself: whether it may send (also kept for
+    /// the account on screen, which the keys that change mail look at) and its
+    /// signature. Both are kept for every account, shown or not.
+    fn apply_account_facts(&mut self, event: Event, selection: &Selection) {
+        match event {
+            Event::ChangesAllowed { account, allowed } => {
+                if is_shown(selection, &account) {
+                    self.changes_refused = !allowed;
+                }
+                if allowed {
+                    self.read_only.remove(&account);
+                } else {
+                    self.read_only.insert(account);
+                }
+            }
+            Event::AccountSignature { account, text } => {
+                if text.is_empty() {
+                    self.signatures.remove(&account);
+                } else {
+                    self.signatures.insert(account, text);
+                }
+            }
+            _ => {}
         }
     }
 

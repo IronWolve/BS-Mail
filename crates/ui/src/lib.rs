@@ -16,6 +16,7 @@ pub mod options;
 pub mod search;
 pub mod setup;
 pub mod theme;
+pub mod view_bands;
 pub mod view_facts;
 pub mod view_panes;
 pub mod view_sidebar;
@@ -24,5 +25,6 @@ pub mod widgets;
 
 pub use app_identity::AppIdentity;
 pub use app_view::AppView;
+pub use composer::AddressBook;
 pub use options::{AccountSummary, OptionsAction, OptionsPaths};
 pub use setup::{AccountPrefill, SavedClient};

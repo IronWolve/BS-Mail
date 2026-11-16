@@ -66,6 +66,7 @@ pub(super) fn remap_event(slot: Slot, event: Event) -> Mapped<Event> {
         | Event::SyncProgress { .. }
         | Event::Quota { .. }
         | Event::ChangesAllowed { .. }
+        | Event::AccountSignature { .. }
         | Event::MessageSent { .. }
         | Event::OpFailed { .. }) => unchanged,
     })

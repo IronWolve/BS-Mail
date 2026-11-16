@@ -42,7 +42,8 @@ pub struct SetupForm {
     pub provider_menu: Option<ProviderMenu>,
     /// The provider the browser sign-in is set up for, from the address.
     pub oauth_provider: Option<&'static str>,
-    /// Off keeps the account read-only: nothing is ever changed or sent.
+    /// On (the start for a new account) lets the program change mail and send
+    /// it; off keeps the account read-only: nothing is ever changed or sent.
     pub allow_changes: bool,
     pub focus: SetupField,
     /// A problem with what was typed, or the server's answer.
@@ -108,7 +109,7 @@ impl SetupForm {
             provider: ProviderChoice::Auto,
             provider_menu: None,
             oauth_provider: None,
-            allow_changes: false,
+            allow_changes: true,
             focus: SetupField::Email,
             notice: None,
             info: None,

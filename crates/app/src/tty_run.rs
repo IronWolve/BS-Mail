@@ -34,11 +34,15 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         .with_accounts(scene.live.clone())
         .with_settings(scene.settings.clone())
         .with_link_opener(Box::new(SystemOpener::new()));
+    if let (Some(dir), true) = (&data_dir, scene.live.is_some()) {
+        screen = screen.keep_addresses_in(dir.clone());
+    }
     if let (Some(dir), Some(state)) = (data_dir, remembered) {
         screen = screen.remember_layout_in(dir, state);
     }
     let mut host = TtyHost::new(depth);
     host.run(&mut screen).map_err(|error| AppError::Window(error.to_string()))?;
+    screen.save_addresses();
     screen.save_state()?;
     let (cols, rows) = screen.grid();
     Ok(Stats {

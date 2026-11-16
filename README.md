@@ -22,6 +22,7 @@ anywhere else.
 | `accounts/<id>/account.toml.bak` | one backup of the account file, without its secrets |
 | `config.toml` | your settings |
 | `state.toml` | the sizes of the panes and the window |
+| `addresses.txt` | the names and addresses of the people your mail came from, went to or was copied to, and those you sent to, so they can complete as you type a recipient (plain text, one per line, at most 2000, only you can read it; delete the file to forget them) |
 | `oauth_clients.toml` | the client ids (and any client secret) you entered for browser sign-in, kept once per provider |
 | `themes/` | themes you added |
 | `lock` | lets one copy of the program use the folder at a time |
@@ -47,6 +48,6 @@ checks, and it loads no remote images or content from messages.
 ## Removing it
 
 - **One account:** remove it in Options. Its folder (account file, tokens, saved
-  copies, backup) is deleted. Your settings and the saved client ids stay.
+  copies, backup) is deleted. Your settings, the saved client ids and the address list stay.
 - **Everything:** close the program and delete the data folder. The program
   itself is a single file; delete it too.

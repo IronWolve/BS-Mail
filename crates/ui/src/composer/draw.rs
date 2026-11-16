@@ -3,20 +3,24 @@
 
 use surface::{CursorRequest, CursorShape, Frame, Modifier, Rect};
 
+use super::buttons::{ButtonRects, button_rects, draw_buttons};
 use super::editor_buffer::{EditorBuffer, Pos};
 use super::form::{ComposeForm, Field, Progress};
 use super::graphemes::{cells_between, count, list, width};
 use super::input::Pane;
+use super::popup::{draw_popup, open_popup};
 use crate::theme::roles;
 use crate::widgets::{DrawContext, fill_cells, put_text};
 
 /// Cells the field labels take, including the gap before the text.
-const LABEL_CELLS: u16 = 10;
+pub(super) const LABEL_CELLS: u16 = 10;
 /// Rows above the body: title, from, four fields and the rule.
 const HEADER_ROWS: u16 = 7;
 /// The last row holds the notice, so the body needs at least this much more.
 const MIN_BODY_ROWS: u16 = 3;
-const HINT: &str = "Ctrl+Enter or F10 send   Esc cancel";
+/// What the From line says while it has focus and more than one account can
+/// be chosen.
+const FROM_HINT: &str = "Left Right Space: other account   Enter: list";
 
 /// Where each part of the composer sits inside the main area.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,20 +82,34 @@ pub fn draw_composer(frame: &mut Frame, ctx: &DrawContext<'_>, main: Rect, form:
     if form.progress == Progress::Writing {
         frame.cursor = cursor_request(&rects, form);
     }
+    if let Some(open) = open_popup(form, &rects, main) {
+        draw_popup(frame, ctx, &open);
+    }
+}
+
+/// Where the Send and Cancel buttons sit in `rects`' title row for `form`.
+pub fn buttons_for(rects: &ComposerRects, form: &ComposeForm) -> Option<ButtonRects> {
+    let title_cells = u16::try_from(form.title().chars().count()).unwrap_or(u16::MAX);
+    button_rects(rects.title, title_cells)
 }
 
 fn draw_title(frame: &mut Frame, ctx: &DrawContext<'_>, rects: &ComposerRects, form: &ComposeForm) {
-    let title = if form.in_reply_to.is_some() { "Reply" } else { "New message" };
-    put_text(frame, rects.title, rects.title.x, rects.title.y, title, ctx.fg(roles::LIST_TITLE));
-    let hint_cells = u16::try_from(HINT.chars().count()).unwrap_or(0);
-    let at = rects.title.right().saturating_sub(hint_cells);
-    put_text(frame, rects.title, at, rects.title.y, HINT, ctx.fg(roles::LIST_HINT_LABEL));
+    put_text(frame, rects.title, rects.title.x, rects.title.y, form.title(), ctx.fg(roles::LIST_TITLE));
+    if let Some(buttons) = buttons_for(rects, form) {
+        draw_buttons(frame, ctx, rects.title, &buttons, form);
+    }
 }
 
 fn draw_from(frame: &mut Frame, ctx: &DrawContext<'_>, rects: &ComposerRects, form: &ComposeForm) {
     let row = rects.from;
-    put_text(frame, row, row.x, row.y, "From:", ctx.fg(roles::READER_HEADER_LABEL));
-    put_text(frame, row, row.x + LABEL_CELLS, row.y, &form.from, ctx.fg(roles::READER_HEADER_VALUE));
+    let focused = form.focus == Field::From;
+    let label_style = if focused { ctx.fg(roles::SECTION_TITLE) } else { ctx.fg(roles::READER_HEADER_LABEL) };
+    put_text(frame, row, row.x, row.y, Field::From.label(), label_style);
+    let value = ctx.fg(roles::READER_HEADER_VALUE);
+    let end = put_text(frame, row, row.x + LABEL_CELLS, row.y, &form.from, value);
+    if focused && form.can_choose_sender() {
+        put_text(frame, row, end + 2, row.y, FROM_HINT, ctx.fg(roles::LIST_HINT_LABEL));
+    }
 }
 
 fn draw_field(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, field: Field, form: &ComposeForm) {
@@ -175,6 +193,7 @@ fn is_selected(selection: Option<(Pos, Pos)>, at: Pos) -> bool {
 
 fn cursor_request(rects: &ComposerRects, form: &ComposeForm) -> Option<CursorRequest> {
     let (col, row) = match form.focus {
+        Field::From => return None,
         Field::Body => {
             let (visual_row, cell) = form.body.cursor_cell(usize::from(rects.body.width));
             let row = visual_row.checked_sub(form.body_scroll)?;
@@ -203,7 +222,7 @@ fn field_index(field: Field) -> usize {
         Field::To => 0,
         Field::Cc => 1,
         Field::Bcc => 2,
-        Field::Subject | Field::Body => 3,
+        Field::Subject | Field::Body | Field::From => 3,
     }
 }
 

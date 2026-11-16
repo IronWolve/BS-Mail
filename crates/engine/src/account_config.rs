@@ -29,7 +29,14 @@
 //! smtp_password = "app-password" # default: the mailbox `password`
 //! smtp_trust = "verify"      # verify | any                (default verify)
 //! save_sent = true           # true | false                (default true)
+//!
+//! signature = "Alex Rivera\nacme.example"  # optional; \n starts a new line
 //! ```
+//!
+//! `signature` is the text the composer puts under the cursor of a new
+//! message, after a `-- ` line, and above the quoted text of a reply or a
+//! forward (see `account_signature.rs` for what is cleaned). The program only
+//! reads it; the Options screen edits it.
 //!
 //! Signing in with OAuth2 instead of a password (`auth = "oauth2"`, no
 //! `password` needed) is described in `account_oauth.rs`: the keys
@@ -55,15 +62,16 @@
 //! 1 to 14 is raised to 15, the shortest wait allowed, without an error.
 
 use std::fmt;
-use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 
 use model::{Secret, wipe_text};
 use serde::Deserialize;
 
 use crate::account_oauth::{AuthKind, OAuthSettings, RawOAuth, token_file_in};
+use crate::account_signature::clean_signature;
 use crate::account_smtp::RawSmtp;
 pub use crate::account_smtp::{SmtpAuth, SmtpSettings};
+pub use crate::loopback_host::is_loopback_host;
 
 /// How the connection is protected.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
@@ -118,6 +126,9 @@ pub struct AccountConfig {
     pub poll_seconds: u32,
     /// How an OAuth2 account signs in; `None` for a password account.
     pub oauth: Option<OAuthSettings>,
+    /// The text the composer puts under a new message, lines joined with a
+    /// newline; empty for none. See `account_signature`.
+    pub signature: String,
     /// The folder this account keeps what it must not lose in: its sign-in
     /// tokens and the copies of sent mail not yet saved on the server. `None`
     /// for text parsed in memory, which has no folder of its own.
@@ -189,6 +200,7 @@ struct RawAccount {
     smtp_trust: Option<Trust>,
     save_sent: Option<bool>,
     poll_seconds: Option<u32>,
+    signature: Option<String>,
 }
 
 /// Reads an optional text value of the file straight into a `Secret`, so the
@@ -304,6 +316,7 @@ impl AccountConfig {
             smtp,
             poll_seconds: resolve_poll_seconds(raw.poll_seconds),
             oauth,
+            signature: clean_signature(raw.signature.as_deref()),
             state_dir: None,
         };
         config.validate()?;
@@ -354,21 +367,6 @@ impl AccountConfig {
             )));
         }
         Ok(())
-    }
-}
-
-/// True for `localhost` and for loopback addresses, with or without brackets.
-pub fn is_loopback_host(host: &str) -> bool {
-    let bare = host.trim_start_matches('[').trim_end_matches(']');
-    if bare.trim_end_matches('.').eq_ignore_ascii_case("localhost") {
-        return true;
-    }
-    match bare.parse::<IpAddr>() {
-        Ok(IpAddr::V4(v4)) => v4.is_loopback(),
-        Ok(IpAddr::V6(v6)) => {
-            v6.is_loopback() || v6.to_ipv4_mapped().is_some_and(|v4| v4.is_loopback())
-        }
-        Err(_) => false,
     }
 }
 

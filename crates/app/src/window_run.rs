@@ -51,6 +51,7 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         .with_accounts(scene.live.clone())
         .with_settings(scene.settings.clone())
         .with_link_opener(Box::new(SystemOpener::new()));
+    screen = keep_addresses(screen, data_dir.as_ref(), scene.live.is_some());
     if let Some(dir) = data_dir {
         screen = remember(screen, dir, remember_size, remembered);
     }
@@ -58,6 +59,7 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         screen = screen.stop_after(1);
     }
     run_window(&fonts, window, &mut screen).map_err(|error| AppError::Window(error.to_string()))?;
+    screen.save_addresses();
     screen.save_state()?;
     let (cols, rows) = screen.grid();
     Ok(Stats {
@@ -95,6 +97,15 @@ fn remember(screen: Screen, dir: PathBuf, size: bool, loaded: Option<state_file:
         screen.remember_in(dir)
     } else {
         screen.remember_layout_in(dir, loaded.unwrap_or_default())
+    }
+}
+
+/// Keeps the address book in the data folder, for a run with real accounts;
+/// mock mail has no addresses worth keeping.
+fn keep_addresses(screen: Screen, dir: Option<&PathBuf>, real: bool) -> Screen {
+    match dir {
+        Some(dir) if real => screen.keep_addresses_in(dir.clone()),
+        _ => screen,
     }
 }
 

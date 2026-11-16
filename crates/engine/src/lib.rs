@@ -4,9 +4,11 @@
 
 pub mod account_config;
 mod account_oauth;
+mod account_signature;
 mod account_smtp;
 mod change_refusals;
 mod imap_session;
+mod loopback_host;
 mod mime_render;
 pub mod mock;
 pub mod mock_backend;

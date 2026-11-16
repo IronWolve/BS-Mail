@@ -17,6 +17,16 @@ pub fn parse(text: &str) -> Result<Vec<Address>, String> {
     Ok(out)
 }
 
+/// The bare addresses in the text of a field, lowercased, for the entries
+/// that read as an address; an entry that does not is left out.
+pub fn emails_in(text: &str) -> Vec<String> {
+    split_entries(text)
+        .iter()
+        .filter_map(|entry| parse_entry(entry.trim()))
+        .map(|address| address.email.to_lowercase())
+        .collect()
+}
+
 /// The list as it is shown in a field: `Name <a@b.org>` or just the address.
 pub fn format(addresses: &[Address]) -> String {
     addresses.iter().map(format_one).collect::<Vec<_>>().join(", ")

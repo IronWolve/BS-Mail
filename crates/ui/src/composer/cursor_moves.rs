@@ -13,7 +13,7 @@ use super::wrap::{VisualLine, visual_index};
 impl EditorBuffer {
     /// Where a move starts from: ends the typing run, and sets or drops the
     /// selection anchor.
-    fn start_move(&mut self, extend: bool) {
+    pub(super) fn start_move(&mut self, extend: bool) {
         self.history.break_run();
         if extend {
             self.anchor.get_or_insert(self.cursor);
@@ -126,7 +126,7 @@ impl EditorBuffer {
     }
 
     /// The position in screen line `piece` nearest cell column `x`.
-    fn position_at(&self, visual: &[VisualLine], at: usize, piece: VisualLine, x: usize) -> Pos {
+    pub(super) fn position_at(&self, visual: &[VisualLine], at: usize, piece: VisualLine, x: usize) -> Pos {
         let line = &self.lines[piece.line];
         let mut used = 0;
         let mut col = piece.start;

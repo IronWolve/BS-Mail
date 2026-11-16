@@ -21,8 +21,9 @@ const OPTIONS: &str = "options";
 
 /// A button's default key text and label; the keys table of a later stage
 /// replaces the key text. The default bar (`[keybar] buttons`) offers the ten
-/// buttons of the reference picture; the others (Archive, Spam, Mark all,
-/// Unmark all, Invert marks, Next unread) are there for a bar that lists them.
+/// buttons of the reference picture; the others (Edit as new, Archive, Spam,
+/// Mark all, Unmark all, Invert marks, Next unread) are there for a bar that
+/// lists them.
 #[derive(Debug, PartialEq, Eq)]
 struct Button {
     action: &'static str,
@@ -30,11 +31,12 @@ struct Button {
     label: &'static str,
 }
 
-const BUTTONS: [Button; 17] = [
+const BUTTONS: [Button; 18] = [
     Button { action: "compose", key: "F2", label: "Compose" },
     Button { action: "reply", key: "R", label: "Reply" },
     Button { action: "reply_all", key: "Shift+R", label: "Reply All" },
     Button { action: "forward", key: "F", label: "Forward" },
+    Button { action: "edit_as_new", key: "W", label: "Edit as new" },
     Button { action: "delete", key: "D", label: "Delete" },
     Button { action: "archive", key: "E", label: "Archive" },
     Button { action: "spam", key: "!", label: "Spam" },

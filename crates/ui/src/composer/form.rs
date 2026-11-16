@@ -6,10 +6,15 @@ use model::{AccountId, Address, MessageId, OutgoingMessage};
 use super::address_list::{format, parse};
 use super::editor_buffer::EditorBuffer;
 use super::reply::Draft;
+use super::sender::Sender;
+use super::suggest::Suggestions;
 
 /// The fields, in the order Tab visits them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Field {
+    /// Who the message is from: a choice among the accounts that may send,
+    /// not text.
+    From,
     To,
     Cc,
     Bcc,
@@ -18,7 +23,7 @@ pub enum Field {
 }
 
 impl Field {
-    pub const ALL: [Field; 5] = [Field::To, Field::Cc, Field::Bcc, Field::Subject, Field::Body];
+    pub const ALL: [Field; 6] = [Field::From, Field::To, Field::Cc, Field::Bcc, Field::Subject, Field::Body];
 
     pub fn next(self) -> Self {
         Self::ALL[(self.index() + 1) % Self::ALL.len()]
@@ -34,6 +39,7 @@ impl Field {
 
     pub fn label(self) -> &'static str {
         match self {
+            Self::From => "From:",
             Self::To => "To:",
             Self::Cc => "Cc:",
             Self::Bcc => "Bcc:",
@@ -63,6 +69,14 @@ pub struct ComposeForm {
     pub account: AccountId,
     /// Who the message is from, as the From line shows it.
     pub from: String,
+    /// The accounts the From line can be set to, and which one it is now.
+    /// Only the account the message started with when nothing else may send.
+    pub senders: Vec<Sender>,
+    pub sender: usize,
+    /// The From pull-down while it is open: the row the cursor is on.
+    pub from_menu: Option<usize>,
+    /// The From line as a buffer, so every field has one; it is never edited.
+    pub(super) from_line: EditorBuffer,
     pub to: EditorBuffer,
     pub cc: EditorBuffer,
     pub bcc: EditorBuffer,
@@ -84,8 +98,25 @@ pub struct ComposeForm {
     pub close_armed: bool,
     /// The first screen line of the body shown.
     pub body_scroll: usize,
+    /// The matches for the address being typed, while there are any.
+    pub suggest: Option<Suggestions>,
+    /// The field and text for which the user closed the matches; they stay
+    /// closed until that text changes.
+    pub(super) suggest_off: Option<(Field, String)>,
+    /// The field a pointer drag is selecting text in, while a button is held.
+    pub drag: Option<Field>,
+    /// The draft on the server this message continues; it is taken out of the
+    /// Drafts folder once the message is sent.
+    pub draft: Option<MessageId>,
+    /// The body as it was made, without a signature, and with one: what the
+    /// body is compared with to tell whether it was written in, and what it is
+    /// made again from when the From line changes first.
+    pub(super) base_body: String,
+    pub(super) opening_body: String,
+    /// Whether the body gets the signature of the account it is from.
+    pub(super) signs: bool,
     /// The text the form started with, to tell whether anything was written.
-    started_with: String,
+    pub(super) started_with: String,
 }
 
 impl ComposeForm {
@@ -101,6 +132,10 @@ impl ComposeForm {
         let focus = if draft.to.is_empty() && !draft.is_reply() { Field::To } else { Field::Body };
         let mut form = Self {
             account,
+            senders: Vec::new(),
+            sender: 0,
+            from_menu: None,
+            from_line: EditorBuffer::single_line(&from),
             from,
             to: EditorBuffer::single_line(&format(&draft.to)),
             cc: EditorBuffer::single_line(&format(&draft.cc)),
@@ -116,6 +151,13 @@ impl ComposeForm {
             discard_armed: false,
             close_armed: false,
             body_scroll: 0,
+            suggest: None,
+            suggest_off: None,
+            drag: None,
+            draft: None,
+            base_body: draft.body.clone(),
+            opening_body: draft.body.clone(),
+            signs: false,
             started_with: String::new(),
         };
         form.started_with = form.fingerprint();
@@ -124,6 +166,7 @@ impl ComposeForm {
 
     pub fn focused(&mut self) -> &mut EditorBuffer {
         match self.focus {
+            Field::From => &mut self.from_line,
             Field::To => &mut self.to,
             Field::Cc => &mut self.cc,
             Field::Bcc => &mut self.bcc,
@@ -134,6 +177,7 @@ impl ComposeForm {
 
     pub fn buffer(&self, field: Field) -> &EditorBuffer {
         match field {
+            Field::From => &self.from_line,
             Field::To => &self.to,
             Field::Cc => &self.cc,
             Field::Bcc => &self.bcc,
@@ -142,7 +186,7 @@ impl ComposeForm {
         }
     }
 
-    fn fingerprint(&self) -> String {
+    pub(super) fn fingerprint(&self) -> String {
         [&self.to, &self.cc, &self.bcc, &self.subject, &self.body]
             .iter()
             .map(|buffer| buffer.text())

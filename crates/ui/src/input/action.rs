@@ -38,6 +38,8 @@ pub enum Action {
     Reply,
     ReplyAll,
     Forward,
+    /// `w`: a copy of the message as a new one to edit.
+    EditAsNew,
     /// `a`: mark every message shown.
     MarkAll,
     /// `A`: clear every mark.
@@ -78,6 +80,7 @@ pub fn action_for(key: &KeyEvent) -> Option<Action> {
         LogicalKey::Char('r') if !held.shift => Some(Action::Reply),
         LogicalKey::Char('R') => Some(Action::ReplyAll),
         LogicalKey::Char('f') if !held.shift => Some(Action::Forward),
+        LogicalKey::Char('w') if !held.shift => Some(Action::EditAsNew),
         LogicalKey::Char('d') if !held.shift => Some(Action::Delete),
         LogicalKey::Char('a') if !held.shift => Some(Action::MarkAll),
         LogicalKey::Char('A') => Some(Action::UnmarkAll),

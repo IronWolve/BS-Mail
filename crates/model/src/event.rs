@@ -79,10 +79,20 @@ pub enum Event {
     },
     /// Whether the account lets the program change mail on the server. An
     /// account that does not shows a note instead of trying and failing. A
-    /// backend that never says so is taken to allow it.
+    /// backend that never says so is taken to allow it. Sent for every
+    /// account, shown or not: the composer offers only the accounts that may
+    /// send.
     ChangesAllowed {
         account: AccountId,
         allowed: bool,
+    },
+    /// The text the composer puts under the cursor of a new message from an
+    /// account, as the account's file says; empty for no signature. Sent for
+    /// every account, shown or not, because the composer can write from any
+    /// account that may send.
+    AccountSignature {
+        account: AccountId,
+        text: String,
     },
     /// A message the user sent has been accepted by the server for delivery.
     MessageSent {

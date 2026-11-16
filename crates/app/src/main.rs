@@ -2,6 +2,7 @@
 //! asks for, and reports what went wrong when it cannot.
 
 mod account_writer;
+mod address_file;
 mod accounts;
 mod browser_login;
 mod cli;

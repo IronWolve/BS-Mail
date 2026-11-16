@@ -9,6 +9,7 @@ use ui::theme::roles;
 use ui::{AppView, OptionsPaths};
 
 use crate::accounts::{Place, Scan, recover, scan};
+use crate::address_file;
 use crate::cli::Options;
 use crate::config_io::{self, CONFIG_NAME};
 use crate::data_lock::{self, DataLock, Refused};
@@ -58,6 +59,10 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
     scene.view.set_theme_names(scene.settings.theme_names().to_vec());
     if let Some(live) = &scene.live {
         scene.view.set_accounts(live.summaries());
+        // The addresses seen so far complete recipients; mock mail keeps none.
+        if let Some(dir) = data.as_deref() {
+            scene.view.set_address_book(address_file::load(dir));
+        }
     }
     // With no account the program starts on the empty screen, which says where
     // to add one; the form opens only when `--setup` asks for it.

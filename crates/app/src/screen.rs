@@ -22,6 +22,7 @@ use crate::setup_flow::SetupFlow;
 use crate::state_file::{self, State};
 use crate::ticker::Ticker;
 
+mod addresses;
 mod links;
 
 /// How many times mail is moved again after the accounts changed, at most.
@@ -58,6 +59,8 @@ pub struct Screen {
     settings: Settings,
     /// What opens a web address the user clicked in a message.
     links: Box<dyn LinkOpener>,
+    /// Where the address book is kept, when this run keeps one.
+    addresses: Option<addresses::AddressSave>,
 }
 
 impl Screen {
@@ -85,6 +88,7 @@ impl Screen {
             live: None,
             settings: Settings::default(),
             links: Box::new(NoOpener),
+            addresses: None,
         }
     }
 
@@ -196,6 +200,7 @@ impl Screen {
                 break;
             }
         }
+        self.keep_addresses();
         changed
     }
 

@@ -8,8 +8,8 @@ use super::sink::EventSink;
 use crate::account_config::AccountConfig;
 
 /// The first events of a run, sent before any connection is tried so the
-/// screen can show the account as connecting: state, host, account list and
-/// whether changes are allowed.
+/// screen can show the account as connecting: state, host, account list,
+/// whether changes are allowed and its signature.
 pub fn announce(config: &AccountConfig, sink: &EventSink) {
     let (host_name, system) = host_info();
     sink.send(connection(sink, ConnectionState::Connecting));
@@ -23,6 +23,15 @@ pub fn announce(config: &AccountConfig, sink: &EventSink) {
         selected: true,
     }]));
     sink.send(changes_allowed(config, sink));
+    sink.send(account_signature(config, sink));
+}
+
+/// The signature the account's file asks for, for the composer.
+pub fn account_signature(config: &AccountConfig, sink: &EventSink) -> Event {
+    Event::AccountSignature {
+        account: sink.account().clone(),
+        text: config.signature.clone(),
+    }
 }
 
 /// Whether this account lets the program change mail on the server.
@@ -75,3 +84,6 @@ pub fn now_unix() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |elapsed| i64::try_from(elapsed.as_secs()).unwrap_or(i64::MAX))
 }
+
+#[cfg(test)]
+include!("lifecycle.tests.rs");

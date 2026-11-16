@@ -131,6 +131,9 @@ impl AppView {
         match action {
             Action::FocusNext => self.change_focus(self.focus.next()),
             Action::FocusPrevious => self.change_focus(self.focus.previous()),
+            Action::Enter if self.focus == Focus::List && self.selected_is_draft() => {
+                self.start_compose(ComposeKind::Draft);
+            }
             Action::Enter => self.focus = deeper(self.focus),
             Action::Back if self.focus == Focus::List && !self.marked.is_empty() => self.clear_marks(),
             Action::Back if self.focus == Focus::List && self.search.is_some() => self.end_search(),
@@ -157,6 +160,7 @@ impl AppView {
             Action::Reply => self.start_compose(ComposeKind::Reply),
             Action::ReplyAll => self.start_compose(ComposeKind::ReplyAll),
             Action::Forward => self.start_compose(ComposeKind::Forward),
+            Action::EditAsNew => self.start_compose(ComposeKind::EditAsNew),
             movement => {
                 let layout = self.layout(grid.0, grid.1);
                 match self.focus {
@@ -195,8 +199,13 @@ impl AppView {
                 self.select_folder_row(index);
             }
             Hit::Message(index) => {
+                // A second click on the draft that is selected goes on with it.
+                let again = self.focus == Focus::List && index == self.selection.message_index && self.selected_is_draft();
                 self.focus = Focus::List;
                 self.select_message(index, &layout);
+                if again {
+                    self.start_compose(ComposeKind::Draft);
+                }
             }
             Hit::Account(index) => return self.click_account(index),
             Hit::Sidebar => self.focus = Focus::Sidebar,
@@ -215,6 +224,7 @@ impl AppView {
             "reply" => self.act(Action::Reply, grid),
             "reply_all" => self.act(Action::ReplyAll, grid),
             "forward" => self.act(Action::Forward, grid),
+            "edit_as_new" => self.act(Action::EditAsNew, grid),
             "delete" => self.act(Action::Delete, grid),
             "archive" => self.act(Action::Archive, grid),
             "spam" => self.act(Action::Spam, grid),

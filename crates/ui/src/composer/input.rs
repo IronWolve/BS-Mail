@@ -8,6 +8,8 @@
 use surface::{KeyEvent, LogicalKey, NamedKey};
 
 use super::form::{ComposeForm, Field, Progress};
+use super::sender_keys::{from_menu_key, from_text};
+use super::suggest::suggestion_key;
 
 /// What the composer wants done after an input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,6 +42,9 @@ pub fn handle_key(form: &mut ComposeForm, key: &KeyEvent, pane: Pane) -> Outcome
         return sending_key(form, key);
     }
     let held = key.modifiers;
+    if let Some(outcome) = from_menu_key(form, key).or_else(|| suggestion_key(form, key)) {
+        return finish(form, outcome, pane);
+    }
     let outcome = match key.key {
         _ if held.alt || held.meta => Outcome::Ignored,
         LogicalKey::Named(NamedKey::Escape) => return escape(form),
@@ -49,6 +54,12 @@ pub fn handle_key(form: &mut ComposeForm, key: &KeyEvent, pane: Pane) -> Outcome
         LogicalKey::Char(ch) if held.ctrl => shortcut(form, ch, held.shift),
         LogicalKey::Char(_) => Outcome::Ignored,
     };
+    finish(form, outcome, pane)
+}
+
+/// What every input that changed the form does afterwards: the notices about
+/// closing end, and the caret comes back into view.
+fn finish(form: &mut ComposeForm, outcome: Outcome, pane: Pane) -> Outcome {
     if outcome == Outcome::Changed {
         form.notice = None;
         form.discard_armed = false;
@@ -62,6 +73,9 @@ pub fn handle_key(form: &mut ComposeForm, key: &KeyEvent, pane: Pane) -> Outcome
 pub fn handle_text(form: &mut ComposeForm, text: &str, pane: Pane) -> Outcome {
     if form.progress == Progress::Sending {
         return Outcome::Ignored;
+    }
+    if form.focus == Field::From || form.from_menu.is_some() {
+        return from_text(form, text);
     }
     if !form.focused().insert_text(&clean(text)) {
         return Outcome::Ignored;
@@ -78,33 +92,47 @@ pub fn handle_text(form: &mut ComposeForm, text: &str, pane: Pane) -> Outcome {
 fn sending_key(form: &mut ComposeForm, key: &KeyEvent) -> Outcome {
     let plain = !key.modifiers.alt && !key.modifiers.meta;
     if plain && matches!(key.key, LogicalKey::Named(NamedKey::Escape)) {
-        form.notice = Some(ESCAPE_WHILE_SENDING.to_string());
-        return Outcome::Changed;
+        return escape_while_sending(form);
     }
     Outcome::Ignored
 }
 
-fn escape(form: &mut ComposeForm) -> Outcome {
+/// Escape, or a click on Cancel, while the message is with the server.
+pub(super) fn escape_while_sending(form: &mut ComposeForm) -> Outcome {
+    form.notice = Some(ESCAPE_WHILE_SENDING.to_string());
+    Outcome::Changed
+}
+
+/// Escape, or a click on Cancel: closes a message with nothing written at
+/// once, and asks for a second press before it throws text away.
+pub(super) fn escape(form: &mut ComposeForm) -> Outcome {
     if !form.is_dirty() || form.discard_armed {
         return Outcome::Close;
     }
     form.discard_armed = true;
-    form.notice = Some("this message has text in it: press Esc again to discard it".to_string());
+    form.notice = Some("this message has text in it: press Esc again (or click Cancel) to discard it".to_string());
     Outcome::Changed
 }
 
 fn named_key(form: &mut ComposeForm, key: NamedKey, shift: bool, ctrl: bool, pane: Pane) -> Outcome {
     let in_body = form.focus == Field::Body;
     match key {
-        NamedKey::Tab => {
-            form.focus = if shift { form.focus.previous() } else { form.focus.next() };
-        }
+        NamedKey::Tab => form.step_focus(!shift),
         NamedKey::Enter if in_body => {
             form.focused().insert_newline();
         }
-        NamedKey::Enter => form.focus = form.focus.next(),
-        NamedKey::Up if !in_body => form.focus = form.focus.previous(),
-        NamedKey::Down if !in_body => form.focus = form.focus.next(),
+        NamedKey::Enter if form.focus == Field::From && form.can_choose_sender() => {
+            form.from_menu = Some(form.sender);
+        }
+        NamedKey::Enter => form.step_focus(true),
+        NamedKey::Up if !in_body => form.step_focus(false),
+        NamedKey::Down if !in_body => form.step_focus(true),
+        NamedKey::Left | NamedKey::Right if form.focus == Field::From => {
+            if !form.step_sender(key == NamedKey::Right) {
+                return Outcome::Ignored;
+            }
+        }
+        _ if form.focus == Field::From => return Outcome::Ignored,
         NamedKey::Up => form.body.move_vertical(false, pane.width, shift),
         NamedKey::Down => form.body.move_vertical(true, pane.width, shift),
         NamedKey::PageUp | NamedKey::PageDown if in_body => {
@@ -137,6 +165,9 @@ fn named_key(form: &mut ComposeForm, key: NamedKey, shift: bool, ctrl: bool, pan
 
 /// Ctrl with a letter: select all, undo and redo, cut, copy, paste.
 fn shortcut(form: &mut ComposeForm, ch: char, shift: bool) -> Outcome {
+    if form.focus == Field::From {
+        return Outcome::Ignored;
+    }
     match ch.to_ascii_lowercase() {
         'a' => form.focused().select_all(),
         'z' if shift => {

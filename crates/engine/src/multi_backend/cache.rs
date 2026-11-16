@@ -8,6 +8,7 @@ use model::{ConnectionState, Event};
 pub(super) struct MemberCache {
     folders: Option<Event>,
     changes: Option<Event>,
+    signature: Option<Event>,
     connection: Option<Event>,
     quota: Option<Event>,
     sync: Option<Event>,
@@ -19,6 +20,7 @@ impl MemberCache {
         match event {
             Event::FolderList { .. } => self.folders = Some(event.clone()),
             Event::ChangesAllowed { .. } => self.changes = Some(event.clone()),
+            Event::AccountSignature { .. } => self.signature = Some(event.clone()),
             Event::ConnectionState { .. } => self.connection = Some(event.clone()),
             Event::Quota { .. } => self.quota = Some(event.clone()),
             Event::SyncProgress { .. } => self.sync = Some(event.clone()),
@@ -36,10 +38,10 @@ impl MemberCache {
     }
 
     /// What the screen needs about the account, in the order it is applied:
-    /// folders, whether changes are allowed, connection, quota, sync status.
-    /// Only the ones the member has said.
+    /// folders, whether changes are allowed, signature, connection, quota,
+    /// sync status. Only the ones the member has said.
     pub fn replay(&self) -> Vec<Event> {
-        [&self.folders, &self.changes, &self.connection, &self.quota, &self.sync]
+        [&self.folders, &self.changes, &self.signature, &self.connection, &self.quota, &self.sync]
             .into_iter()
             .flatten()
             .cloned()
