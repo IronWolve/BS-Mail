@@ -11,7 +11,6 @@ use super::compose::ComposeKind;
 use super::hit::{Hit, HitView, hit_at};
 use super::motion::folders_height;
 use super::movement::WHEEL_ROWS;
-use super::viewport::{folders_first, list_first};
 use crate::app_view::AppView;
 use crate::layout::Layout;
 use crate::view_state::{Focus, ListPage, OverlayKind};
@@ -104,10 +103,11 @@ impl AppView {
     /// event and every backend event.
     pub fn take_commands(&mut self) -> Vec<Command> {
         let mut commands = self.queue.take(&self.selection, &self.mail);
+        self.note_own_changes(&commands);
         // Older mail is only asked for while the folder's own list is shown,
         // not while the results of a search are.
         if self.search.is_none() {
-            commands.extend(self.queue.take_more(&self.selection, &self.mail));
+            commands.extend(self.queue.take_more(&self.selection, &self.mail, self.scroll.list_reach));
         }
         commands
     }
@@ -237,19 +237,21 @@ impl AppView {
             return false;
         }
         let layout = self.layout(grid.0, grid.1);
-        let action = if rows < 0 { Action::Up } else { Action::Down };
-        let notches = usize::from(rows.unsigned_abs()) * WHEEL_ROWS;
         let target = match self.hit(&layout, col, row) {
             Hit::Folder(_) | Hit::Account(_) | Hit::Sidebar => Focus::Sidebar,
             Hit::Message(_) | Hit::ListChrome => Focus::List,
             Hit::Reader => Focus::Reader,
             Hit::KeyBar(_) | Hit::Nothing => return false,
         };
-        for _ in 0..notches {
-            match target {
-                Focus::Sidebar => self.move_folder(action, &layout),
-                Focus::List => self.move_message(action, &layout),
-                Focus::Reader => self.scroll_reader(action, &layout),
+        // The pane under the pointer scrolls; the selection and the focus stay.
+        match target {
+            Focus::Sidebar => self.wheel_folders(&layout, rows),
+            Focus::List => self.wheel_list(&layout, rows),
+            Focus::Reader => {
+                let action = if rows < 0 { Action::Up } else { Action::Down };
+                for _ in 0..usize::from(rows.unsigned_abs()) * WHEEL_ROWS {
+                    self.scroll_reader(action, &layout);
+                }
             }
         }
         true
@@ -263,13 +265,7 @@ impl AppView {
         let view = HitView {
             layout,
             folder_offsets: &offsets,
-            folders_first: folders_first(
-                &rows,
-                &offsets,
-                self.selection.folder,
-                self.scroll.folders,
-                height,
-            ),
+            folders_first: self.folders_view_first(&rows, &offsets, height),
             list_first: self.list_first(layout),
             messages: self.shown_page().map_or(0, |page| page.envelopes.len()),
             accounts: self.mail.accounts.len(),
@@ -288,7 +284,7 @@ impl AppView {
     fn list_first(&self, layout: &Layout) -> usize {
         let visible = layout.list.as_ref().map_or(0, |list| usize::from(list.rows.height));
         let total = self.shown_page().map_or(0, |page| page.envelopes.len());
-        list_first(self.scroll.list, self.selection.message_index, visible, total)
+        self.list_view_first(visible, total)
     }
 }
 

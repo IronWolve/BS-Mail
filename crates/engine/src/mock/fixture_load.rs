@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use model::{
-    Account, AccountId, Body, Envelope, Folder, FolderId, MailDate, MessageId, SyncStatus,
+    Account, AccountId, Body, Envelope, Folder, FolderId, FolderRole, MailDate, MessageId, SyncStatus,
 };
 use toml::de::Error as ParseFailure;
 use toml::from_str as parse_fixture_text;
@@ -70,13 +70,20 @@ impl Fixture {
 }
 
 fn convert(parsed: &FixtureFile) -> Result<Fixture, FieldProblem> {
-    let accounts = accounts_from_rows(&parsed.accounts)?;
+    let mut accounts = accounts_from_rows(&parsed.accounts)?;
     let account = accounts
         .iter()
         .find(|account| account.selected)
         .map(|account| account.id.clone())
         .ok_or_else(|| FieldProblem::new("accounts.selected", "no account is selected"))?;
     let folders = folders_from_rows(&parsed.folders, &account)?;
+    // The account the folders belong to, when the fixture gives it a count,
+    // counts its own Inbox.
+    let inbox = folders.iter().find(|folder| folder.role == FolderRole::Inbox);
+    let counting = accounts.iter_mut().find(|listed| listed.id == account && listed.unread.is_some());
+    if let (Some(inbox), Some(listed)) = (inbox, counting) {
+        listed.unread = Some(inbox.unread);
+    }
     let messages = envelopes_from_rows(&parsed.messages, &folders)?;
     let open_message = MessageId(parsed.open.message);
     if !messages.iter().any(|envelope| envelope.id == open_message) {

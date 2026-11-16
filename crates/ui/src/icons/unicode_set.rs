@@ -32,6 +32,8 @@ pub fn glyph(id: IconId) -> &'static str {
         IconId::SortAsc => "\u{25b4}",
         IconId::SortDesc => "\u{25be}",
         IconId::Attachment => "\u{2295}",
+        IconId::Reply => "\u{21a9}",
+        IconId::Forward => "\u{21aa}",
         // Rounded keycap ends exist only in the icon-font set.
         IconId::CapLeft | IconId::CapRight => "",
     }

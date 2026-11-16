@@ -5,8 +5,8 @@ use std::path::Path;
 use std::str::FromStr;
 
 use model::{
-    AccountId, Body, BodyRole, Command, Envelope, Event, FlagChange, FolderId, MailBackend, MailDate,
-    MessageId, RequestId, StyledLine, StyledSpan, SyncStatus,
+    AccountId, Body, BodyRole, Command, Envelope, Event, FlagChange, FolderId, FolderRole, MailBackend,
+    MailDate, MessageId, RequestId, StyledLine, StyledSpan, SyncStatus,
 };
 
 use crate::change_refusals::{DELETED_NOT_HERE, move_refusal};
@@ -82,6 +82,31 @@ impl MockBackend {
             account: self.data.account.clone(),
             folders: self.data.folders.clone(),
         }
+    }
+
+    /// The folder list, and after it the account's Inbox unread count, which
+    /// is what the account list shows, when the fixture gives the account a
+    /// count (see `AccountRow::unread`).
+    fn folder_list_events(&self) -> Vec<Event> {
+        let mut events = vec![self.folder_list()];
+        let counted = self.data.accounts.iter().any(|listed| listed.id == self.data.account && listed.unread.is_some());
+        let inbox = self.data.folders.iter().find(|folder| folder.role == FolderRole::Inbox);
+        events.extend(inbox.filter(|_| counted).map(|folder| Event::AccountUnread {
+            account: self.data.account.clone(),
+            unread: folder.unread,
+        }));
+        events
+    }
+
+    /// A reply was sent: its original is marked answered, as the real
+    /// backend does once the server has accepted the message.
+    fn mark_answered(&mut self, original: MessageId) -> Vec<Event> {
+        let change = FlagChange { answered: Some(true), ..FlagChange::default() };
+        let outcome = apply_flags(&mut self.data, &[original], change);
+        if outcome.updates.is_empty() {
+            return Vec::new();
+        }
+        vec![Event::FlagsChanged { updates: outcome.updates }]
     }
 
     /// The newest page of a folder: every fixture message filed there, newest
@@ -177,7 +202,7 @@ impl MockBackend {
                 });
             }
             if outcome.counts_moved {
-                events.push(self.folder_list());
+                events.extend(self.folder_list_events());
             }
         }
         if deleted_asked {
@@ -208,7 +233,7 @@ impl MockBackend {
     fn after_relocation(&self, operation: &str, outcome: MoveOutcome) -> Vec<Event> {
         let mut events = Vec::new();
         if !outcome.touched.is_empty() {
-            events.push(self.folder_list());
+            events.extend(self.folder_list_events());
             events.extend(
                 outcome
                     .touched
@@ -315,9 +340,11 @@ impl MailBackend for MockBackend {
                 query,
             } => self.search(request, &account, &query),
             Command::SyncNow { account } => self.sync_now(&account),
-            Command::Send { message } => vec![Event::MessageSent {
-                account: message.account,
-            }],
+            Command::Send { message } => {
+                let mut events = vec![Event::MessageSent { account: message.account }];
+                events.extend(message.in_reply_to.map(|original| self.mark_answered(original)).unwrap_or_default());
+                events
+            }
             Command::SelectAccount { account } => select_account(&self.data, &account),
             Command::Unlock { .. } => Vec::new(),
         }

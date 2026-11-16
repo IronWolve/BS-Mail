@@ -60,6 +60,7 @@ pub(super) fn remap_event(slot: Slot, event: Event) -> Mapped<Event> {
             Event::SearchResults { request, total, envelopes, incomplete }
         }
         unchanged @ (Event::AccountList(_)
+        | Event::AccountUnread { .. }
         | Event::HostInfo { .. }
         | Event::ConnectionState { .. }
         | Event::SyncProgress { .. }

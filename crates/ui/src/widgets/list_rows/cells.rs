@@ -3,6 +3,8 @@
 use model::{Envelope, MailDate};
 use surface::{Frame, Rect};
 
+use super::flag_cell::draw_flag_cell;
+use super::party::recipient_text;
 use super::row_style::RowStyle;
 use crate::format::{DateFormat, format_address, format_list_date, format_size, is_recent};
 use crate::icons::IconId;
@@ -23,6 +25,9 @@ pub struct RowInfo<'a> {
     pub clip: Rect,
     pub short_date: bool,
     pub now: MailDate,
+    /// The sender column names the recipient for this row (the message is
+    /// filed in Sent or Drafts).
+    pub recipient: bool,
 }
 
 /// Draws the cell of `slot` for `row`.
@@ -41,19 +46,12 @@ pub fn draw_cell(
             let text = row.number.to_string();
             put_aligned(frame, row.clip, at, &text, align, style.plain(roles::LIST_ROW));
         }
-        ColumnId::Flag if flags.alert => {
-            let icon = ctx.icon_inline(IconId::Alert);
-            put_aligned(frame, row.clip, at, icon, align, style.accent(roles::LIST_FLAG_ALERT));
-        }
-        ColumnId::Flag if !flags.seen => {
-            let icon = ctx.icon_inline(IconId::Dot);
-            put_aligned(frame, row.clip, at, icon, align, style.accent(roles::LIST_FLAG_UNREAD));
-        }
+        ColumnId::Flag => draw_flag_cell(frame, ctx, style, row, slot),
         ColumnId::Star if flags.flagged => {
             let icon = ctx.icon_inline(IconId::Star);
             put_aligned(frame, row.clip, at, icon, align, style.accent(roles::LIST_STAR));
         }
-        ColumnId::Flag | ColumnId::Star => {}
+        ColumnId::Star => {}
         ColumnId::From => draw_from(frame, ctx, style, row, slot),
         ColumnId::Subject => draw_subject(frame, ctx, style, row, slot),
         ColumnId::Date => draw_date(frame, ctx, style, row, slot),
@@ -71,10 +69,14 @@ fn draw_from(
     row: &RowInfo<'_>,
     slot: &ColumnSlot,
 ) {
-    let Some(from) = row.envelope.from.first() else {
-        return;
+    let text = if row.recipient {
+        recipient_text(row.envelope, ctx.config.list.from_format)
+    } else {
+        let Some(from) = row.envelope.from.first() else {
+            return;
+        };
+        format_address(from, ctx.config.list.from_format)
     };
-    let text = format_address(from, ctx.config.list.from_format);
     let plain = style.plain(roles::LIST_ROW);
     put_cut(frame, row.clip, slot.x, row.y, &text, slot.width, plain);
 }

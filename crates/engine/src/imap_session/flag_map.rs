@@ -4,15 +4,9 @@ use async_imap::types::Flag;
 use model::Flags;
 
 /// Keywords the server or other clients set for their own bookkeeping; they
-/// are not tags the user sees.
-const BOOKKEEPING: [&str; 6] = [
-    "nonjunk",
-    "junk",
-    "notjunk",
-    "forwarded",
-    "mdnsent",
-    "phishing",
-];
+/// are not tags the user sees. (`$Forwarded` is not among them: it is the
+/// forwarded mark.)
+const BOOKKEEPING: [&str; 5] = ["nonjunk", "junk", "notjunk", "mdnsent", "phishing"];
 
 /// The flags of one message and the free-form keywords it carries.
 pub fn map_flags(flags: &[Flag<'_>]) -> (Flags, Vec<String>) {
@@ -56,6 +50,8 @@ fn classify_keyword(name: &str, flags: &mut Flags, tags: &mut Vec<String>) {
     let bare = lower.trim_start_matches(['$', '\\']);
     if bare == "important" {
         flags.alert = true;
+    } else if bare == "forwarded" {
+        flags.forwarded = true;
     } else if !name.starts_with('$') && !name.starts_with('\\') && !BOOKKEEPING.contains(&bare) {
         tags.push(name.to_owned());
     }

@@ -42,11 +42,14 @@ fn bar_after(id: ColumnId) -> bool {
 }
 
 /// Draws the header into the one-row `rect` (the list's text width).
+/// `from_label` is what the sender column is called over these rows: `From`,
+/// or `To` over a list of sent mail.
 pub fn draw_list_header(
     frame: &mut Frame,
     ctx: &DrawContext<'_>,
     rect: Rect,
     columns: &ColumnLayout,
+    from_label: &str,
 ) {
     if rect.is_empty() {
         return;
@@ -56,7 +59,8 @@ pub fn draw_list_header(
     let bar_style = ctx.fg(roles::LIST_HEADER_BAR);
     for (index, slot) in columns.slots.iter().enumerate() {
         let at = (slot.x, rect.y, slot.width);
-        put_aligned(frame, rect, at, column_label(slot.id), column_align(slot.id), label_style);
+        let label = if slot.id == ColumnId::From { from_label } else { column_label(slot.id) };
+        put_aligned(frame, rect, at, label, column_align(slot.id), label_style);
         let has_next = index + 1 < columns.slots.len();
         if bar_after(slot.id) && has_next {
             put_text(frame, rect, slot.x.saturating_add(slot.width), rect.y, &bar, bar_style);

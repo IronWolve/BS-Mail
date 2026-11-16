@@ -131,14 +131,27 @@ impl Screen {
         } else {
             self.remember.as_ref().and_then(|(_, saved)| saved.grid)
         };
+        let saved_place = self.remember.as_ref().map(|(_, saved)| saved.place.clone()).unwrap_or_default();
         State {
             layout: self.view.prefs().clone(),
             grid,
+            place: self.view.place().over(&saved_place),
+        }
+    }
+
+    /// Keeps the account and folder that are open when they are not the ones
+    /// kept, so a run that ends without a goodbye still comes back to them.
+    fn save_place_when_changed(&mut self) {
+        let changed = self.remember.as_ref().is_some_and(|(_, saved)| self.state_now().place != saved.place);
+        if changed {
+            // A failure waits: closing the program tries again and says so.
+            let _ = self.save_state();
         }
     }
 
     /// Writes what is remembered, when it has changed. Called when a drag
-    /// ends and when the window closes. A write that failed is an error, and
+    /// ends, when the account or folder open changes and when the window
+    /// closes. A write that failed is an error, and
     /// what was saved before is left as it was; the sizes stay marked as not
     /// saved, so the next call tries again.
     pub fn save_state(&mut self) -> Result<(), AppError> {
@@ -309,6 +322,7 @@ impl EventSink for Screen {
         if used {
             self.exchange(host);
             host.request_redraw();
+            self.save_place_when_changed();
         }
         if matches!(event, InputEvent::Button { state: surface::ButtonState::Released, .. }) {
             // A failure here waits: closing the program tries again and says

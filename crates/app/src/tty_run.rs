@@ -19,12 +19,15 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
     let started = Instant::now();
     let depth = depth_for(options);
     let mut scene = scene::build(options, Capabilities::terminal(depth))?;
-    scene.prime();
     let data_dir = data_dir(options.data_dir.as_ref());
     let remembered = data_dir.as_ref().map(|dir| state_file::load(dir));
     if let Some(state) = &remembered {
         scene.view.set_prefs(state.layout.clone());
+        // Told before the first events are taken, so the first account and
+        // folder shown are the ones that were open last.
+        scene.view.restore_place(state.place.clone());
     }
+    scene.prime();
     let (cols, rows) = terminal_size().unwrap_or((REF_COLS, REF_ROWS));
     let grid = (cols.max(MIN_COLS), rows.max(MIN_ROWS));
     let mut screen = Screen::new(scene.view, scene.backend, grid, scene.fixed_now)

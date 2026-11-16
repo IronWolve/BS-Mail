@@ -6,7 +6,8 @@ use super::composite::MultiBackend;
 
 impl MultiBackend {
     /// One account per member, in member order, with the latest connection
-    /// state seen from it and the active one marked selected.
+    /// state and Inbox unread count seen from it and the active one marked
+    /// selected.
     pub(super) fn account_list(&self) -> Event {
         let accounts = self
             .entries
@@ -16,6 +17,7 @@ impl MultiBackend {
                 name: entry.name.clone(),
                 address: entry.address.clone(),
                 state: entry.cache.connection_state(),
+                unread: entry.inbox_unread,
                 selected: self.active.as_ref() == Some(&entry.id),
             })
             .collect();

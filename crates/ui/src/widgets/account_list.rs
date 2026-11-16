@@ -1,12 +1,15 @@
 //! The accounts section body: one row per account, a filled dot and a bold
 //! address for the selected account, a ring and a plain address for others,
-//! and the row the keyboard cursor is on drawn like a selected folder.
+//! the account's Inbox unread count at the right end of the row as a folder's
+//! count is (an account whose count is not known yet shows none), and the
+//! row the keyboard cursor is on drawn like a selected folder.
 
 use model::{Account, AccountId};
 use surface::{Frame, Rect};
 
-use super::cell_text::{fill_cells, put_cut, put_text};
+use super::cell_text::{cells, fill_cells, put_cut, put_text};
 use super::draw_context::DrawContext;
+use crate::format::sidebar_count;
 use crate::icons::IconId;
 use crate::theme::roles;
 
@@ -48,9 +51,27 @@ pub fn draw_account_list(
         };
         put_text(frame, body, body.x + ICON_AT, y, ctx.icon(icon), icon_style);
         let x = body.x + ADDRESS_AT;
-        let room = body.right().saturating_sub(x);
+        let (count, count_x) = count_slot(ctx, account, body, x);
+        let gap = u16::from(count.is_some());
+        let room = count_x.saturating_sub(gap).saturating_sub(x);
         put_cut(frame, body, x, y, &account.address, room, text_style);
+        if let Some(text) = count {
+            let style = if under_cursor { ctx.fg(roles::SIDEBAR_SELECTED) } else { ctx.fg(roles::SIDEBAR_COUNT) };
+            put_text(frame, body, count_x, y, &text, style);
+        }
     }
+}
+
+/// The unread count and where it starts. The address always keeps at least
+/// the one cell its ellipsis needs: when the count would take that, it is left
+/// out instead.
+fn count_slot(ctx: &DrawContext<'_>, account: &Account, body: Rect, address_x: u16) -> (Option<String>, u16) {
+    let count = account.unread.and_then(|unread| sidebar_count(&ctx.config.appearance, unread));
+    let count_x = count.as_ref().map_or(body.right(), |text| body.right().saturating_sub(cells(text)));
+    if count_x.saturating_sub(1).saturating_sub(address_x) == 0 {
+        return (None, body.right());
+    }
+    (count, count_x)
 }
 
 #[cfg(test)]

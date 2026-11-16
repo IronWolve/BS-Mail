@@ -103,6 +103,8 @@ on_accent  = "#04121c"   # dark text on cyan and keycap blocks
 "list.marked"            = { bg = "bg_raised", bold = true } # not drawn yet; a marked row reverses its number cell
 "list.flag.unread"       = { fg = "green" }
 "list.flag.alert"        = { fg = "yellow", bold = true }
+"list.flag.answered"     = { fg = "cyan" }                  # the reply and forward marks
+"list.attachment"        = { fg = "ice" }
 "list.star"              = { fg = "yellow" }
 "list.date.recent"       = { fg = "text" }
 "list.date.ahead"        = { fg = "yellow" }

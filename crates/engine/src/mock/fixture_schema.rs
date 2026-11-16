@@ -35,6 +35,13 @@ pub(crate) struct AccountRow {
     #[serde(default)]
     pub selected: bool,
     pub connection: ConnectionText,
+    /// The Inbox unread count the account list shows beside the address; left
+    /// out, the account shows none (the reference picture has none). For the
+    /// selected account, the account the fixture holds folders for, giving
+    /// any number means the count is its Inbox folder's own, which the mock
+    /// keeps up as mail is read.
+    #[serde(default)]
+    pub unread: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -117,6 +124,10 @@ pub(crate) struct MessageRow {
     pub unread: bool,
     #[serde(default)]
     pub starred: bool,
+    #[serde(default)]
+    pub answered: bool,
+    #[serde(default)]
+    pub forwarded: bool,
     #[serde(default)]
     pub alert: bool,
     #[serde(default)]

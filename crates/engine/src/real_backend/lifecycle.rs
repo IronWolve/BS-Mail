@@ -19,6 +19,7 @@ pub fn announce(config: &AccountConfig, sink: &EventSink) {
         name: config.name.clone(),
         address: config.address.clone(),
         state: ConnectionState::Connecting,
+        unread: None,
         selected: true,
     }]));
     sink.send(changes_allowed(config, sink));

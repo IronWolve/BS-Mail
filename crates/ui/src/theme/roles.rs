@@ -87,6 +87,8 @@ roles! {
     LIST_MARKED = "list.marked"; // not drawn yet: a marked row reverses its number cell
     LIST_FLAG_UNREAD = "list.flag.unread";
     LIST_FLAG_ALERT = "list.flag.alert";
+    LIST_FLAG_ANSWERED = "list.flag.answered";
+    LIST_ATTACHMENT = "list.attachment";
     LIST_STAR = "list.star";
     LIST_DATE_RECENT = "list.date.recent";
     LIST_DATE_AHEAD = "list.date.ahead";

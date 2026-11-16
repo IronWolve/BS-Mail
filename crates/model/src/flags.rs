@@ -5,6 +5,9 @@ pub struct Flags {
     pub seen: bool,
     pub flagged: bool,
     pub answered: bool,
+    /// The message was forwarded (the `$Forwarded` keyword). Only read from
+    /// the server: the program sets no such flag, so there is no change for it.
+    pub forwarded: bool,
     pub draft: bool,
     pub deleted: bool,
     /// The alert marker shown as a yellow `!` in the list.

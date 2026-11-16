@@ -133,6 +133,8 @@ impl AppView {
     /// `reader.mark_read_after_ms`. `now_ms` is any steady clock in
     /// milliseconds; the caller calls this a few times a second.
     pub fn tick(&mut self, now_ms: u64) {
+        self.last_tick_ms = now_ms;
+        self.expire_new_mail(now_ms);
         if self.options.is_some() || self.composer.is_some() || self.setup.is_some() || self.overlays.is_open() {
             // Mail that is hidden behind the Options screen, the composer, the
             // account form or the help is not marked read, and its time starts

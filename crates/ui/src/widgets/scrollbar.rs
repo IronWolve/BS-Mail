@@ -16,12 +16,24 @@ const ASCII_TRACK: &str = "|";
 
 /// Rows (from the top of the track) where the thumb starts and how many it
 /// covers, for `first` of `total` rows with `visible` shown in `height` rows.
-fn thumb_span(first: usize, visible: usize, total: usize, height: usize) -> (usize, usize) {
+/// Only for `total > visible`.
+pub fn thumb_span(first: usize, visible: usize, total: usize, height: usize) -> (usize, usize) {
     let size = (visible * height / total).clamp(1, height);
     let scrollable = total - visible;
     let first = first.min(scrollable);
     let top = (first * (height - size) + scrollable / 2) / scrollable;
     (top, size)
+}
+
+/// The first row to show so that a thumb `size` rows tall starts `top` rows
+/// down the track: the inverse of `thumb_span`, for dragging.
+pub fn first_for_top(top: usize, size: usize, visible: usize, total: usize, height: usize) -> usize {
+    let scrollable = total.saturating_sub(visible);
+    let travel = height.saturating_sub(size);
+    if travel == 0 {
+        return 0;
+    }
+    ((top.min(travel) * scrollable + travel / 2) / travel).min(scrollable)
 }
 
 /// Draws the bar in column `col` over the rows of `rows`. Nothing is drawn

@@ -17,24 +17,47 @@ pub(super) struct Gate<'a> {
     pub host_sent: &'a mut bool,
 }
 
-/// The events of `events` that go to the screen, in order.
+/// The events of `events` that go to the screen, in order. A folder list that
+/// changes the member's Inbox unread count is followed by the event that says
+/// so, whether or not the list itself goes on: the screen shows every
+/// account's count.
 pub(super) fn admit_all(entry: &mut Entry, events: Vec<Event>, gate: &mut Gate<'_>) -> Vec<Event> {
+    let mut out = Vec::new();
+    for event in events {
+        let class = classify(&event);
+        if class == Class::Swallowed {
+            continue;
+        }
+        let event = match remap_event(entry.slot, event) {
+            Ok(event) => event,
+            Err(OutOfRange) => {
+                out.extend(out_of_range_notice(entry));
+                continue;
+            }
+        };
+        entry.cache.store(&event);
+        let unread = entry.note_inbox_unread(&event);
+        out.extend(forward(entry, event, class, gate));
+        out.extend(unread);
+    }
+    keep_the_last_count(out)
+}
+
+/// Of the counts one batch tells about an account only the last stands: the
+/// account list built after the batch already carries it, and a count that
+/// went up and then up again must not look to the screen like a fall and then
+/// a rise.
+fn keep_the_last_count(events: Vec<Event>) -> Vec<Event> {
+    let last = events.iter().rposition(|event| matches!(event, Event::AccountUnread { .. }));
     events
         .into_iter()
-        .filter_map(|event| admit(entry, event, gate))
+        .enumerate()
+        .filter(|(at, event)| !matches!(event, Event::AccountUnread { .. }) || Some(*at) == last)
+        .map(|(_, event)| event)
         .collect()
 }
 
-fn admit(entry: &mut Entry, event: Event, gate: &mut Gate<'_>) -> Option<Event> {
-    let class = classify(&event);
-    if class == Class::Swallowed {
-        return None;
-    }
-    let event = match remap_event(entry.slot, event) {
-        Ok(event) => event,
-        Err(OutOfRange) => return out_of_range_notice(entry),
-    };
-    entry.cache.store(&event);
+fn forward(entry: &Entry, event: Event, class: Class, gate: &mut Gate<'_>) -> Option<Event> {
     match class {
         Class::Host => (!std::mem::replace(gate.host_sent, true)).then_some(event),
         other => other

@@ -1,5 +1,5 @@
 //! What the program remembers between runs: the sizes the user dragged the
-//! bars to and the size of the window.
+//! bars to, the size of the window, and the account and folder that were open.
 //!
 //! One small file in the data folder. A file that is missing, unreadable or
 //! not understood gives the defaults and is never an error: the worst result
@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use ui::layout::{LayoutPrefs, MIN_COLS, MIN_ROWS};
+use ui::view_state::Place;
 
 pub const STATE_NAME: &str = "state.toml";
 
@@ -20,6 +21,8 @@ pub struct State {
     pub layout: LayoutPrefs,
     /// The window's grid, in cells, as it was when it last closed.
     pub grid: Option<(u16, u16)>,
+    /// The account (by id) and the folder (by path) that were open.
+    pub place: Place,
 }
 
 impl Default for State {
@@ -27,6 +30,7 @@ impl Default for State {
         Self {
             layout: LayoutPrefs::default(),
             grid: None,
+            place: Place::default(),
         }
     }
 }
@@ -37,6 +41,14 @@ struct StateFile {
     layout: LayoutState,
     #[serde(default)]
     window: WindowState,
+    #[serde(default)]
+    view: ViewState,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct ViewState {
+    account: Option<String>,
+    folder: Option<String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -77,6 +89,9 @@ pub fn load(dir: &Path) -> State {
             state.grid = Some((cols, rows));
         }
     }
+    // A name that is empty names nothing.
+    let named = |text: Option<String>| text.filter(|text| !text.is_empty());
+    state.place = Place { account: named(file.view.account), folder: named(file.view.folder) };
     state
 }
 
@@ -91,6 +106,10 @@ pub fn save(dir: &Path, state: &State) -> io::Result<()> {
         window: WindowState {
             cols: state.grid.map(|grid| grid.0),
             rows: state.grid.map(|grid| grid.1),
+        },
+        view: ViewState {
+            account: state.place.account.clone(),
+            folder: state.place.folder.clone(),
         },
     };
     let text = toml::to_string_pretty(&file)

@@ -33,6 +33,7 @@ impl AppView {
         self.change_folder(chosen);
         if let Some(first) = first {
             self.scroll.folders = first;
+            self.scroll.folders_detached = None;
         }
     }
 
@@ -67,18 +68,17 @@ impl AppView {
         self.selection.message = Some(envelope.id);
         self.selection.message_index = index;
         self.scroll.list = list_first(self.scroll.list, index, visible, page.envelopes.len());
+        self.scroll.list_detached = None;
         if changed {
             self.scroll.reader = 0;
         }
     }
 
-    pub(super) fn scroll_reader(&mut self, action: Action, layout: &Layout) {
-        let Some(reader) = &layout.reader else {
-            return;
-        };
-        let Some(content) = self.reader_content() else {
-            return;
-        };
+    /// How many wrapped lines the open message has, and how many of them the
+    /// reader's body shows at once.
+    pub(super) fn reader_extent(&self, layout: &Layout) -> Option<(usize, usize)> {
+        let reader = layout.reader.as_ref()?;
+        let content = self.reader_content()?;
         let ctx = DrawContext::new(&self.theme, &self.icons, &self.config, self.now);
         let view = BodyView {
             lead: &content.lead,
@@ -87,8 +87,14 @@ impl AppView {
             app_name: &self.identity.name,
             rules: HighlightRules::default(),
         };
-        let height = usize::from(reader.body.height);
-        let last = visual_len(&ctx, reader.body, &view).saturating_sub(height);
+        Some((visual_len(&ctx, reader.body, &view), usize::from(reader.body.height)))
+    }
+
+    pub(super) fn scroll_reader(&mut self, action: Action, layout: &Layout) {
+        let Some((lines, height)) = self.reader_extent(layout) else {
+            return;
+        };
+        let last = lines.saturating_sub(height);
         let next = match action {
             Action::Up => self.scroll.reader.saturating_sub(1),
             Action::Down => self.scroll.reader.saturating_add(1),

@@ -26,7 +26,7 @@ impl AppView {
         self.selection.message = None;
         self.selection.message_index = 0;
         self.search = None;
-        self.scroll.list = 0;
+        self.scroll.reset_list();
         self.scroll.reader = 0;
         self.mail.page = None;
         self.mail.body = None;

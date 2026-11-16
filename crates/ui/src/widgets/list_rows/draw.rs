@@ -1,9 +1,10 @@
 //! The visible rows of the message list.
 
-use model::{Envelope, MailDate};
+use model::{Envelope, Folder, MailDate};
 use surface::{Frame, Rect};
 
 use super::cells::{RowInfo, draw_cell};
+use super::party::{names_recipient, role_of};
 use super::row_style::RowStyle;
 use crate::layout::ColumnLayout;
 use crate::theme::roles;
@@ -13,6 +14,9 @@ use crate::widgets::cell_text::fill_cells;
 /// What to draw: the page of envelopes, the columns and the position.
 pub struct ListRowsView<'a> {
     pub envelopes: &'a [Envelope],
+    /// The folders of the account on screen, for the role of the folder each
+    /// message is filed in.
+    pub folders: &'a [Folder],
     pub columns: &'a ColumnLayout,
     /// Index in `envelopes` of the selected row.
     pub selected: Option<usize>,
@@ -47,6 +51,7 @@ pub fn draw_list_rows(
             clip: rows,
             short_date: view.columns.short_date,
             now: view.now,
+            recipient: names_recipient(role_of(view.folders, envelope)),
         };
         for slot in &view.columns.slots {
             draw_cell(frame, ctx, &style, &info, slot);

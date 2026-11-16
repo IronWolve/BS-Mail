@@ -34,6 +34,7 @@ pub(crate) fn accounts_from_rows(rows: &[AccountRow]) -> Result<Vec<Account>, Fi
             name: row.name.clone(),
             address: row.address.clone(),
             state: connection_state(row.connection),
+            unread: row.unread,
             selected: row.selected,
         })
         .collect())
@@ -142,6 +143,8 @@ fn envelope_from_row(
         flags: Flags {
             seen: !row.unread,
             flagged: row.starred,
+            answered: row.answered,
+            forwarded: row.forwarded,
             alert: row.alert,
             ..Flags::default()
         },

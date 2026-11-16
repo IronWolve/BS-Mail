@@ -4,10 +4,9 @@ use surface::{Frame, Rect};
 
 use crate::app_view::AppView;
 use crate::icons::IconId;
-use crate::input::viewport::folders_first;
 use crate::layout::{FolderSpacing, SectionKind, SidebarLayout};
 use crate::widgets::{
-    DrawContext, FolderTreeView, StatusLine, draw_account_list, draw_folder_tree, draw_section_title,
+    DrawContext, FolderTreeView, StatusLine, draw_account_list, draw_folder_tree, draw_scrollbar, draw_section_title,
     draw_status_panel, row_offsets, visible_rows,
 };
 
@@ -21,7 +20,12 @@ impl AppView {
             };
             draw_section_title(frame, ctx, section.title, icon, title);
             match section.kind {
-                SectionKind::Folders => self.draw_folders(frame, ctx, section.body, sidebar.spacing),
+                SectionKind::Folders => {
+                    self.draw_folders(frame, ctx, section.body, sidebar.spacing);
+                    if let Some(bar) = self.folders_bar(sidebar) {
+                        draw_scrollbar(frame, ctx, bar.col, bar.rows, bar.first, bar.visible, bar.total);
+                    }
+                }
                 SectionKind::Accounts => draw_account_list(
                     frame,
                     ctx,
@@ -48,7 +52,7 @@ impl AppView {
         let rows = visible_rows(&self.mail.folders);
         let offsets = row_offsets(&rows, spacing);
         let selected = self.selection.folder;
-        let first = folders_first(&rows, &offsets, selected, self.scroll.folders, body.height);
+        let first = self.folders_view_first(&rows, &offsets, body.height);
         let view = FolderTreeView {
             rows: &rows,
             selected,

@@ -24,6 +24,8 @@ use crate::setup::draw::draw_setup;
 use crate::search::draw::draw_search_bar;
 use crate::move_picker::draw::draw_picker;
 use crate::composer::draw::draw_composer;
+use crate::input::new_mail::NewMail;
+use crate::input::scrollbars::BarDrag;
 use crate::input::{CommandQueue, Drag};
 use crate::layout::{
     FolderSpacing, GridSize, Layout, LayoutOptions, LayoutPrefs, MIN_COLS, MIN_ROWS, SectionKind,
@@ -31,7 +33,7 @@ use crate::layout::{
 };
 use crate::theme::{Theme, roles};
 use crate::view_state::{
-    Focus, MailSnapshot, OverlayKind, Overlays, ScrollState, Selection,
+    Focus, MailSnapshot, OverlayKind, Overlays, Place, ScrollState, Selection,
 };
 use crate::widgets::{
     DrawContext, FooterData, StatusLine, StripData, content_rows, draw_account_strip, draw_banner,
@@ -61,6 +63,16 @@ pub struct AppView {
     pub(crate) auto_marked: Option<MessageId>,
     /// The bar being dragged, while a button is held on it.
     pub(crate) drag: Option<Drag>,
+    /// The scrollbar thumb being dragged, while a button is held on it.
+    pub(crate) bar_drag: Option<BarDrag>,
+    /// The place remembered from the last run that is still to be opened.
+    pub(crate) restore: Option<Place>,
+    /// The notice of new mail the footer shows.
+    pub(crate) new_mail: Option<NewMail>,
+    /// The last time the caller's clock was told (see `tick`).
+    pub(crate) last_tick_ms: u64,
+    /// When the program last sent a change of mail, on that clock.
+    pub(crate) own_change_ms: Option<u64>,
     /// The message being written, when the composer is open.
     pub(crate) composer: Option<ComposeForm>,
     /// The user clicked Quit; the program closes it, the screen cannot.
@@ -132,6 +144,11 @@ impl AppView {
             read_timer: None,
             auto_marked: None,
             drag: None,
+            bar_drag: None,
+            restore: None,
+            new_mail: None,
+            last_tick_ms: 0,
+            own_change_ms: None,
             composer: None,
             quit_requested: false,
             link_requests: Vec::new(),
@@ -194,7 +211,12 @@ impl AppView {
         }
         let (folder, message) = (self.selection.folder, self.selection.message);
         let done = self.settle_moved_note(&event);
+        let lists = matches!(event, Event::AccountList(_) | Event::FolderList { .. });
+        let rise = self.unread_rise(&event);
         self.mail.apply(event, &mut self.selection);
+        if let Some((account, by)) = rise {
+            self.note_new_mail(&account, by);
+        }
         if done.is_some() {
             self.mail.set_note(done);
         }
@@ -206,6 +228,9 @@ impl AppView {
         // Another message is read from the top.
         if self.selection.message != message {
             self.scroll.reader = 0;
+        }
+        if lists {
+            self.apply_restore();
         }
         self.prune_marks();
     }
@@ -350,6 +375,7 @@ impl AppView {
                 mailbox: mailbox.as_ref(),
                 status: &self.mail.status,
                 error: self.mail.error.as_deref().or(self.config_problem.as_deref()),
+                notice: self.new_mail_notice(),
             };
             draw_footer(frame, ctx, rect, &data);
         }

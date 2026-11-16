@@ -11,6 +11,12 @@ use crate::sync_status::{ConnectionState, Quota, SyncStatus};
 pub enum Event {
     /// All configured accounts, in the order the sidebar lists them.
     AccountList(Vec<Account>),
+    /// The unread count of an account's Inbox changed, for the account list
+    /// and the notice of new mail. Sent for every account, shown or not.
+    AccountUnread {
+        account: AccountId,
+        unread: u32,
+    },
     /// The machine the engine runs on, for the account strip's host segment.
     HostInfo {
         /// Short host name, without the domain.

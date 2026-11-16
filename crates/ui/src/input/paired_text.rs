@@ -28,6 +28,12 @@ impl AppView {
     /// Reacts to one input event on a `cols` x `rows` grid. Returns whether
     /// anything on screen may have changed, so the host knows to redraw.
     pub fn handle_input(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
+        // The notice of new mail stays only until the next key.
+        let cleared = matches!(event, InputEvent::Key(_)) && self.new_mail.take().is_some();
+        self.handle_unnoticed_input(event, grid) || cleared
+    }
+
+    fn handle_unnoticed_input(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
         let paired = self.paired_text.take();
         if let (InputEvent::Text(text), Some(letter)) = (event, paired)
             && *text == letter.to_string()

@@ -1,6 +1,8 @@
 //! The automatic check for new mail. Every `poll_seconds` the worker asks
 //! the server for the counts of the open folder (and of the Inbox when that
-//! is another folder) with STATUS, which only reads. When something differs
+//! is another folder, or when no folder is open at all: an account the screen
+//! is not showing still has its Inbox looked at, so the account list can show
+//! its unread count) with STATUS, which only reads. When something differs
 //! from the last look it sends what a sync of the open folder sends: the
 //! folder list with fresh counts, the newest page with the same ids for the
 //! messages already known, and the sync status with the number of arrivals.
@@ -62,9 +64,7 @@ impl Worker {
 
     /// One look. Only a lost connection is an error.
     pub(super) async fn poll_check(&mut self, session: &mut ImapSession) -> Result<(), SessionError> {
-        let Some(open) = self.wanted.folder else {
-            return Ok(());
-        };
+        let open = self.wanted.folder;
         let full = self.poll.next_check();
         let found = self.look_at_counts(session, open).await?;
         let mut list_changed = !found.changed.is_empty();
@@ -78,10 +78,12 @@ impl Worker {
                 folders: self.state.folders().to_vec(),
             });
         }
-        if found.changed.contains(&open) && !self.search_shown {
-            events.extend(self.refreshed_page(session, open).await?);
-        } else if !self.search_shown {
-            events.extend(self.look_at_flags(session, open).await?);
+        if let Some(open) = open.filter(|_| !self.search_shown) {
+            if found.changed.contains(&open) {
+                events.extend(self.refreshed_page(session, open).await?);
+            } else {
+                events.extend(self.look_at_flags(session, open).await?);
+            }
         }
         if !events.is_empty() {
             self.poll.add_arrived(found.arrived);
@@ -93,12 +95,13 @@ impl Worker {
         Ok(())
     }
 
-    /// Asks STATUS about the open folder and the Inbox, keeps the counts in
-    /// the folder list current, and says which folders changed.
-    async fn look_at_counts(&mut self, session: &mut ImapSession, open: FolderId) -> Result<Found, SessionError> {
-        let mut targets = vec![open];
+    /// Asks STATUS about the open folder, when there is one, and the Inbox,
+    /// keeps the counts in the folder list current, and says which folders
+    /// changed.
+    async fn look_at_counts(&mut self, session: &mut ImapSession, open: Option<FolderId>) -> Result<Found, SessionError> {
+        let mut targets: Vec<FolderId> = open.into_iter().collect();
         let inbox = self.state.folders().iter().find(|f| f.role == FolderRole::Inbox).map(|f| f.id);
-        targets.extend(inbox.filter(|id| *id != open));
+        targets.extend(inbox.filter(|id| Some(*id) != open));
         let mut found = Found::default();
         for id in targets {
             let Some((path, listed)) = self.state.folder(id).map(|f| (f.path.clone(), (f.unread, f.total))) else {

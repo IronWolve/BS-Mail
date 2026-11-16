@@ -6,13 +6,12 @@
 use surface::Frame;
 
 use crate::app_view::AppView;
-use crate::input::viewport::list_first;
 use crate::layout::{ListRegion, ReaderRegion};
 use crate::options::empty_hint::draw_no_account_hint;
 use crate::view_state::ListPage;
 use crate::widgets::{
-    BodyView, DrawContext, HighlightRules, ListRowsView, ReaderTitleData, draw_list_header,
-    draw_list_rows, draw_list_title, draw_reader_body, draw_reader_headers, draw_reader_title,
+    BodyView, DrawContext, HighlightRules, ListRowsView, ReaderTitleData, column_label_for, draw_list_header,
+    draw_list_rows, draw_list_title, draw_scrollbar, draw_reader_body, draw_reader_headers, draw_reader_title,
 };
 
 impl AppView {
@@ -25,26 +24,42 @@ impl AppView {
     pub(crate) fn draw_list(&self, frame: &mut Frame, ctx: &DrawContext<'_>, list: &ListRegion) {
         let mailbox = self.list_summary();
         draw_list_title(frame, ctx, list.title, mailbox.as_ref());
-        draw_list_header(frame, ctx, list.header, &list.columns);
+        let page = self.shown_page();
+        let from_label = self.from_column_label(page);
+        draw_list_header(frame, ctx, list.header, &list.columns, from_label);
         if self.options_host.has_no_account() {
             draw_no_account_hint(frame, ctx, list.rows);
             return;
         }
-        let Some(page) = self.shown_page() else {
+        let Some(page) = page else {
             return;
         };
         let visible = usize::from(list.rows.height);
         let selected = self.selection.message_index;
         let view = ListRowsView {
             envelopes: &page.envelopes,
+            folders: &self.mail.folders,
             columns: &list.columns,
             selected: Some(selected),
             offset: page.offset,
-            first: list_first(self.scroll.list, selected, visible, page.envelopes.len()),
+            first: self.list_view_first(visible, page.envelopes.len()),
             now: self.now,
         };
         draw_list_rows(frame, ctx, list.rows, &view);
+        if let Some(bar) = self.list_bar(list) {
+            draw_scrollbar(frame, ctx, bar.col, bar.rows, bar.first, bar.visible, bar.total);
+        }
         self.show_marks(frame, list, view.first, &page.envelopes);
+    }
+
+    /// What the sender column is called over the rows on screen: `To` in the
+    /// Sent and Drafts folders, `From` everywhere else.
+    fn from_column_label(&self, page: Option<&ListPage>) -> &'static str {
+        // A search list is not the folder's own, so an empty one says nothing
+        // about whom the rows would name.
+        let own_list = self.search.is_none().then_some(self.selection.folder).flatten();
+        let folder_role = own_list.and_then(|id| self.mail.folder(id)).map(|folder| folder.role);
+        column_label_for(&self.mail.folders, page.map_or(&[], |page| page.envelopes.as_slice()), folder_role)
     }
 
     fn reader_title_data<'a>(&'a self, page: &'a ListPage) -> Option<ReaderTitleData<'a>> {
@@ -74,3 +89,6 @@ impl AppView {
         }
     }
 }
+
+#[cfg(test)]
+include!("view_panes.tests.rs");

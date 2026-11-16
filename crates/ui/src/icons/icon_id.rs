@@ -48,11 +48,15 @@ pub enum IconId {
     CapLeft,
     /// Right round end of a keycap.
     CapRight,
+    /// The list's mark for a message that was answered.
+    Reply,
+    /// The list's mark for a message that was forwarded.
+    Forward,
 }
 
 impl IconId {
     /// Every icon, in declaration order; `ALL[i].index() == i`.
-    pub const ALL: [IconId; 29] = [
+    pub const ALL: [IconId; 31] = [
         IconId::Mail,
         IconId::Person,
         IconId::Inbox,
@@ -82,6 +86,8 @@ impl IconId {
         IconId::Attachment,
         IconId::CapLeft,
         IconId::CapRight,
+        IconId::Reply,
+        IconId::Forward,
     ];
 
     /// Position in `ALL`, for table lookups.

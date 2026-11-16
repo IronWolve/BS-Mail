@@ -44,15 +44,16 @@ impl CommandQueue {
         self.asked_more = None;
     }
 
-    /// The request for older mail that is due: the selection is near the end
-    /// of what is loaded and the folder has more. Asked once for each number
-    /// of messages loaded.
-    pub fn take_more(&mut self, selection: &Selection, mail: &MailSnapshot) -> Option<Command> {
+    /// The request for older mail that is due: the selection, or the last row
+    /// the wheel or a scrollbar has brought into view (`reach`), is near the
+    /// end of what is loaded and the folder has more. Asked once for each
+    /// number of messages loaded.
+    pub fn take_more(&mut self, selection: &Selection, mail: &MailSnapshot, reach: usize) -> Option<Command> {
         let folder = selection.folder?;
         let page = mail.page.as_ref().filter(|page| page.folder == folder)?;
         let have = page.envelopes.len();
         let more = u64::from(page.total) > u64::from(page.offset) + u64::try_from(have).ok()?;
-        let near = selection.message_index + NEAR_END >= have;
+        let near = selection.message_index.max(reach) + NEAR_END >= have;
         if !(more && near) || self.asked_more == Some((folder, have)) {
             return None;
         }

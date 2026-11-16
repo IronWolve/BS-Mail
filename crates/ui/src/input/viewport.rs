@@ -21,6 +21,23 @@ pub fn folders_first(
     }
 }
 
+/// The last first row a body `height` rows tall can be scrolled to: the one
+/// that puts the final folder row at the bottom, or 0 when everything fits.
+pub fn last_folders_first(offsets: &[u16], height: u16) -> usize {
+    let Some(end) = offsets.last().copied() else {
+        return 0;
+    };
+    offsets.iter().position(|offset| end - offset < height).unwrap_or(0)
+}
+
+/// The first folder row whose offset is at or past `cells` rows from the top.
+pub fn folders_first_at(offsets: &[u16], cells: usize) -> usize {
+    offsets
+        .iter()
+        .position(|offset| usize::from(*offset) >= cells)
+        .unwrap_or(offsets.len().saturating_sub(1))
+}
+
 /// The folder row drawn at `y` rows below the top of the body, if any.
 pub fn folder_at(offsets: &[u16], first: usize, y: u16) -> Option<usize> {
     let origin = *offsets.get(first)?;

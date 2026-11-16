@@ -23,6 +23,7 @@ impl MemberCache {
             Event::Quota { .. } => self.quota = Some(event.clone()),
             Event::SyncProgress { .. } => self.sync = Some(event.clone()),
             Event::AccountList(_)
+            | Event::AccountUnread { .. }
             | Event::HostInfo { .. }
             | Event::EnvelopePage { .. }
             | Event::OlderEnvelopes { .. }

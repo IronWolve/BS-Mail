@@ -72,6 +72,11 @@ impl MailSnapshot {
                 self.accounts = accounts;
                 selection.choose_account(&self.accounts);
             }
+            Event::AccountUnread { account, unread } => {
+                if let Some(entry) = self.accounts.iter_mut().find(|listed| listed.id == account) {
+                    entry.unread = Some(unread);
+                }
+            }
             Event::ChangesAllowed { account, allowed } => {
                 if is_shown(selection, &account) {
                     self.changes_refused = !allowed;

@@ -22,9 +22,14 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
     let started = Instant::now();
     let fonts = fonts::embedded().map_err(|error| AppError::Fonts(error.to_string()))?;
     let mut scene = scene::build(options, Capabilities::window())?;
-    scene.prime();
     let data_dir = data_dir(options.data_dir.as_ref());
     let remembered = data_dir.as_ref().map(|dir| state_file::load(dir));
+    // Told before the first events are taken, so the first account and folder
+    // shown are the ones that were open last.
+    if let Some(state) = &remembered {
+        scene.view.restore_place(state.place.clone());
+    }
+    scene.prime();
     let remember_size = scene.window.remember_geometry;
     let (cols, rows) = starting_grid(options.size, remembered.as_ref(), remember_size);
     let window = WindowOptions {

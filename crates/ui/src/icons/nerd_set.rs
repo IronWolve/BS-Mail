@@ -36,6 +36,8 @@ pub fn glyph(id: IconId) -> &'static str {
         IconId::Attachment => "\u{f0c6}",
         IconId::CapLeft => "\u{e0b6}",
         IconId::CapRight => "\u{e0b4}",
+        IconId::Reply => "\u{f112}",
+        IconId::Forward => "\u{f064}",
     }
 }
 

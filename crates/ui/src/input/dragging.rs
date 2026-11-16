@@ -15,7 +15,7 @@ impl AppView {
                 self.drag = Some(drag);
                 true
             }
-            None => false,
+            None => self.press_scrollbar(col, row, grid),
         }
     }
 
@@ -23,7 +23,7 @@ impl AppView {
     /// going, which means the screen needs drawing again.
     pub(crate) fn drag_to(&mut self, pos: CellPosition, grid: (u16, u16)) -> bool {
         let Some(drag) = self.drag else {
-            return false;
+            return self.drag_scrollbar(pos.row, grid);
         };
         let layout = self.layout(grid.0, grid.1);
         match size_for(drag, layout.main, pos.col, pos.row) {
@@ -35,7 +35,8 @@ impl AppView {
 
     /// Lets go of the bar. Returns whether one was held.
     pub(crate) fn end_drag(&mut self) -> bool {
-        self.drag.take().is_some()
+        let bar = self.bar_drag.take().is_some();
+        self.drag.take().is_some() || bar
     }
 
     /// The pointer to show at a position: the resize pointer on a bar, and

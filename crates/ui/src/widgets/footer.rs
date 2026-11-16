@@ -31,6 +31,9 @@ pub struct FooterData<'a> {
     /// The last failure the backend reported, shown in place of the usual
     /// segments until something succeeds.
     pub error: Option<&'a str>,
+    /// A notice that is not a failure (new mail), shown in place of the
+    /// usual segments while there is no failure to show.
+    pub notice: Option<&'a str>,
 }
 
 fn text_run(ctx: &DrawContext<'_>, text: impl Into<String>) -> Run {
@@ -86,7 +89,7 @@ fn segment(ctx: &DrawContext<'_>, name: &str, data: &FooterData<'_>) -> Option<V
 fn error_segments(
     ctx: &DrawContext<'_>,
     data: &FooterData<'_>,
-    error: &str,
+    (error, role): (&str, &str),
     width: u16,
 ) -> Vec<Vec<Run>> {
     let connection = connection_segment(ctx, data.connection);
@@ -97,7 +100,7 @@ fn error_segments(
         return vec![connection];
     }
     let text = truncate(error, usize::from(room), ELLIPSIS_CHAR);
-    vec![connection, vec![Run::new(text, ctx.fg(roles::FOOTER_ERROR))]]
+    vec![connection, vec![Run::new(text, ctx.fg(role))]]
 }
 
 /// Draws the footer into the one-row `rect` (inside the frame). Segments
@@ -118,8 +121,12 @@ pub fn draw_footer(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, data: &
         let right = right_x.saturating_sub(SLASH_GAP);
         area = Rect::new(left, rect.y, right.saturating_sub(left), 1);
     }
-    let mut segments: Vec<Vec<Run>> = match data.error {
-        Some(error) => error_segments(ctx, data, error, area.width),
+    let shown = data
+        .error
+        .map(|error| (error, roles::FOOTER_ERROR))
+        .or(data.notice.map(|notice| (notice, roles::FOOTER_UNREAD)));
+    let mut segments: Vec<Vec<Run>> = match shown {
+        Some(text) => error_segments(ctx, data, text, area.width),
         None => footer
             .segments
             .iter()

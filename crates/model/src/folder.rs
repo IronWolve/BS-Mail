@@ -9,6 +9,9 @@ pub struct Account {
     pub name: String,
     pub address: String,
     pub state: ConnectionState,
+    /// The unread count of the account's Inbox, once it is known: `None` until
+    /// the first look at the server has answered.
+    pub unread: Option<u32>,
     /// The account whose mailbox the UI shows first. The backend names one at
     /// start-up; after that the UI owns the live selection.
     pub selected: bool,

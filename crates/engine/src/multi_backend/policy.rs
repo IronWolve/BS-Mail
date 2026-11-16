@@ -5,7 +5,9 @@ use model::Event;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Class {
-    /// The composite builds the account list itself; a member's is dropped.
+    /// The composite builds the account list and the Inbox unread counts
+    /// itself (from the folder lists the members send); a member's own is
+    /// dropped.
     Swallowed,
     /// Forwarded once, from whichever member says it first.
     Host,
@@ -24,7 +26,7 @@ pub(super) enum Class {
 
 pub(super) fn classify(event: &Event) -> Class {
     match event {
-        Event::AccountList(_) => Class::Swallowed,
+        Event::AccountList(_) | Event::AccountUnread { .. } => Class::Swallowed,
         Event::HostInfo { .. } => Class::Host,
         Event::ConnectionState { .. } => Class::Connection,
         Event::FolderList { .. }

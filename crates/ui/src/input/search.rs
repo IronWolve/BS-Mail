@@ -153,7 +153,7 @@ impl AppView {
                 });
                 self.selection.message = envelopes.first().map(|envelope| envelope.id);
                 self.selection.message_index = 0;
-                self.scroll.list = 0;
+                self.scroll.reset_list();
                 self.scroll.reader = 0;
             }
             Event::EnvelopePage { folder, .. } => {

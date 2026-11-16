@@ -9,6 +9,7 @@ use super::font::FontConfig;
 use super::footer::FooterConfig;
 use super::key_bar::KeyBarConfig;
 use super::list::ListConfig;
+use super::notify::NotifyConfig;
 use super::reader::ReaderConfig;
 use super::sidebar::SidebarConfig;
 use super::strip::StripConfig;
@@ -30,6 +31,7 @@ pub struct Config {
     #[serde(rename = "keybar")]
     pub key_bar: KeyBarConfig,
     pub footer: FooterConfig,
+    pub notify: NotifyConfig,
 }
 
 /// Builds an owned list of strings from literals.
