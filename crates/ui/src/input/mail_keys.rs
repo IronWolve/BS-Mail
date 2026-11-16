@@ -5,6 +5,7 @@
 
 use super::action::Action;
 use crate::app_view::AppView;
+use crate::view_state::Focus;
 
 impl AppView {
     /// Does `action` when it is one that acts on messages; false for any
@@ -26,6 +27,11 @@ impl AppView {
             Action::Tag => self.start_tag(),
             Action::ToggleAlert => self.toggle_alert(),
             Action::FolderKeys => self.begin_folder_keys(),
+            Action::SortNext => self.sort_next(),
+            Action::SortReverse => self.sort_reverse(),
+            Action::ToggleThreads => self.toggle_threads(),
+            Action::Right if self.focus == Focus::List && self.open_thread() => {}
+            Action::Left if self.focus == Focus::List && self.close_thread() => {}
             _ => return false,
         }
         true

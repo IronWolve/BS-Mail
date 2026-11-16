@@ -19,6 +19,7 @@ pub mod names;
 pub mod poll;
 pub mod sync_status;
 pub mod theme_schema;
+pub mod thread_headers;
 
 pub use address::Address;
 pub use attachments::{MAX_FETCH_BYTES, MAX_SEND_BYTES, OutgoingAttachment, TEXT_RESERVE, max_raw_len, sendable_name, wire_size};
@@ -35,3 +36,4 @@ pub use ids::{AccountId, FolderId, MessageId, RequestId, ThreadId, Uid};
 pub use poll::{DEFAULT_POLL_SECONDS, MIN_POLL_SECONDS};
 pub use names::{BOOKKEEPING_KEYWORDS, MAX_FOLDER_NAME, MAX_TAG, check_folder_name, check_tag};
 pub use sync_status::{ConnectionState, Quota, SyncState, SyncStatus};
+pub use thread_headers::{ThreadHeaders, normal_id};

@@ -134,6 +134,15 @@ pub(crate) struct MessageRow {
     pub attachments: bool,
     #[serde(default)]
     pub tags: Vec<String>,
+    /// The Message-ID header, as written (`<id@host>`).
+    #[serde(default)]
+    pub message_id: Option<String>,
+    /// The In-Reply-To header text.
+    #[serde(default)]
+    pub in_reply_to: Option<String>,
+    /// The References header text.
+    #[serde(default)]
+    pub references: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

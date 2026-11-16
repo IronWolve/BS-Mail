@@ -135,6 +135,7 @@ fn remap_envelope(slot: Slot, envelope: Envelope) -> Mapped<Envelope> {
         tags,
         thread,
         message_id: header_id,
+        threading,
     } = envelope;
     Ok(Envelope {
         id: message_id(slot, id)?,
@@ -152,6 +153,7 @@ fn remap_envelope(slot: Slot, envelope: Envelope) -> Mapped<Envelope> {
         tags,
         thread: thread_id(slot, thread)?,
         message_id: header_id,
+        threading,
     })
 }
 

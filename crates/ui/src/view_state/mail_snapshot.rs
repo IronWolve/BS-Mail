@@ -3,10 +3,11 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use model::{
-    Account, AccountId, Body, Envelope, Event, Folder, FolderId, MessageId, SyncStatus,
+    Account, AccountId, Body, Event, Folder, FolderId, MessageId, SyncStatus,
 };
 
-use super::page_merge::{append_older, merge_newest_without};
+use super::list_page::ListPage;
+use crate::list_order::Arrangement;
 use super::selection::Selection;
 
 /// The machine the engine runs on, for the strip's host segment.
@@ -14,16 +15,6 @@ use super::selection::Selection;
 pub struct HostSummary {
     pub name: String,
     pub system: String,
-}
-
-/// One page of the open folder's envelopes.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ListPage {
-    pub folder: FolderId,
-    pub offset: u32,
-    /// Messages in the folder.
-    pub total: u32,
-    pub envelopes: Vec<Envelope>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -69,6 +60,9 @@ pub struct MailSnapshot {
     /// the folder Notes"): the page that follows does not end it, a failure or
     /// the next key does (see `done_note`).
     pub done_text: Option<String>,
+    /// How the list is arranged: the sorts, threads and the open threads. The
+    /// rows of the page are made from the loaded messages by it.
+    pub arrangement: Arrangement,
 }
 
 impl MailSnapshot {
@@ -184,37 +178,6 @@ impl MailSnapshot {
         !left && self.folders.iter().any(|known| known.id == folder)
     }
 
-    /// A page of a folder. The newest page read again keeps the older mail
-    /// that was loaded below it; any other page replaces what is shown.
-    fn apply_page(&mut self, folder: FolderId, offset: u32, total: u32, envelopes: Vec<Envelope>, selection: &mut Selection) {
-        if !self.accepts_page(folder, selection) {
-            return;
-        }
-        let shown = self.page.take().filter(|page| page.folder == folder && offset == 0);
-        let envelopes = match shown {
-            Some(shown) => self.merged_with(shown.envelopes, total, envelopes),
-            None => {
-                self.relocated.clear();
-                envelopes
-            }
-        };
-        selection.page_loaded(folder, &envelopes);
-        self.remember_tags(selection.account.as_ref(), &envelopes);
-        self.clear_failure(selection.account.as_ref());
-        self.page = Some(ListPage { folder, offset, total, envelopes });
-    }
-
-    /// The newest page put on top of the list that was shown. The messages
-    /// named in `relocated` that are still below the page stay named, for a
-    /// page that does not show the change yet; the others are settled.
-    fn merged_with(&mut self, old: Vec<Envelope>, total: u32, new: Vec<Envelope>) -> Vec<Envelope> {
-        let on_page: Vec<MessageId> = new.iter().map(|envelope| envelope.id).collect();
-        let merged = merge_newest_without(old, total, new, &self.relocated);
-        self.relocated
-            .retain(|id| !on_page.contains(id) && merged.iter().any(|envelope| envelope.id == *id));
-        merged
-    }
-
     /// The folder tree of the account on screen. A folder that was open and is
     /// no longer there leaves nothing of its mail behind: the list, the
     /// message and its body go until the folder the selection moves to has
@@ -277,21 +240,6 @@ impl MailSnapshot {
         }
     }
 
-    /// A page of older mail. It only means something next to the list it
-    /// follows: the same folder, still open.
-    fn apply_older(&mut self, folder: FolderId, total: u32, envelopes: Vec<Envelope>, selection: &Selection) {
-        self.remember_tags(selection.account.as_ref(), &envelopes);
-        let Some(page) = self.page.as_mut().filter(|page| page.folder == folder) else {
-            return;
-        };
-        if selection.folder != Some(folder) {
-            return;
-        }
-        page.envelopes = append_older(std::mem::take(&mut page.envelopes), envelopes);
-        page.total = total;
-        self.clear_failure(selection.account.as_ref());
-    }
-
     fn apply_list_event(&mut self, event: Event, selection: &mut Selection) {
         match event {
             Event::EnvelopePage { folder, offset, total, envelopes } => {
@@ -307,16 +255,7 @@ impl MailSnapshot {
             Event::OpFailed { account, operation, reason } => {
                 self.note_failure(account, &operation, &reason, selection);
             }
-            Event::FlagsChanged { updates } => {
-                let Some(page) = self.page.as_mut() else {
-                    return;
-                };
-                for (id, flags) in updates {
-                    if let Some(envelope) = page.envelopes.iter_mut().find(|e| e.id == id) {
-                        envelope.flags = flags;
-                    }
-                }
-            }
+            Event::FlagsChanged { updates } => self.apply_flags(updates, selection),
             Event::TagsChanged { updates } => self.apply_tags(updates, selection),
             _ => {}
         }

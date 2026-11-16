@@ -17,7 +17,7 @@ impl AppView {
         self.forget_folder_view();
     }
 
-    /// Drops the list, the message and its body, the marks, the search and the
+    /// Drops the list, the message and its body, the marks, the open threads, the search and the
     /// scroll positions of the folder that was open, and the memory of what
     /// was asked for it, so its successor is asked for even when it was asked
     /// for before. The folder's own page, which the queue asks for next,
@@ -31,6 +31,7 @@ impl AppView {
         self.mail.page = None;
         self.mail.body = None;
         self.mail.relocated.clear();
+        self.mail.arrangement.open.clear();
         self.marked.clear();
         self.queue.forget();
     }

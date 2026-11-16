@@ -27,6 +27,7 @@ use crate::input::memory::InputMemory;
 use crate::view_bands::draw_too_small;
 use crate::input::menus::OpenMenu;
 use crate::keys::KeyMap;
+use crate::list_order::Arrangement;
 use crate::input::new_mail::NewMail;
 use crate::input::scrollbars::BarDrag;
 use crate::input::{CommandQueue, Drag};
@@ -148,6 +149,7 @@ pub struct AppView {
 
 impl AppView {
     pub fn new(identity: AppIdentity, theme: Theme, config: Config, icons: IconSet) -> Self {
+        let arrangement = Arrangement::from_config(&config.list);
         Self {
             identity,
             theme,
@@ -157,7 +159,7 @@ impl AppView {
             capabilities: Capabilities::window(),
             now: MailDate::default(),
             prefs: LayoutPrefs::default(),
-            mail: MailSnapshot::default(),
+            mail: MailSnapshot { arrangement, ..MailSnapshot::default() },
             selection: Selection::default(),
             scroll: ScrollState::default(),
             focus: Focus::default(),

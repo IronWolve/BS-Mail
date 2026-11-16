@@ -12,6 +12,7 @@ pub mod icons;
 pub mod input;
 pub mod keys;
 pub mod layout;
+pub mod list_order;
 pub mod delete_prompt;
 pub mod move_picker;
 pub mod options;

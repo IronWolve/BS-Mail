@@ -30,14 +30,14 @@ const HINTS: [(HintKey, &str); 4] = [
     (HintKey::Text("/"), "Search"),
 ];
 
-fn title_text(mailbox: Option<&MailboxSummary>) -> String {
-    match mailbox {
-        Some(mailbox) => format!(
-            "Messages \u{2014} {} ({} unread)",
-            mailbox.name,
-            group_thousands(u64::from(mailbox.unread))
-        ),
-        None => "Messages".to_string(),
+fn title_text(mailbox: Option<&MailboxSummary>, order: Option<&str>) -> String {
+    match (mailbox, order) {
+        (Some(mailbox), order) => {
+            let unread = group_thousands(u64::from(mailbox.unread));
+            let after = order.map_or_else(String::new, |order| format!(", {order}"));
+            format!("Messages \u{2014} {} ({unread} unread){after}", mailbox.name)
+        }
+        (None, _) => "Messages".to_string(),
     }
 }
 
@@ -87,18 +87,21 @@ fn draw_hints(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, title_end: u
 }
 
 /// Draws the title into the one-row `rect` (the list's text width). `mailbox`
-/// is the folder shown; without one the title is just `Messages`.
+/// is the folder shown; without one the title is just `Messages`. `order`
+/// says how the rows are arranged (`threads, sorted by size (loaded mail
+/// only)`) and follows the unread count.
 pub fn draw_list_title(
     frame: &mut Frame,
     ctx: &DrawContext<'_>,
     rect: Rect,
     mailbox: Option<&MailboxSummary>,
+    order: Option<&str>,
 ) {
     if rect.is_empty() {
         return;
     }
     put_text(frame, rect, rect.x, rect.y, ctx.icon(IconId::Mail), ctx.fg(roles::LIST_ICON));
-    let title = title_text(mailbox);
+    let title = title_text(mailbox, order);
     let title_x = rect.x.saturating_add(TITLE_AT);
     let room = rect.right().saturating_sub(title_x);
     put_cut(frame, rect, title_x, rect.y, &title, room, ctx.fg(roles::LIST_TITLE));

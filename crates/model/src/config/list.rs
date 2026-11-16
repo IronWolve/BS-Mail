@@ -92,14 +92,18 @@ pub struct ListConfig {
     pub date_short: String,
     pub size_format: SizeStyle,
     pub show_hints: bool,
-    /// Conversations. Not built yet: the list is flat, one row per message,
-    /// so this is false until grouping exists and `true` changes nothing.
+    /// Conversations: the loaded rows are grouped by the ids in their
+    /// headers, a thread shows as one row and opens with Right. The `T` key
+    /// turns it on or off for the session. Only loaded mail is grouped, and
+    /// the list's title says so.
     pub threaded: bool,
     // Tables come last so the settings serialize with plain values first.
     /// Subject tag to theme role name.
     pub subject_tags: BTreeMap<String, String>,
-    /// Not built yet: the list is in arrival order, newest first, which the
-    /// default describes; another value is accepted and changes nothing.
+    /// The sort of a kind of folder the user has not chosen one for: a column
+    /// (`date`, `from`, `subject`, `size` or `flag`) and a direction. The
+    /// default, `date` with `descending`, is the folder's own order, newest
+    /// arrival first.
     pub default_sort: SortSetting,
     pub widths: ListWidths,
 }

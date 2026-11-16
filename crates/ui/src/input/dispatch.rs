@@ -221,7 +221,10 @@ impl AppView {
             Hit::Message(index) => self.press_message(index, (col, row), modifiers, &layout),
             Hit::Account(index) => return self.click_account(index),
             Hit::Sidebar => self.focus = Focus::Sidebar,
-            Hit::ListChrome => self.focus = Focus::List,
+            Hit::ListChrome => {
+                self.focus = Focus::List;
+                self.press_header(&layout, col, row);
+            }
             Hit::Reader => self.click_reader(&layout, (col, row), modifiers, grid),
             Hit::KeyBar(action) => self.press_button(action, grid),
             Hit::Nothing => return self.footer_span_at(&layout, col, row).is_some_and(|span| self.click_footer(span)),

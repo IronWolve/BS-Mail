@@ -172,7 +172,7 @@ impl AppView {
     /// selection off it when it is the one selected.
     fn remove_sent_draft(&mut self, id: MessageId) {
         self.select_neighbor_outside(&[id]);
-        if self.shown_page().is_some_and(|page| page.envelopes.iter().any(|envelope| envelope.id == id)) {
+        if self.shown_page().is_some_and(|page| page.loaded.iter().any(|envelope| envelope.id == id)) {
             self.mail.relocated.push(id);
         }
         self.queue.push(Command::Delete { messages: vec![id] });

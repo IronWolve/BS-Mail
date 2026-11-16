@@ -94,6 +94,12 @@ pub enum Action {
     /// Enter saves it, `o` opens it and `a` asks where to save it.
     NextAttachment,
     PreviousAttachment,
+    /// `o`: sort the list by the next column.
+    SortNext,
+    /// `O`: reverse the order of the sort.
+    SortReverse,
+    /// `T`: threads on or off for this session.
+    ToggleThreads,
 }
 
 /// Where a selection key takes the selection.

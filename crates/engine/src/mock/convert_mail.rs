@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use model::{
     Account, AccountId, Address, ConnectionState, Envelope, Flags, Folder, FolderId, FolderRole,
-    MessageId, Quota, SyncState, SyncStatus, ThreadId, Uid,
+    MessageId, Quota, SyncState, SyncStatus, ThreadHeaders, ThreadId, Uid,
 };
 
 use super::convert_address::parse_address;
@@ -158,7 +158,11 @@ fn envelope_from_row(
         has_attachments: row.attachments,
         tags: row.tags.clone(),
         thread: ThreadId(row.id),
-        message_id: None,
+        message_id: row.message_id.as_deref().map(str::trim).filter(|text| !text.is_empty()).map(str::to_owned),
+        threading: ThreadHeaders::parse(
+            row.in_reply_to.as_deref().unwrap_or_default().as_bytes(),
+            row.references.as_deref().unwrap_or_default().as_bytes(),
+        ),
     })
 }
 

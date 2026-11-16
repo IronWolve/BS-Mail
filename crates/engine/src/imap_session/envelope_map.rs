@@ -3,7 +3,7 @@
 use async_imap::imap_proto::Envelope as WireEnvelope;
 use async_imap::types::Flag;
 use mail_parser::DateTime;
-use model::{Envelope, FolderId, MailDate, MessageId, ThreadId, Uid};
+use model::{Envelope, FolderId, MailDate, MessageId, ThreadHeaders, ThreadId, Uid};
 
 use super::flag_map::map_flags;
 use super::header_text::{decode_text, map_addresses, unescaped};
@@ -17,6 +17,9 @@ pub struct FetchedRow<'a> {
     pub internal_date: Option<MailDate>,
     pub size: u32,
     pub has_attachments: bool,
+    /// The `References` header of the message, as the server sent it when it
+    /// was asked for (see `fetch_envelopes`); `None` when it was not.
+    pub references: Option<&'a [u8]>,
 }
 
 /// How far past the server's receive time a `Date` header may be before it is
@@ -45,6 +48,7 @@ pub fn build_envelope(id: MessageId, folder: FolderId, row: &FetchedRow<'_>) -> 
         .and_then(|e| e.date.as_deref())
         .and_then(parse_date_header);
     let (date, date_ahead) = shown_date(header_date, row.internal_date);
+    let in_reply_to = wire.and_then(|e| e.in_reply_to.as_deref()).map(|raw| unescaped(raw).into_owned()).unwrap_or_default();
     Envelope {
         id,
         folder,
@@ -67,6 +71,7 @@ pub fn build_envelope(id: MessageId, folder: FolderId, row: &FetchedRow<'_>) -> 
             .and_then(|e| e.message_id.as_deref())
             .map(|raw| String::from_utf8_lossy(&unescaped(raw)).trim().to_owned())
             .filter(|text| !text.is_empty()),
+        threading: ThreadHeaders::parse(&in_reply_to, row.references.unwrap_or_default()),
     }
 }
 

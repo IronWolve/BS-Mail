@@ -1,11 +1,13 @@
 //! What each column of one row shows.
 
 use model::{Envelope, MailDate};
+use crate::list_order::RowMeta;
 use surface::{Frame, Rect};
 
 use super::flag_cell::draw_flag_cell;
 use super::party::recipient_text;
 use super::row_style::RowStyle;
+use super::thread_cell::thread_prefix;
 use crate::format::{DateFormat, format_address, format_list_date, format_size, is_recent};
 use crate::icons::IconId;
 use crate::layout::{ColumnId, ColumnSlot};
@@ -28,6 +30,9 @@ pub struct RowInfo<'a> {
     /// The sender column names the recipient for this row (the message is
     /// filed in Sent or Drafts).
     pub recipient: bool,
+    /// What the row is: a message on its own, a thread's row or one of a
+    /// thread's messages.
+    pub meta: RowMeta,
 }
 
 /// Draws the cell of `slot` for `row`.
@@ -89,7 +94,8 @@ fn draw_subject(
     slot: &ColumnSlot,
 ) {
     let base = style.plain(roles::LIST_ROW);
-    let runs = subject_runs(ctx, &row.envelope.subject, base, &|role| style.accent(role), true);
+    let mut runs = thread_prefix(ctx, style, row.meta.kind, row.meta.count);
+    runs.extend(subject_runs(ctx, &row.envelope.subject, base, &|role| style.accent(role), true));
     put_runs_cut(frame, row.clip, slot.x, row.y, &runs, slot.width);
 }
 

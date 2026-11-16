@@ -3,6 +3,7 @@
 use crate::address::Address;
 use crate::flags::Flags;
 use crate::ids::{FolderId, MessageId, ThreadId, Uid};
+use crate::thread_headers::ThreadHeaders;
 
 /// A point in time with the sender's UTC offset, so the reader can show the
 /// original zone.
@@ -36,4 +37,8 @@ pub struct Envelope {
     pub thread: ThreadId,
     /// The Message-ID header value, when present.
     pub message_id: Option<String>,
+    /// The `In-Reply-To` and `References` ids, cleaned and bounded (see
+    /// `thread_headers`); empty when the server was not asked or the message
+    /// has none.
+    pub threading: ThreadHeaders,
 }

@@ -5,12 +5,14 @@
 //! not understood gives the defaults and is never an error: the worst result
 //! of a damaged state file is bars and a window at their usual sizes.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use ui::layout::{LayoutPrefs, MIN_COLS, MIN_ROWS};
+use ui::list_order::SortPrefs;
 use ui::view_state::Place;
 
 pub const STATE_NAME: &str = "state.toml";
@@ -23,6 +25,19 @@ pub struct State {
     pub grid: Option<(u16, u16)>,
     /// The account (by id) and the folder (by path) that were open.
     pub place: Place,
+    /// The sort the user chose for each kind of folder.
+    pub sorts: SortPrefs,
+}
+
+impl State {
+    /// Tells the view where the user was and how they had sorted the lists,
+    /// before the first events are taken, so the first account and folder
+    /// shown are the ones that were open last and the first page arrives
+    /// sorted.
+    pub fn restore_into(&self, view: &mut ui::AppView) {
+        view.restore_place(self.place.clone());
+        view.restore_sorts(self.sorts.clone());
+    }
 }
 
 impl Default for State {
@@ -31,6 +46,7 @@ impl Default for State {
             layout: LayoutPrefs::default(),
             grid: None,
             place: Place::default(),
+            sorts: SortPrefs::default(),
         }
     }
 }
@@ -49,6 +65,9 @@ struct StateFile {
 struct ViewState {
     account: Option<String>,
     folder: Option<String>,
+    /// The sort of each kind of folder, by the kind's name: `size descending`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    sort: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -92,6 +111,7 @@ pub fn load(dir: &Path) -> State {
     // A name that is empty names nothing.
     let named = |text: Option<String>| text.filter(|text| !text.is_empty());
     state.place = Place { account: named(file.view.account), folder: named(file.view.folder) };
+    state.sorts = SortPrefs::from_texts(&file.view.sort);
     state
 }
 
@@ -110,6 +130,7 @@ pub fn save(dir: &Path, state: &State) -> io::Result<()> {
         view: ViewState {
             account: state.place.account.clone(),
             folder: state.place.folder.clone(),
+            sort: state.sorts.to_texts(),
         },
     };
     let text = toml::to_string_pretty(&file)

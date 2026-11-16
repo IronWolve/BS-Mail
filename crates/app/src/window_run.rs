@@ -27,7 +27,7 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
     // Told before the first events are taken, so the first account and folder
     // shown are the ones that were open last.
     if let Some(state) = &remembered {
-        scene.view.restore_place(state.place.clone());
+        state.restore_into(&mut scene.view);
     }
     scene.prime();
     let remember_size = scene.window.remember_geometry;

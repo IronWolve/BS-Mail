@@ -52,7 +52,7 @@ impl AppView {
     /// folder cannot be told (it left the list) is kept: asking to move it is
     /// harmless.
     fn not_in(&self, ids: Vec<MessageId>, folder: FolderId) -> Vec<MessageId> {
-        let shown = self.mail.page.as_ref().map(|page| page.envelopes.as_slice()).unwrap_or_default();
+        let shown = self.mail.page.as_ref().map(|page| page.loaded.as_slice()).unwrap_or_default();
         ids.into_iter()
             .filter(|id| shown.iter().find(|envelope| envelope.id == *id).is_none_or(|envelope| envelope.folder != folder))
             .collect()

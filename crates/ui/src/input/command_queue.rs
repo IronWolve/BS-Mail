@@ -51,9 +51,11 @@ impl CommandQueue {
     pub fn take_more(&mut self, selection: &Selection, mail: &MailSnapshot, reach: usize) -> Option<Command> {
         let folder = selection.folder?;
         let page = mail.page.as_ref().filter(|page| page.folder == folder)?;
-        let have = page.envelopes.len();
+        // The count asked for is of the messages loaded; how near the end the
+        // cursor is, is by the rows drawn (a thread's folded messages have none).
+        let have = page.loaded.len();
         let more = u64::from(page.total) > u64::from(page.offset) + u64::try_from(have).ok()?;
-        let near = selection.message_index.max(reach) + NEAR_END >= have;
+        let near = selection.message_index.max(reach) + NEAR_END >= page.envelopes.len();
         if !(more && near) || self.asked_more == Some((folder, have)) {
             return None;
         }

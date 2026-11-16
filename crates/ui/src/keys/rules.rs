@@ -32,7 +32,6 @@ pub const FIXED_KEYS: &[(&str, &str)] = &[
     ("Ctrl+o, Ctrl+r, Ctrl+w", "attach a file, and the keys kept for reload and layout"),
     ("Ctrl+=, Ctrl+-, Ctrl+0", "the window's text size"),
     ("Ctrl+h, Ctrl+i, Ctrl+j, Ctrl+m, Ctrl+[", "a terminal sends these as Backspace, Tab, Enter and Esc"),
-    ("o, O", "kept for sorting, and for opening an attachment"),
 ];
 
 /// The characters a rule names that no action may be given with Ctrl.
@@ -51,7 +50,6 @@ pub fn refusal(spec: &KeySpec) -> Option<String> {
         LogicalKey::Char(' ') => Some(format!("{name} is fixed: it pages and marks")),
         LogicalKey::Char(ch) if spec.ctrl && CTRL_FIXED.contains(ch) => Some(format!("{name} is fixed: the program or the terminal keeps it")),
         LogicalKey::Char('q') if !spec.ctrl && !spec.alt => Some(format!("{name} is fixed: it quits")),
-        LogicalKey::Char('o' | 'O') if !spec.ctrl && !spec.alt => Some(format!("{name} is kept for sorting and for opening an attachment")),
         LogicalKey::Char(_) => None,
     }
 }

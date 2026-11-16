@@ -36,13 +36,18 @@ impl Screen {
             layout: self.view.prefs().clone(),
             grid,
             place: self.view.place().over(&saved_place),
+            sorts: self.view.sort_prefs(),
         }
     }
 
-    /// Keeps the account and folder that are open when they are not the ones
-    /// kept, so a run that ends without a goodbye still comes back to them.
+    /// Keeps the account and folder that are open, and the sorts chosen, when
+    /// they are not the ones kept, so a run that ends without a goodbye still
+    /// comes back to them.
     pub(super) fn save_place_when_changed(&mut self) {
-        let changed = self.remember.as_ref().is_some_and(|(_, saved)| self.state_now().place != saved.place);
+        let changed = self.remember.as_ref().is_some_and(|(_, saved)| {
+            let now = self.state_now();
+            now.place != saved.place || now.sorts != saved.sorts
+        });
         if changed {
             // A failure waits: closing the program tries again and says so.
             let _ = self.save_state();

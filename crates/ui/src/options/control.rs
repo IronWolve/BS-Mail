@@ -22,6 +22,8 @@ pub enum Control {
     /// Where the reader sits, and how the sidebar is spaced.
     ReaderPosition,
     Density,
+    /// Threads in the list, on or off.
+    Threaded,
     /// A column of the list, or a panel, shown or hidden.
     Column(Column),
     Panel(Panel),
@@ -43,7 +45,7 @@ impl Control {
     pub fn kind(self) -> Kind {
         match self {
             Self::AccountList => Kind::List,
-            Self::Theme | Self::Icons | Self::ReaderPosition | Self::Density | Self::Column(_) | Self::Panel(_) => Kind::Choice,
+            Self::Theme | Self::Icons | Self::ReaderPosition | Self::Density | Self::Threaded | Self::Column(_) | Self::Panel(_) => Kind::Choice,
             Self::TextSize | Self::LineSpacing => Kind::Stepper,
             _ => Kind::Button,
         }

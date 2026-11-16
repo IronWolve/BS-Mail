@@ -7,33 +7,46 @@
 //! none. A marked row shows its number in reverse, and the list's title says
 //! how many are marked.
 
+use std::collections::HashSet;
+
 use model::{Envelope, MessageId};
 use surface::{Frame, Modifier};
 
 use crate::app_view::AppView;
 use crate::layout::{ColumnId, ListRegion};
+use crate::list_order::RowKind;
+use crate::view_state::ListPage;
 
 impl AppView {
-    /// Marks or unmarks the selected message.
+    /// Marks or unmarks the selected message: all of a thread's messages when
+    /// the row is a thread's.
     pub(crate) fn toggle_mark(&mut self) {
-        let Some(id) = self.current_id() else {
-            return;
-        };
-        if !self.marked.remove(&id) {
-            self.marked.insert(id);
+        let ids = self.current_row_ids();
+        self.toggle_marks_of(&ids);
+    }
+
+    /// Unmarks `ids` when any of them is marked, else marks them all. For one
+    /// message that is a plain toggle.
+    pub(crate) fn toggle_marks_of(&mut self, ids: &[MessageId]) {
+        if ids.iter().any(|id| self.marked.contains(id)) {
+            for id in ids {
+                self.marked.remove(id);
+            }
+        } else {
+            self.marked.extend(ids.iter().copied());
         }
     }
 
-    /// Marks every message shown in the list (the ones loaded so far, which
-    /// include the answer to a search while one is showing).
+    /// Marks every message loaded for the list, the ones folded into a
+    /// thread's row too (the answer to a search while one is showing).
     pub(crate) fn mark_all(&mut self) {
-        let ids: Vec<MessageId> = self.shown_page_for_marks().map(|page| page.iter().map(|e| e.id).collect()).unwrap_or_default();
+        let ids: Vec<MessageId> = self.loaded_for_marks().map(|page| page.iter().map(|e| e.id).collect()).unwrap_or_default();
         self.marked.extend(ids);
     }
 
     /// Marks the messages that are not marked and unmarks the ones that are.
     pub(crate) fn invert_marks(&mut self) {
-        let ids: Vec<MessageId> = self.shown_page_for_marks().map(|page| page.iter().map(|e| e.id).collect()).unwrap_or_default();
+        let ids: Vec<MessageId> = self.loaded_for_marks().map(|page| page.iter().map(|e| e.id).collect()).unwrap_or_default();
         for id in ids {
             if !self.marked.remove(&id) {
                 self.marked.insert(id);
@@ -41,14 +54,15 @@ impl AppView {
         }
     }
 
-    /// The messages a change key acts on, in the order of the list: the
-    /// marked ones, else the selected one.
+    /// The messages a change key acts on, in the order they were loaded: the
+    /// marked ones, else the selected one (every message of its thread when
+    /// the selected row is a thread's).
     pub(crate) fn targets(&self) -> Vec<MessageId> {
-        let Some(page) = self.shown_page_for_marks() else {
+        let Some(page) = self.loaded_for_marks() else {
             return Vec::new();
         };
         if self.marked.is_empty() {
-            return self.current_id().into_iter().collect();
+            return self.current_row_ids();
         }
         page.iter().filter(|e| self.marked.contains(&e.id)).map(|e| e.id).collect()
     }
@@ -63,30 +77,22 @@ impl AppView {
         if self.marked.is_empty() {
             return;
         }
-        let present: Vec<MessageId> = self
-            .shown_page_for_marks()
-            .map(|page| page.iter().map(|e| e.id).collect())
-            .unwrap_or_default();
+        let present: HashSet<MessageId> =
+            self.loaded_for_marks().map(|page| page.iter().map(|e| e.id).collect()).unwrap_or_default();
         self.marked.retain(|id| present.contains(id));
     }
 
-    fn current_id(&self) -> Option<MessageId> {
-        self.shown_page_for_marks()?.get(self.selection.message_index).map(|e| e.id)
-    }
-
-    fn shown_page_for_marks(&self) -> Option<&[Envelope]> {
-        let folder = self.selection.folder?;
-        self.mail
-            .page
-            .as_ref()
-            .filter(|page| page.folder == folder)
-            .map(|page| page.envelopes.as_slice())
+    /// Every message loaded for the folder shown, whether or not a row of its
+    /// own shows it.
+    fn loaded_for_marks(&self) -> Option<&[Envelope]> {
+        self.shown_page().map(|page| page.loaded.as_slice())
     }
 
     /// Shows the marked rows: their number cells in reverse, or, when the
     /// number column is not there (a narrow list, or one set up without it),
-    /// the first cell that is.
-    pub(crate) fn show_marks(&self, frame: &mut Frame, list: &ListRegion, first: usize, envelopes: &[Envelope]) {
+    /// the first cell that is. A thread's row is marked when any of its
+    /// messages is.
+    pub(crate) fn show_marks(&self, frame: &mut Frame, list: &ListRegion, first: usize, page: &ListPage) {
         if self.marked.is_empty() {
             return;
         }
@@ -94,8 +100,15 @@ impl AppView {
         let Some(number) = slots.iter().find(|slot| slot.id == ColumnId::Num).or_else(|| slots.first()) else {
             return;
         };
-        for (line, envelope) in envelopes.iter().skip(first).take(usize::from(list.rows.height)).enumerate() {
-            if !self.marked.contains(&envelope.id) {
+        let shown = page.envelopes.iter().enumerate().skip(first).take(usize::from(list.rows.height));
+        for (line, (row, envelope)) in shown.enumerate() {
+            let marked = match page.thread_of_row(row) {
+                Some(thread) if matches!(page.row_kind(row), RowKind::Head { .. }) => {
+                    thread.members.iter().any(|id| self.marked.contains(id))
+                }
+                _ => self.marked.contains(&envelope.id),
+            };
+            if !marked {
                 continue;
             }
             let y = list.rows.y.saturating_add(u16::try_from(line).unwrap_or(u16::MAX));

@@ -61,7 +61,7 @@ impl AppView {
             return self.mailbox_summary();
         };
         let page = self.mail.page.as_ref()?;
-        let unread = page.envelopes.iter().filter(|envelope| !envelope.flags.seen).count();
+        let unread = page.loaded.iter().filter(|envelope| !envelope.flags.seen).count();
         let incomplete = self.search.as_ref().is_some_and(|search| search.incomplete.is_some());
         let marker = if incomplete { " (incomplete)" } else { "" };
         Some(MailboxSummary {

@@ -19,7 +19,7 @@ pub enum Setting {
     /// range when written.
     LineSpacing(f32),
     /// A layout setting: `reader.position`, `appearance.density`,
-    /// `list.columns`, or a panel's `show`.
+    /// `list.columns`, `list.threaded`, or a panel's `show`.
     Layout(LayoutChange),
 }
 
@@ -32,7 +32,7 @@ impl Setting {
             Self::Layout(change) => match change {
                 LayoutChange::ReaderPosition(_) => "reader",
                 LayoutChange::Density(_) => "appearance",
-                LayoutChange::Columns(_) => "list",
+                LayoutChange::Columns(_) | LayoutChange::Threaded(_) => "list",
                 LayoutChange::Panel(panel, _) => panel.table(),
             },
         }
@@ -48,6 +48,7 @@ impl Setting {
                 LayoutChange::ReaderPosition(_) => "position",
                 LayoutChange::Density(_) => "density",
                 LayoutChange::Columns(_) => "columns",
+                LayoutChange::Threaded(_) => "threaded",
                 LayoutChange::Panel(..) => "show",
             },
         }
@@ -72,6 +73,7 @@ fn layout_value(change: &LayoutChange) -> Value {
         LayoutChange::Density(density) => Value::from(density_name(*density)),
         LayoutChange::Columns(names) => Value::Array(names.iter().map(String::as_str).collect()),
         LayoutChange::Panel(_, shown) => Value::from(*shown),
+        LayoutChange::Threaded(on) => Value::from(*on),
     }
 }
 

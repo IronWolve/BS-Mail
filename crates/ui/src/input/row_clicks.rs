@@ -25,9 +25,7 @@ impl AppView {
         };
         if modifiers.ctrl {
             self.focus = Focus::List;
-            if !self.marked.remove(&id) {
-                self.marked.insert(id);
-            }
+            self.toggle_marks_of(&self.row_ids_of(index));
             self.memory.anchor = Some(id);
         } else if modifiers.shift {
             self.focus = Focus::List;
@@ -36,8 +34,9 @@ impl AppView {
             self.select_message(index, layout);
         } else {
             match self.message_cell(layout, at.0) {
-                Some(ColumnId::Flag) => self.toggle_read_of(id),
-                Some(ColumnId::Star) => self.toggle_star_of(id),
+                Some(ColumnId::Flag) => self.toggle_read_of(&self.row_ids_of(index)),
+                Some(ColumnId::Star) => self.toggle_star_of(&self.row_ids_of(index)),
+                _ if self.on_thread_arrow(layout, index, at.0) => self.toggle_thread_at(index),
                 _ => self.press_plain(index, id, at, layout),
             }
         }
@@ -61,7 +60,7 @@ impl AppView {
         } else if double {
             self.focus = Focus::Reader;
         } else {
-            self.hold_rows(at, id);
+            self.hold_rows(at, index);
         }
     }
 
@@ -75,9 +74,10 @@ impl AppView {
     }
 
     /// Takes the rows a drag from here would move: the marked ones when this
-    /// row is one of them, else this row alone.
-    fn hold_rows(&mut self, at: (u16, u16), id: MessageId) {
-        let ids = if self.marked.contains(&id) { self.targets() } else { vec![id] };
+    /// row is one of them, else the messages this row stands for.
+    fn hold_rows(&mut self, at: (u16, u16), index: usize) {
+        let own = self.row_ids_of(index);
+        let ids = if own.iter().any(|id| self.marked.contains(id)) { self.targets() } else { own };
         self.memory.row_drag = Some(RowDrag { pressed: at, ids, active: false, over: None });
     }
 
@@ -90,10 +90,10 @@ impl AppView {
         let from = self
             .memory
             .anchor
-            .and_then(|id| page.envelopes.iter().position(|envelope| envelope.id == id))
+            .and_then(|id| page.row_of(id))
             .unwrap_or(self.selection.message_index);
         let (low, high) = (from.min(index), from.max(index));
-        let ids: Vec<MessageId> = page.envelopes.iter().skip(low).take(high - low + 1).map(|envelope| envelope.id).collect();
+        let ids: Vec<MessageId> = (low..=high).flat_map(|row| page.row_ids(row)).collect();
         self.marked.extend(ids);
     }
 

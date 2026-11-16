@@ -7,7 +7,7 @@ use crate::options::layout_choices::{LayoutChange, cycle_density, cycle_reader, 
 use crate::options::{Control, OptionsAction};
 
 impl AppView {
-    /// A press on the reader's place, the spacing, a column or a panel.
+    /// A press on the reader's place, the spacing, threads, a column or a panel.
     /// `forward` is the direction of a choice that goes round; a column or a
     /// panel is shown or hidden by either.
     pub(crate) fn press_layout(&mut self, control: Control, forward: bool) {
@@ -21,6 +21,13 @@ impl AppView {
                 let next = cycle_density(self.config.appearance.density, forward);
                 self.config.appearance.density = next;
                 LayoutChange::Density(next)
+            }
+            Control::Threaded => {
+                let on = !self.config.list.threaded;
+                self.config.list.threaded = on;
+                self.mail.arrangement.threaded = on;
+                self.arrangement_changed();
+                LayoutChange::Threaded(on)
             }
             Control::Column(column) => {
                 let shown = !column.shown(&self.config);

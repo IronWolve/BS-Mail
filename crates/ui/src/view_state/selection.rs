@@ -2,6 +2,8 @@
 
 use model::{Account, AccountId, Envelope, Folder, FolderId, FolderRole, MessageId};
 
+use super::list_page::ListPage;
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Selection {
     pub account: Option<AccountId>,
@@ -51,19 +53,28 @@ impl Selection {
     /// a message removed elsewhere does not throw the reader to the top. With
     /// no message selected, the first row is.
     pub fn page_loaded(&mut self, folder: FolderId, envelopes: &[Envelope]) {
+        let row_of = |id: MessageId| envelopes.iter().position(|envelope| envelope.id == id);
+        self.settle(folder, envelopes.len(), &row_of, &|row| envelopes.get(row).map(|envelope| envelope.id));
+    }
+
+    /// The same for a page whose rows were arranged (sorted, threads folded):
+    /// the selected message keeps its place whatever row it moved to, and a
+    /// message folded into a thread's row is shown by that row.
+    pub fn page_arranged(&mut self, folder: FolderId, page: &ListPage) {
+        let id_at = |row: usize| page.envelopes.get(row).map(|envelope| envelope.id);
+        self.settle(folder, page.envelopes.len(), &|id| page.row_of(id), &id_at);
+    }
+
+    fn settle(&mut self, folder: FolderId, rows: usize, row_of: &dyn Fn(MessageId) -> Option<usize>, id_at: &dyn Fn(usize) -> Option<MessageId>) {
         self.folder = Some(folder);
-        let kept = self
-            .message
-            .and_then(|id| envelopes.iter().position(|envelope| envelope.id == id));
+        let kept = self.message.and_then(row_of);
         let index = match (kept, self.message) {
             (Some(index), _) => index,
-            (None, Some(_)) => self.message_index.min(envelopes.len().saturating_sub(1)),
+            (None, Some(_)) => self.message_index.min(rows.saturating_sub(1)),
             (None, None) => 0,
         };
         self.message_index = index;
-        if kept.is_none() {
-            self.message = envelopes.get(index).map(|envelope| envelope.id);
-        }
+        self.message = id_at(index);
     }
 }
 

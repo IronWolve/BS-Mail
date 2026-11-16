@@ -19,13 +19,6 @@ pub fn unused(config: &Config) -> Vec<&'static str> {
     if config.appearance.pane_borders != default.appearance.pane_borders {
         names.push("appearance.pane_borders");
     }
-    // The list is flat and in arrival order.
-    if config.list.threaded != default.list.threaded {
-        names.push("list.threaded");
-    }
-    if config.list.default_sort != default.list.default_sort {
-        names.push("list.default_sort");
-    }
     names
 }
 

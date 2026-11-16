@@ -23,10 +23,10 @@ impl AppView {
 
     pub(crate) fn draw_list(&self, frame: &mut Frame, ctx: &DrawContext<'_>, list: &ListRegion) {
         let mailbox = self.list_summary();
-        draw_list_title(frame, ctx, list.title, mailbox.as_ref());
+        draw_list_title(frame, ctx, list.title, mailbox.as_ref(), self.order_note().as_deref());
         let page = self.shown_page();
         let from_label = self.from_column_label(page);
-        draw_list_header(frame, ctx, list.header, &list.columns, from_label);
+        draw_list_header(frame, ctx, list.header, &list.columns, from_label, self.list_sort());
         if self.options_host.has_no_account() {
             draw_no_account_hint(frame, ctx, list.rows);
             return;
@@ -38,6 +38,7 @@ impl AppView {
         let selected = self.selection.message_index;
         let view = ListRowsView {
             envelopes: &page.envelopes,
+            rows: &page.rows,
             folders: &self.mail.folders,
             columns: &list.columns,
             selected: Some(selected),
@@ -49,12 +50,12 @@ impl AppView {
         if let Some(bar) = self.list_bar(list) {
             draw_scrollbar(frame, ctx, bar.col, bar.rows, bar.first, bar.visible, bar.total);
         }
-        self.show_marks(frame, list, view.first, &page.envelopes);
+        self.show_marks(frame, list, view.first, page);
     }
 
     /// What the sender column is called over the rows on screen: `To` in the
     /// Sent and Drafts folders, `From` everywhere else.
-    fn from_column_label(&self, page: Option<&ListPage>) -> &'static str {
+    pub(crate) fn from_column_label(&self, page: Option<&ListPage>) -> &'static str {
         // A search list is not the folder's own, so an empty one says nothing
         // about whom the rows would name.
         let own_list = self.search.is_none().then_some(self.selection.folder).flatten();

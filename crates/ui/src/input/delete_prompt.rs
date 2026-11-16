@@ -22,7 +22,7 @@ impl AppView {
         let is_trash = |folder| {
             self.mail.folders.iter().any(|candidate| candidate.id == folder && candidate.role == model::FolderRole::Trash)
         };
-        let shown = self.mail.page.as_ref().map(|page| page.envelopes.as_slice()).unwrap_or_default();
+        let shown = self.mail.page.as_ref().map(|page| page.loaded.as_slice()).unwrap_or_default();
         let known: Vec<_> = shown.iter().filter(|envelope| ids.contains(&envelope.id)).collect();
         let unknown = ids.len() - known.len().min(ids.len());
         let in_trash = known.iter().filter(|envelope| is_trash(envelope.folder)).count();

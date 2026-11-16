@@ -131,6 +131,8 @@ pub fn toggled_columns(columns: &[String], column: Column, shown: bool) -> Vec<S
 pub enum LayoutChange {
     ReaderPosition(ReaderPosition),
     Density(Density),
+    /// Threads in the list: `[list] threaded`.
+    Threaded(bool),
     /// The whole list of columns, as it is to be written.
     Columns(Vec<String>),
     Panel(Panel, bool),

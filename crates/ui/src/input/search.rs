@@ -131,13 +131,9 @@ impl AppView {
                 // The footer says what was missed, so a partial answer is
                 // not taken for the whole one.
                 self.mail.set_note(incomplete.clone());
-                self.mail.page = Some(ListPage {
-                    folder,
-                    offset: 0,
-                    total: *total,
-                    envelopes: envelopes.clone(),
-                });
-                self.selection.message = envelopes.first().map(|envelope| envelope.id);
+                let page = ListPage::arranged(folder, 0, *total, envelopes.clone(), &self.mail.arrangement, &self.mail.folders);
+                self.selection.message = page.envelopes.first().map(|envelope| envelope.id);
+                self.mail.page = Some(page);
                 self.selection.message_index = 0;
                 self.scroll.reset_list();
                 self.scroll.reader = 0;

@@ -33,7 +33,7 @@ impl AppView {
     /// nothing about where a message is; its own folder does. Mail whose
     /// folder cannot be told is taken to be in the folder shown.
     pub(crate) fn folder_all_are_in(&self, ids: &[MessageId]) -> Option<FolderId> {
-        let shown = self.mail.page.as_ref().map(|page| page.envelopes.as_slice()).unwrap_or_default();
+        let shown = self.mail.page.as_ref().map(|page| page.loaded.as_slice()).unwrap_or_default();
         let mut folders = shown.iter().filter(|envelope| ids.contains(&envelope.id)).map(|envelope| envelope.folder);
         let Some(first) = folders.next() else {
             return self.selection.folder;

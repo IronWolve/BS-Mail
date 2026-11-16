@@ -43,7 +43,9 @@ impl AppView {
             Control::Icons => self.press_icons(forward),
             Control::TextSize => self.press_text_size(forward),
             Control::LineSpacing => self.press_line_spacing(forward),
-            Control::ReaderPosition | Control::Density | Control::Column(_) | Control::Panel(_) => self.press_layout(control, forward),
+            Control::ReaderPosition | Control::Density | Control::Threaded | Control::Column(_) | Control::Panel(_) => {
+                self.press_layout(control, forward);
+            }
             Control::Reload => self.queue_options_action(OptionsAction::ReloadSettings),
             Control::AccountList => {}
         }

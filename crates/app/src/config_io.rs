@@ -97,6 +97,11 @@ fn clamp(config: &mut Config, problems: &mut Vec<String>) {
         problems.push(format!("font.line_spacing {given} is out of range, using {spacing}"));
         config.font.line_spacing = spacing;
     }
+    if ui::list_order::Sort::from_setting(&config.list.default_sort.column, config.list.default_sort.descending).is_none() {
+        let name = config.list.default_sort.column.clone();
+        problems.push(format!("list.default_sort: `{name}` is not a column to sort by (date, from, subject, size or flag); using date"));
+        config.list.default_sort = model::config::list::SortSetting::default();
+    }
     let weight = config.appearance.line_weight.clamp(1, 4);
     if weight != config.appearance.line_weight {
         problems.push(format!("appearance.line_weight {} is out of range, using {weight}", config.appearance.line_weight));

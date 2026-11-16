@@ -84,7 +84,8 @@ impl AppView {
                 self.link_under(layout, col, row).is_some() || self.over_find_word(layout, col, row) || self.attachment_at(layout, col, row).is_some()
             }
             Hit::Nothing => self.footer_span_at(layout, col, row).is_some(),
-            Hit::Sidebar | Hit::ListChrome => false,
+            Hit::ListChrome => self.header_column_at(layout, col, row).is_some(),
+            Hit::Sidebar => false,
         }
     }
 

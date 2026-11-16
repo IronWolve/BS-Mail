@@ -7,6 +7,7 @@ use super::cells::{RowInfo, draw_cell};
 use super::party::{names_recipient, role_of};
 use super::row_style::RowStyle;
 use crate::layout::ColumnLayout;
+use crate::list_order::RowMeta;
 use crate::theme::roles;
 use crate::widgets::DrawContext;
 use crate::widgets::cell_text::fill_cells;
@@ -14,6 +15,9 @@ use crate::widgets::cell_text::fill_cells;
 /// What to draw: the page of envelopes, the columns and the position.
 pub struct ListRowsView<'a> {
     pub envelopes: &'a [Envelope],
+    /// What each row is, one for each envelope; empty when every row is a
+    /// message on its own.
+    pub rows: &'a [RowMeta],
     /// The folders of the account on screen, for the role of the folder each
     /// message is filed in.
     pub folders: &'a [Folder],
@@ -52,6 +56,7 @@ pub fn draw_list_rows(
             short_date: view.columns.short_date,
             now: view.now,
             recipient: names_recipient(role_of(view.folders, envelope)),
+            meta: view.rows.get(index).copied().unwrap_or(RowMeta::SINGLE),
         };
         for slot in &view.columns.slots {
             draw_cell(frame, ctx, &style, &info, slot);

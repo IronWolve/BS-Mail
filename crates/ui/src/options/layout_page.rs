@@ -18,6 +18,7 @@ pub fn rows(view: &OptionsView<'_>) -> Vec<Row> {
         Row::text("Layout", Tone::Dim),
         applies_now("Reader", Control::ReaderPosition, reader_name(config.reader.position)),
         applies_now("Folder spacing", Control::Density, density_name(config.appearance.density)),
+        applies_now("Threads", Control::Threaded, if config.list.threaded { "on" } else { "off" }),
         Row::blank(),
         Row::text("Columns of the list (the subject always shows)", Tone::Dim),
     ];

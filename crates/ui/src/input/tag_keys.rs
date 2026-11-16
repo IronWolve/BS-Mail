@@ -17,7 +17,7 @@ impl AppView {
     /// before, and those of the messages shown now.
     fn tags_to_offer(&self) -> BTreeSet<String> {
         let mut tags = self.selection.account.as_ref().map(|account| self.mail.known_tags_of(account)).unwrap_or_default();
-        let shown = self.mail.page.as_ref().map(|page| page.envelopes.as_slice()).unwrap_or_default();
+        let shown = self.mail.page.as_ref().map(|page| page.loaded.as_slice()).unwrap_or_default();
         for tag in shown.iter().flat_map(|envelope| envelope.tags.iter()) {
             if !tags.iter().any(|have| have.eq_ignore_ascii_case(tag)) {
                 tags.insert(tag.clone());

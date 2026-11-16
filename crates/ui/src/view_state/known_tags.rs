@@ -31,15 +31,16 @@ impl MailSnapshot {
     /// The server's new tags for messages: the rows shown take them, and the
     /// tags are remembered. A change that went through ends a failure shown,
     /// as a page or a body arriving does.
-    pub(super) fn apply_tags(&mut self, updates: Vec<(MessageId, Vec<String>)>, selection: &Selection) {
+    pub(super) fn apply_tags(&mut self, updates: Vec<(MessageId, Vec<String>)>, selection: &mut Selection) {
         for (id, tags) in updates {
-            let Some(envelope) = self.page.as_mut().and_then(|page| page.envelopes.iter_mut().find(|e| e.id == id)) else {
+            let Some(envelope) = self.page.as_mut().and_then(|page| page.loaded.iter_mut().find(|e| e.id == id)) else {
                 continue;
             };
             envelope.tags = tags;
             let kept = [envelope.clone()];
             self.remember_tags(selection.account.as_ref(), &kept);
         }
+        self.rearrange(selection);
         self.clear_failure(selection.account.as_ref());
     }
 

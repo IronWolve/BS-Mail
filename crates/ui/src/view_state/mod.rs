@@ -3,6 +3,8 @@
 
 pub mod focus;
 pub mod known_tags;
+pub mod list_events;
+pub mod list_page;
 pub mod mail_snapshot;
 pub mod overlays;
 pub mod page_merge;
@@ -11,7 +13,8 @@ pub mod scroll;
 pub mod selection;
 
 pub use focus::Focus;
-pub use mail_snapshot::{HostSummary, ListPage, MailSnapshot};
+pub use list_page::ListPage;
+pub use mail_snapshot::{HostSummary, MailSnapshot};
 pub use overlays::{OverlayKind, Overlays};
 pub use place::Place;
 pub use scroll::{ScrollState, first_row_at_offsets, first_row_showing};

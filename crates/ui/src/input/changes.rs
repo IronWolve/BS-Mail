@@ -5,6 +5,8 @@
 //! says it happened, so a refusal or a failure never leaves it showing
 //! something the server does not have.
 
+use std::collections::HashSet;
+
 use model::{Command, Envelope, FlagChange, MessageId};
 
 use crate::app_view::AppView;
@@ -29,14 +31,14 @@ impl AppView {
         true
     }
 
-    /// The envelopes of the messages a change acts on.
+    /// The envelopes of the messages a change acts on, found among every
+    /// loaded message (a thread's folded messages have no row of their own).
     pub(crate) fn target_envelopes(&self) -> Vec<&Envelope> {
-        let ids = self.targets();
-        let folder = self.selection.folder;
-        let Some(page) = folder.and_then(|f| self.mail.page.as_ref().filter(|p| p.folder == f)) else {
+        let ids: HashSet<MessageId> = self.targets().into_iter().collect();
+        let Some(page) = self.shown_page() else {
             return Vec::new();
         };
-        page.envelopes.iter().filter(|e| ids.contains(&e.id)).collect()
+        page.loaded.iter().filter(|e| ids.contains(&e.id)).collect()
     }
 
     /// Read when any target is unread, otherwise unread: one key press makes
@@ -57,37 +59,42 @@ impl AppView {
         self.queue.push(set_flags_for(ids, FlagChange { seen: Some(make_seen), ..FlagChange::default() }));
     }
 
-    /// A click on the unread cell of a row: that message alone is made read
-    /// if it is unread, unread if it is read.
-    pub(crate) fn toggle_read_of(&mut self, id: MessageId) {
-        let Some(seen) = self.envelope_of(id).map(|envelope| envelope.flags.seen) else {
+    /// A click on the unread cell of a row: the messages the row stands for
+    /// (that message alone, or every message of a thread's row) are made read
+    /// if any is unread, unread if all are read.
+    pub(crate) fn toggle_read_of(&mut self, ids: &[MessageId]) {
+        let found: Vec<&Envelope> = ids.iter().filter_map(|id| self.envelope_of(*id)).collect();
+        if found.is_empty() {
             return;
-        };
+        }
+        let make_seen = found.iter().any(|envelope| !envelope.flags.seen);
         if !self.changes_allowed_or_note() {
             return;
         }
         // The user's own choice wins over the timer for the message open.
-        if self.selection.message == Some(id) {
-            self.auto_marked = Some(id);
+        if let Some(open) = self.selection.message.filter(|open| ids.contains(open)) {
+            self.auto_marked = Some(open);
             self.read_timer = None;
         }
-        self.queue.push(set_flags(id, FlagChange { seen: Some(!seen), ..FlagChange::default() }));
+        self.queue.push(set_flags_for(ids.to_vec(), FlagChange { seen: Some(make_seen), ..FlagChange::default() }));
     }
 
-    /// A click on the star cell of a row: that message alone is starred if it
-    /// is not, unstarred if it is.
-    pub(crate) fn toggle_star_of(&mut self, id: MessageId) {
-        let Some(flagged) = self.envelope_of(id).map(|envelope| envelope.flags.flagged) else {
+    /// A click on the star cell of a row: the messages the row stands for are
+    /// starred if any is not, unstarred if all are.
+    pub(crate) fn toggle_star_of(&mut self, ids: &[MessageId]) {
+        let found: Vec<&Envelope> = ids.iter().filter_map(|id| self.envelope_of(*id)).collect();
+        if found.is_empty() {
             return;
-        };
+        }
+        let make_flagged = found.iter().any(|envelope| !envelope.flags.flagged);
         if !self.changes_allowed_or_note() {
             return;
         }
-        self.queue.push(set_flags(id, FlagChange { flagged: Some(!flagged), ..FlagChange::default() }));
+        self.queue.push(set_flags_for(ids.to_vec(), FlagChange { flagged: Some(make_flagged), ..FlagChange::default() }));
     }
 
     fn envelope_of(&self, id: MessageId) -> Option<&Envelope> {
-        self.shown_page()?.envelopes.iter().find(|envelope| envelope.id == id)
+        self.shown_page()?.loaded_envelope(id)
     }
 
     /// Starred when any target is not, otherwise unstarred.

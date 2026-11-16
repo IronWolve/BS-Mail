@@ -11,8 +11,12 @@ use super::session::ImapSession;
 use super::timeouts::bounded;
 use super::uid_set::UidSet;
 
-/// The data items that fill a list row.
-const ROW_ITEMS: &str = "(UID FLAGS INTERNALDATE RFC822.SIZE ENVELOPE BODYSTRUCTURE)";
+/// The data items that fill a list row. The `References` header is the one
+/// thing the ENVELOPE does not carry that threads need; PEEK, so no message is
+/// marked read by listing it, and partial, so a hostile header of any length
+/// costs no more than `model::thread_headers::MAX_HEADER_BYTES` (65536) a row.
+const ROW_ITEMS: &str =
+    "(UID FLAGS INTERNALDATE RFC822.SIZE ENVELOPE BODYSTRUCTURE BODY.PEEK[HEADER.FIELDS (REFERENCES)]<0.65536>)";
 
 /// The sequence set for the page that starts `offset` messages from the
 /// newest and holds up to `count`, or `None` when the page is empty.
@@ -77,6 +81,7 @@ pub fn fetched_row(fetch: &Fetch) -> Option<FetchedRow<'_>> {
         }),
         size: fetch.size.unwrap_or(0),
         has_attachments: fetch.bodystructure().is_some_and(has_attachments),
+        references: fetch.header(),
     })
 }
 

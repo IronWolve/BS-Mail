@@ -25,7 +25,7 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         scene.view.set_prefs(state.layout.clone());
         // Told before the first events are taken, so the first account and
         // folder shown are the ones that were open last.
-        scene.view.restore_place(state.place.clone());
+        state.restore_into(&mut scene.view);
     }
     scene.prime();
     let (cols, rows) = terminal_size().unwrap_or((REF_COLS, REF_ROWS));
