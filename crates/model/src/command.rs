@@ -5,6 +5,8 @@ use std::fmt;
 use zeroize::Zeroize;
 
 use crate::address::Address;
+use crate::attachments::OutgoingAttachment;
+use crate::body::AttachmentInfo;
 use crate::flags::FlagChange;
 use crate::ids::{AccountId, FolderId, MessageId, RequestId};
 
@@ -63,6 +65,8 @@ pub struct OutgoingMessage {
     pub body: String,
     /// The message this one answers, when it is a reply.
     pub in_reply_to: Option<MessageId>,
+    /// Files that go with the message, after its text.
+    pub attachments: Vec<OutgoingAttachment>,
 }
 
 /// Which raw text of a message to read.
@@ -92,6 +96,13 @@ pub enum Command {
     /// open in the browser. The answer is an `HtmlPage`; a message with no
     /// HTML part is answered with a failure.
     PrepareHtml { message: MessageId },
+    /// Download one attachment of a message and decode it to the file it
+    /// holds, for the program to save, open or send on. The attachment is
+    /// the one the reader listed (its `section` names it on the server).
+    /// The answer is an `AttachmentData`, or a failure named `save attachment`
+    /// that says in words why not (it is larger than `MAX_FETCH_BYTES`, the
+    /// message is gone, the server lays it out differently).
+    FetchAttachment { message: MessageId, attachment: AttachmentInfo },
     /// Change flags on one or more messages.
     SetFlags {
         messages: Vec<MessageId>,

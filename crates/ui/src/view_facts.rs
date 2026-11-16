@@ -86,19 +86,30 @@ impl AppView {
             return Some(ReaderContent { lead: vec![raw.heading(), StyledLine::default()], body: raw.lines() });
         }
         let (_, body) = self.mail.body.as_ref().filter(|(id, _)| Some(*id) == self.selection.message)?;
+        // While the cursor is on one attachment, each line has a two cell
+        // gutter and the chosen one a `>` in it and the lead colour.
+        let cursor = self.attachment_cursor();
         let mut lead: Vec<StyledLine> = body
             .attachments
             .iter()
-            .map(|attachment| StyledLine {
-                spans: vec![StyledSpan {
-                    text: format!(
-                        "Attachment: {} ({}, {})",
-                        attachment.name,
-                        attachment.content_type,
-                        format_size(attachment.size, self.config.list.size_format)
-                    ),
-                    role: BodyRole::Path,
-                }],
+            .enumerate()
+            .map(|(at, attachment)| {
+                let marker = match cursor {
+                    None => "",
+                    Some(chosen) if chosen == at => "> ",
+                    Some(_) => "  ",
+                };
+                StyledLine {
+                    spans: vec![StyledSpan {
+                        text: format!(
+                            "{marker}Attachment: {} ({}, {})",
+                            attachment.name,
+                            attachment.content_type,
+                            format_size(attachment.size, self.config.list.size_format)
+                        ),
+                        role: if cursor == Some(at) { BodyRole::LeadNext } else { BodyRole::Path },
+                    }],
+                }
             })
             .collect();
         if !lead.is_empty() {

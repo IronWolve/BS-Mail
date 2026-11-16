@@ -7,7 +7,7 @@
 //! the first account that may. The From line then changes among the accounts
 //! that may send.
 
-use model::{AccountId, FolderRole, MessageId};
+use model::{AccountId, AttachmentInfo, FolderRole, MessageId};
 
 use super::compose::ComposeKind;
 use crate::app_view::AppView;
@@ -41,6 +41,8 @@ struct Started {
     continues: Option<MessageId>,
     /// Where in the list of senders the message starts.
     from: usize,
+    /// For a forward: the message and its attachments, which go with it.
+    forwards: Option<(MessageId, Vec<AttachmentInfo>)>,
 }
 
 impl AppView {
@@ -55,7 +57,7 @@ impl AppView {
             return;
         }
         let started = match kind {
-            ComposeKind::New => Started { draft: Draft::default(), reply_to: None, continues: None, from: self.sender_of(&senders, None) },
+            ComposeKind::New => Started { draft: Draft::default(), reply_to: None, continues: None, from: self.sender_of(&senders, None), forwards: None },
             other => match self.started_from_selected(other, &senders) {
                 Ok(started) => started,
                 Err(NoDraft::NothingSelected) => return,
@@ -71,6 +73,9 @@ impl AppView {
             .with_senders(senders.clone(), started.from, signs);
         form.draft = started.continues;
         self.composer = Some(form);
+        if let Some((message, files)) = started.forwards {
+            self.fetch_original_files(message, files);
+        }
     }
 
     /// Whether the selected message is filed in a Drafts folder, which Enter
@@ -144,7 +149,8 @@ impl AppView {
             ComposeKind::Reply => (reply(&original, own, false), Some(envelope.id), None),
             ComposeKind::New => (Draft::default(), None, None),
         };
-        Ok(Started { draft, reply_to, continues, from })
+        let forwards = (kind == ComposeKind::Forward && !body.attachments.is_empty()).then(|| (envelope.id, body.attachments.clone()));
+        Ok(Started { draft, reply_to, continues, from, forwards })
     }
 }
 

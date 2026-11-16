@@ -51,6 +51,9 @@ pub(super) fn remap_event(slot: Slot, event: Event) -> Mapped<Event> {
         },
         Event::RawText { message, part, text } => Event::RawText { message: message_id(slot, message)?, part, text },
         Event::HtmlPage { message, html, removed } => Event::HtmlPage { message: message_id(slot, message)?, html, removed },
+        Event::AttachmentData { message, attachment, data } => {
+            Event::AttachmentData { message: message_id(slot, message)?, attachment, data }
+        }
         Event::FlagsChanged { updates } => Event::FlagsChanged { updates: remap_updates(slot, updates)? },
         Event::TagsChanged { updates } => Event::TagsChanged { updates: remap_updates(slot, updates)? },
         Event::SearchResults { request, total, envelopes, incomplete } => {

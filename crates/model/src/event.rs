@@ -1,8 +1,9 @@
 //! Events the mail backend sends to the UI.
 
-use crate::body::Body;
+use crate::body::{AttachmentInfo, Body};
 use crate::command::RawPart;
 use crate::envelope::Envelope;
+use crate::file_bytes::FileBytes;
 use crate::flags::Flags;
 use crate::folder::{Account, Folder};
 use crate::ids::{AccountId, FolderId, MessageId, RequestId};
@@ -68,6 +69,13 @@ pub enum Event {
         message: MessageId,
         html: String,
         removed: u32,
+    },
+    /// An attachment, asked for with `Command::FetchAttachment`, decoded to
+    /// the bytes of the file. `attachment` is the one that was asked for.
+    AttachmentData {
+        message: MessageId,
+        attachment: AttachmentInfo,
+        data: FileBytes,
     },
     FlagsChanged {
         updates: Vec<(MessageId, Flags)>,

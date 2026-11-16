@@ -77,6 +77,9 @@ impl AppView {
         if self.memory.folder_pending {
             return self.folder_key(key);
         }
+        if self.attachment_mode() && self.attachment_mode_key(key) {
+            return true;
+        }
         match action_for(key) {
             Some(action) => {
                 self.act(action, grid);

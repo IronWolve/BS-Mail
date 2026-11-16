@@ -44,7 +44,7 @@ impl AppView {
     /// away (a drag that starts on an address selects).
     pub(crate) fn click_reader(&mut self, layout: &Layout, (col, row): (u16, u16), modifiers: Modifiers, grid: (u16, u16)) {
         self.focus = Focus::Reader;
-        if self.click_find_bar(layout, col, row, modifiers.shift, grid) {
+        if self.click_find_bar(layout, col, row, modifiers.shift, grid) || self.click_attachment(layout, (col, row)) {
             return;
         }
         let address = self.link_under(layout, col, row);

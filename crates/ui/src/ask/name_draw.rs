@@ -46,17 +46,23 @@ fn draw_typed(frame: &mut Frame, ctx: &DrawContext<'_>, parts: &NameParts, promp
 
 /// The two buttons on the bottom border: the key as a keycap, the word beside it.
 fn draw_buttons(frame: &mut Frame, ctx: &DrawContext<'_>, parts: &NameParts, go: &str) {
+    draw_button_pair(frame, ctx, parts.rect, parts.go, parts.cancel, go);
+}
+
+/// The two words on the bottom border of the box `outer` that accept (`go`, at
+/// `go_rect`) and cancel (at `cancel_rect`), each as a keycap and its label.
+pub(crate) fn draw_button_pair(frame: &mut Frame, ctx: &DrawContext<'_>, outer: Rect, go_rect: Rect, cancel_rect: Rect, go: &str) {
     let hint = format!(" {go}   {CANCEL_WORDS} ");
-    put_text(frame, parts.rect, parts.go.x.saturating_sub(1), parts.go.y, &hint, ctx.fg(roles::FOOTER_TEXT));
-    for (rect, words) in [(parts.go, go), (parts.cancel, CANCEL_WORDS)] {
+    put_text(frame, outer, go_rect.x.saturating_sub(1), go_rect.y, &hint, ctx.fg(roles::FOOTER_TEXT));
+    for (rect, words) in [(go_rect, go), (cancel_rect, CANCEL_WORDS)] {
         let key_cells = u16::try_from(words.find(' ').unwrap_or(0)).unwrap_or(0);
         let cap = &words[..usize::from(key_cells)];
-        put_text(frame, parts.rect, rect.x, rect.y, cap, ctx.full(roles::KEYBAR_CAP));
-        put_text(frame, parts.rect, rect.x + key_cells, rect.y, &words[usize::from(key_cells)..], ctx.fg(roles::KEYBAR_LABEL));
+        put_text(frame, outer, rect.x, rect.y, cap, ctx.full(roles::KEYBAR_CAP));
+        put_text(frame, outer, rect.x + key_cells, rect.y, &words[usize::from(key_cells)..], ctx.fg(roles::KEYBAR_LABEL));
     }
 }
 
-fn draw_frame(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, title: &str) {
+pub(crate) fn draw_frame(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, title: &str) {
     let border = ctx.fg(roles::MENU_BORDER);
     let set = ctx.borders;
     let (left, right) = (rect.x, rect.right() - 1);

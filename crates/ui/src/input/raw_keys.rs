@@ -4,7 +4,7 @@
 //! selected, copied and searched, and Escape, or another message, brings the
 //! message back. Pressing the same key again does too.
 
-use model::{Command, Event, MessageId, RawPart};
+use model::{Command, ConnectionState, Event, MessageId, RawPart};
 
 use crate::app_view::AppView;
 use crate::view_state::Focus;
@@ -47,6 +47,11 @@ impl AppView {
                 }
             }
             Event::HtmlPage { message, html, removed } => self.page_arrived(*message, html, *removed),
+            Event::AttachmentData { message, attachment, data } => self.attachment_arrived(*message, attachment, data),
+            Event::ConnectionState { account, state } if *state != ConnectionState::Online && self.selection.account.as_ref() == Some(account) => {
+                self.attachments_interrupted();
+            }
+            Event::OpFailed { operation, reason, .. } if operation == "save attachment" => self.attachment_failed(reason),
             Event::OpFailed { operation, .. } if operation == "view headers" || operation == "view source" => {
                 self.reading.raw = None;
             }

@@ -34,6 +34,7 @@ fn operation_name(command: &Command) -> Option<&'static str> {
         Command::FetchRaw { part: RawPart::Headers, .. } => Some("view headers"),
         Command::FetchRaw { part: RawPart::Source, .. } => Some("view source"),
         Command::PrepareHtml { .. } => Some("open in browser"),
+        Command::FetchAttachment { .. } => Some("save attachment"),
         Command::SetFlags { .. } => Some("set flags"),
         Command::Move { .. } => Some("move"),
         Command::Delete { .. } => Some("delete"),

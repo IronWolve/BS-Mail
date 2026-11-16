@@ -26,6 +26,8 @@ pub enum MenuTarget {
     Folder(FolderId),
     Account(AccountId),
     Link(String),
+    /// An attachment of the open message, by its place in the list.
+    Attachment(usize),
 }
 
 /// A menu that is open, and what it is about.
@@ -55,10 +57,11 @@ impl AppView {
             all_alert: !targets.is_empty() && targets.iter().all(|envelope| envelope.flags.alert),
             marked: self.marked.len(),
             folder: None,
+            attachments: self.reader_attachments().len(),
         }
     }
 
-    fn open_menu(&mut self, kind: MenuKind, target: MenuTarget, anchor: (u16, u16)) {
+    pub(crate) fn open_menu(&mut self, kind: MenuKind, target: MenuTarget, anchor: (u16, u16)) {
         let facts = match &target {
             MenuTarget::Selected => self.menu_facts(),
             MenuTarget::Folder(id) => MenuFacts { folder: self.mail.folder(*id).map(|folder| folder.role), ..MenuFacts::default() },
@@ -91,10 +94,11 @@ impl AppView {
                 };
                 self.open_menu(MenuKind::Account, MenuTarget::Account(id), anchor);
             }
-            Hit::Reader => match self.link_under(&layout, col, row) {
-                Some(link) => self.open_menu(MenuKind::Link, MenuTarget::Link(link), anchor),
-                None if self.has_selected_message() => self.open_menu(MenuKind::Reader, MenuTarget::Selected, anchor),
-                None => return false,
+            Hit::Reader => match (self.attachment_at(&layout, col, row), self.link_under(&layout, col, row)) {
+                (Some(at), _) => self.open_attachment_menu(at, anchor),
+                (None, Some(link)) => self.open_menu(MenuKind::Link, MenuTarget::Link(link), anchor),
+                (None, None) if self.has_selected_message() => self.open_menu(MenuKind::Reader, MenuTarget::Selected, anchor),
+                (None, None) => return false,
             },
             _ => return false,
         }
@@ -122,7 +126,11 @@ impl AppView {
                 let (Some(reader), true) = (layout.reader.as_ref(), self.has_selected_message()) else {
                     return false;
                 };
-                self.open_menu(MenuKind::Reader, MenuTarget::Selected, (reader.body.x + 2, reader.body.y));
+                let anchor = (reader.body.x + 2, reader.body.y);
+                match self.attachment_cursor() {
+                    Some(at) => self.open_attachment_menu(at, anchor),
+                    None => self.open_menu(MenuKind::Reader, MenuTarget::Selected, anchor),
+                }
                 true
             }
         }

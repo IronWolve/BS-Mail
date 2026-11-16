@@ -4,6 +4,9 @@
 mod account_writer;
 mod address_file;
 mod accounts;
+mod attach_read;
+mod attachment_name;
+mod attachment_store;
 mod browser_login;
 mod cli;
 mod clock;

@@ -36,6 +36,10 @@ pub struct StyledLine {
 pub struct AttachmentInfo {
     /// Index of the part in the message's part tree.
     pub part: u32,
+    /// The number the server gives the part inside the message ("2", "1.3"),
+    /// which is how the part is asked for. Empty when the message has no
+    /// server to ask (the mock).
+    pub section: String,
     pub name: String,
     pub content_type: String,
     /// Size in bytes.

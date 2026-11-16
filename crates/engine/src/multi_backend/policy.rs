@@ -44,7 +44,7 @@ pub(super) fn classify(event: &Event) -> Class {
         | Event::FlagsChanged { .. }
         | Event::TagsChanged { .. }
         | Event::SearchResults { .. } => Class::Answer,
-        Event::MessageSent { .. } | Event::OpFailed { .. } => Class::Notice,
+        Event::MessageSent { .. } | Event::OpFailed { .. } | Event::AttachmentData { .. } => Class::Notice,
     }
 }
 

@@ -7,6 +7,7 @@
 
 use surface::{KeyEvent, LogicalKey, NamedKey};
 
+use super::attach_input::attach_key;
 use super::form::{ComposeForm, Field, Progress};
 use super::sender_keys::{from_menu_key, from_text};
 use super::suggest::suggestion_key;
@@ -42,7 +43,7 @@ pub fn handle_key(form: &mut ComposeForm, key: &KeyEvent, pane: Pane) -> Outcome
         return sending_key(form, key);
     }
     let held = key.modifiers;
-    if let Some(outcome) = from_menu_key(form, key).or_else(|| suggestion_key(form, key)) {
+    if let Some(outcome) = from_menu_key(form, key).or_else(|| suggestion_key(form, key)).or_else(|| attach_key(form, key)) {
         return finish(form, outcome, pane);
     }
     let outcome = match key.key {
@@ -62,8 +63,7 @@ pub fn handle_key(form: &mut ComposeForm, key: &KeyEvent, pane: Pane) -> Outcome
 fn finish(form: &mut ComposeForm, outcome: Outcome, pane: Pane) -> Outcome {
     if outcome == Outcome::Changed {
         form.notice = None;
-        form.discard_armed = false;
-        form.close_armed = false;
+        form.disarm();
         keep_cursor_in_view(form, pane);
     }
     outcome
@@ -77,12 +77,15 @@ pub fn handle_text(form: &mut ComposeForm, text: &str, pane: Pane) -> Outcome {
     if form.focus == Field::From || form.from_menu.is_some() {
         return from_text(form, text);
     }
+    if form.focus == Field::Attach {
+        // The row holds files, not text.
+        return Outcome::Ignored;
+    }
     if !form.focused().insert_text(&clean(text)) {
         return Outcome::Ignored;
     }
     form.notice = None;
-    form.discard_armed = false;
-    form.close_armed = false;
+    form.disarm();
     keep_cursor_in_view(form, pane);
     Outcome::Changed
 }

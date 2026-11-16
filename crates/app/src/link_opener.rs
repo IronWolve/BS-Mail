@@ -33,6 +33,12 @@ pub trait LinkOpener {
     /// later through `poll`. Only a page this program wrote itself is opened.
     fn open_file(&mut self, path: &Path);
 
+    /// Starts opening the saved attachment at `path` with the program the
+    /// system has for its kind; the result comes later through `poll`. Only a
+    /// file this program saved in its attachments folder is opened, and never
+    /// a program, a script or a page that runs code.
+    fn open_attachment(&mut self, path: &Path);
+
     /// The result of the last `open`, once, when there is one.
     fn poll(&mut self) -> Option<Result<(), String>>;
 }
@@ -45,6 +51,8 @@ impl LinkOpener for NoOpener {
     fn open(&mut self, _url: &str) {}
 
     fn open_file(&mut self, _path: &Path) {}
+
+    fn open_attachment(&mut self, _path: &Path) {}
 
     fn poll(&mut self) -> Option<Result<(), String>> {
         None
@@ -116,11 +124,14 @@ fn system_launchers() -> Vec<Launcher> {
 }
 
 /// The opener of a run: the system's, which may also open the pages kept in
-/// `html/` of the data folder `data` and no other file.
+/// `html/` of the data folder `data` and the attachments saved in its
+/// `attachments/`, and no other file.
 pub fn opener_for(data: Option<&Path>) -> Box<dyn LinkOpener> {
     let opener = SystemOpener::new();
     Box::new(match data {
-        Some(dir) => opener.with_pages_in(dir.join(crate::html_store::HTML_DIR_NAME)),
+        Some(dir) => opener
+            .with_pages_in(dir.join(crate::html_store::HTML_DIR_NAME))
+            .with_attachments_in(dir.join(crate::attachment_store::ATTACHMENTS_DIR_NAME)),
         None => opener,
     })
 }
@@ -130,8 +141,11 @@ pub struct SystemOpener {
     launchers: Vec<Launcher>,
     settle: Duration,
     waiting: Option<Receiver<Result<(), String>>>,
-    /// The only folder a file is opened from: `html/` in the data folder.
+    /// The only folder a page file is opened from: `html/` in the data folder.
     pages_dir: Option<PathBuf>,
+    /// The only folder an attachment is opened from: `attachments/` in the
+    /// data folder.
+    attachments_dir: Option<PathBuf>,
 }
 
 impl SystemOpener {
@@ -141,13 +155,39 @@ impl SystemOpener {
 
     /// An opener with its own launchers and patience, for tests.
     pub fn with(launchers: Vec<Launcher>, settle: Duration) -> Self {
-        Self { launchers, settle, waiting: None, pages_dir: None }
+        Self { launchers, settle, waiting: None, pages_dir: None, attachments_dir: None }
     }
 
     /// Lets the opener open the page files that are in `dir`, and no others.
     pub fn with_pages_in(mut self, dir: PathBuf) -> Self {
         self.pages_dir = Some(dir);
         self
+    }
+
+    /// Lets the opener open the saved attachments that are in `dir`, and no
+    /// others.
+    pub fn with_attachments_in(mut self, dir: PathBuf) -> Self {
+        self.attachments_dir = Some(dir);
+        self
+    }
+
+    /// Starts the launchers with `file` (already checked), or answers with the
+    /// refusal.
+    fn start_file(&mut self, checked: Result<String, String>) {
+        let (sender, receiver) = channel();
+        self.waiting = Some(receiver);
+        let file = match checked {
+            Ok(file) => file,
+            Err(reason) => {
+                let _ = sender.send(Err(reason));
+                return;
+            }
+        };
+        let launchers = self.launchers.clone();
+        let settle = self.settle;
+        thread::spawn(move || {
+            let _ = sender.send(try_each(&launchers, &file, settle));
+        });
     }
 }
 
@@ -168,20 +208,13 @@ impl LinkOpener for SystemOpener {
     }
 
     fn open_file(&mut self, path: &Path) {
-        let (sender, receiver) = channel();
-        self.waiting = Some(receiver);
-        let file = match checked_page(self.pages_dir.as_deref(), path) {
-            Ok(file) => file,
-            Err(reason) => {
-                let _ = sender.send(Err(reason));
-                return;
-            }
-        };
-        let launchers = self.launchers.clone();
-        let settle = self.settle;
-        thread::spawn(move || {
-            let _ = sender.send(try_each(&launchers, &file, settle));
-        });
+        let checked = checked_page(self.pages_dir.as_deref(), path);
+        self.start_file(checked);
+    }
+
+    fn open_attachment(&mut self, path: &Path) {
+        let checked = checked_attachment(self.attachments_dir.as_deref(), path);
+        self.start_file(checked);
     }
 
     fn poll(&mut self) -> Option<Result<(), String>> {
@@ -206,6 +239,33 @@ fn checked_page(pages_dir: Option<&Path>, path: &Path) -> Result<String, String>
     }
     let text = launchable(&file).ok_or_else(|| REFUSED.to_string())?;
     if text.starts_with('-') || text.chars().any(|ch| ch.is_control()) {
+        return Err(REFUSED.to_string());
+    }
+    Ok(text)
+}
+
+/// The path to hand to a launcher for a saved attachment, or why it is
+/// refused. It must be a file in the attachments folder and nowhere else
+/// (after links are followed), named in the safe form this program saves
+/// names in, and not a program, a script or a page that runs code. Its path
+/// is handed over as one argument that no launcher can read as a switch: it
+/// starts with a drive letter or a `/` that names a folder, never with a dash,
+/// and on Windows never with a slash.
+fn checked_attachment(dir: Option<&Path>, path: &Path) -> Result<String, String> {
+    const REFUSED: &str = "that file is not an attachment this program saved, so it was not opened";
+    let dir = dir.ok_or("there is no folder for attachments here, so nothing was opened")?;
+    let dir = dir.canonicalize().map_err(|_| REFUSED.to_string())?;
+    let file = path.canonicalize().map_err(|_| REFUSED.to_string())?;
+    let name = file.file_name().and_then(OsStr::to_str).ok_or_else(|| REFUSED.to_string())?;
+    if file.parent() != Some(dir.as_path()) || !file.is_file() || crate::attachment_name::safe_name(name, "") != name {
+        return Err(REFUSED.to_string());
+    }
+    if crate::attachment_name::is_never_opened(name, "") {
+        return Err(format!("{name} is a program, a script or a page that runs code, so it was saved and not opened"));
+    }
+    let text = launchable(&file).ok_or_else(|| REFUSED.to_string())?;
+    let switch_like = text.starts_with('-') || (cfg!(windows) && text.starts_with('/'));
+    if switch_like || text.chars().any(|ch| ch.is_control()) {
         return Err(REFUSED.to_string());
     }
     Ok(text)

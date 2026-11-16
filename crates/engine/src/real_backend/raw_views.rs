@@ -12,7 +12,7 @@ use crate::imap_session::{ImapSession, SessionError};
 use crate::mime_render::{raw_text, render_page};
 
 /// What the answer to a message that is not there is called.
-const MISSING: &str = "the message is no longer on the server";
+pub(super) const MISSING: &str = "the message is no longer on the server";
 
 /// The message as the server holds it, or the failure to send instead.
 type Read = Result<(Vec<u8>, Option<u64>), Event>;
@@ -66,6 +66,25 @@ impl Worker {
         message: MessageId,
         operation: &str,
     ) -> Result<Read, SessionError> {
+        let uid = match self.open_message(session, message, operation).await? {
+            Ok(uid) => uid,
+            Err(failure) => return Ok(Err(failure)),
+        };
+        Ok(match session.fetch_body(uid).await? {
+            Some(raw) => Ok((raw.bytes, raw.total)),
+            None => Err(self.sink.failure(operation, MISSING)),
+        })
+    }
+
+    /// Opens the folder a message is in, and gives its UID there; or the
+    /// failure to send instead when the id is unknown, the folder is gone or
+    /// was rebuilt since the message was listed.
+    pub(super) async fn open_message(
+        &mut self,
+        session: &mut ImapSession,
+        message: MessageId,
+        operation: &str,
+    ) -> Result<Result<u32, Event>, SessionError> {
         let Some((folder, uid)) = self.state.message_key(message) else {
             return Ok(Err(self.sink.failure(operation, format!("unknown message id: {}", message.0))));
         };
@@ -76,9 +95,6 @@ impl Worker {
         if reopened.is_some_and(|info| self.note_validity(folder, info.uid_validity)) {
             return Ok(Err(self.sink.failure(operation, FOLDER_REBUILT)));
         }
-        Ok(match session.fetch_body(uid.0).await? {
-            Some(raw) => Ok((raw.bytes, raw.total)),
-            None => Err(self.sink.failure(operation, MISSING)),
-        })
+        Ok(Ok(uid.0))
     }
 }

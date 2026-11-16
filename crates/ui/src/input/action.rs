@@ -88,6 +88,11 @@ pub enum Action {
     ViewSource,
     /// `b`: open a safe copy of the message's HTML in the browser.
     OpenInBrowser,
+    /// `x`: the cursor to the next attachment of the open message (the
+    /// first when it is on none); `X` the one before. While it is on one,
+    /// Enter saves it, `o` opens it and `a` asks where to save it.
+    NextAttachment,
+    PreviousAttachment,
 }
 
 /// Where a selection key takes the selection.
@@ -184,6 +189,8 @@ pub fn action_for(key: &KeyEvent) -> Option<Action> {
         LogicalKey::Char('H') => Some(Action::ViewHeaders),
         LogicalKey::Char('v') if !held.shift => Some(Action::ViewSource),
         LogicalKey::Char('b') if !held.shift => Some(Action::OpenInBrowser),
+        LogicalKey::Char('x') if !held.shift => Some(Action::NextAttachment),
+        LogicalKey::Char('X') => Some(Action::PreviousAttachment),
         LogicalKey::Char('1') => Some(Action::FocusPane(Focus::Sidebar)),
         LogicalKey::Char('2') => Some(Action::FocusPane(Focus::List)),
         LogicalKey::Char('3') => Some(Action::FocusPane(Focus::Reader)),

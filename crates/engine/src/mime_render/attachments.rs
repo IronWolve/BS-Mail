@@ -3,12 +3,15 @@
 use mail_parser::{Message, MessagePart, MimeHeaders, PartType};
 use model::AttachmentInfo;
 
+use super::attachment_sections::section_numbers;
 use super::limits::MAX_ATTACHMENTS;
 use crate::text_clean::single_line;
 
 /// The attachments, up to `MAX_ATTACHMENTS`: the part's index in the
-/// message's part tree, its file name, its type and its decoded size.
+/// message's part tree and its number on the server, its file name, its type
+/// and its decoded size.
 pub fn list_attachments(message: &Message<'_>) -> Vec<AttachmentInfo> {
+    let sections = section_numbers(message);
     message
         .attachments
         .iter()
@@ -18,6 +21,7 @@ pub fn list_attachments(message: &Message<'_>) -> Vec<AttachmentInfo> {
             let part = message.parts.get(id as usize)?;
             Some(AttachmentInfo {
                 part: id,
+                section: sections.get(id as usize).cloned().flatten().unwrap_or_default(),
                 name: name_of(part, position),
                 content_type: type_of(part),
                 size: part.len() as u64,

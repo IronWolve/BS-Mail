@@ -1,6 +1,7 @@
-//! Opening what the user asked the browser for: the web addresses clicked in
-//! a message, and the pages of HTML messages (see `pages`). Each goes to the
-//! opener, and how that went is told to the footer.
+//! Opening what the user asked the system for: the web addresses clicked in
+//! a message, the pages of HTML messages (see `pages`) and the attachments
+//! (see `attachments`). Each goes to the opener, and how that went is told to
+//! the footer.
 
 use super::Screen;
 
@@ -14,14 +15,19 @@ impl Screen {
             changed = true;
         }
         changed |= self.page_steps();
+        changed |= self.attachment_steps();
         match self.links.poll() {
-            Some(Ok(())) => match self.page_removed.take() {
-                Some(removed) => self.view.html_opened(removed),
-                None => self.view.link_opened(),
+            Some(Ok(())) => match (self.attachments.take_opening(), self.page_removed.take()) {
+                (Some(opening), _) => self.view.attachment_done(opening.opened()),
+                (None, Some(removed)) => self.view.html_opened(removed),
+                (None, None) => self.view.link_opened(),
             },
             Some(Err(reason)) => {
                 self.page_removed = None;
-                self.view.link_open_failed(&reason);
+                match self.attachments.take_opening() {
+                    Some(opening) => self.view.attachment_done(opening.failed(&reason)),
+                    None => self.view.link_open_failed(&reason),
+                }
             }
             None => return changed,
         }

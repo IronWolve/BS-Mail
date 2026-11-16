@@ -47,7 +47,7 @@ pub fn open_popup(form: &ComposeForm, rects: &ComposerRects, bounds: Rect) -> Op
         Field::To => rects.fields[0],
         Field::Cc => rects.fields[1],
         Field::Bcc => rects.fields[2],
-        Field::From | Field::Subject | Field::Body => return None,
+        Field::From | Field::Subject | Field::Attach | Field::Body => return None,
     };
     let rows: Vec<String> = shown.items.iter().map(|address| format(std::slice::from_ref(address))).collect();
     let rect = panel_under(anchor, &rows, bounds)?;

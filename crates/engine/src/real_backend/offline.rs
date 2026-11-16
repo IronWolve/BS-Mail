@@ -48,6 +48,7 @@ impl Worker {
             Command::Search { .. } => ("search", false),
             Command::FetchRaw { part, .. } => (operation_of(part), false),
             Command::PrepareHtml { .. } => ("open in browser", false),
+            Command::FetchAttachment { .. } => (super::attachment_fetch::OPERATION, false),
             Command::LoadMore { .. } => ("load older mail", false),
             _ => ("sync", false),
         };

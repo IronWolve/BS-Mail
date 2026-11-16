@@ -33,6 +33,7 @@
 //! the mailbox has it, however long that takes (see `save_sent`).
 
 mod answered;
+mod attachment_fetch;
 mod backoff;
 mod bounded_join;
 mod bulk_changes;

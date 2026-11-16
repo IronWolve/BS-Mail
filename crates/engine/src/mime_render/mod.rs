@@ -1,6 +1,7 @@
 //! Turns a raw message into what the reading pane shows. This file only
 //! declares and re-exports the modules.
 
+mod attachment_sections;
 mod attachments;
 mod body_select;
 mod flowed;

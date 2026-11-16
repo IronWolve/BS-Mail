@@ -7,7 +7,7 @@ use surface::{Modifiers, NamedKey};
 use crate::composer::EditorBuffer;
 
 /// Does what `named` does to the text of `bar`; false for a key that is not an editing key.
-pub(super) fn edit_line(bar: &mut EditorBuffer, named: NamedKey, held: Modifiers) -> bool {
+pub(crate) fn edit_line(bar: &mut EditorBuffer, named: NamedKey, held: Modifiers) -> bool {
     match named {
         NamedKey::Left if held.ctrl => bar.move_word_left(held.shift),
         NamedKey::Right if held.ctrl => bar.move_word_right(held.shift),

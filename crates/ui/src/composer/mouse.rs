@@ -5,6 +5,8 @@
 
 use surface::{ButtonState, InputEvent, PointerButton, PointerShape, Rect};
 
+use super::attach_input::attach_press;
+use super::attach_line::{attach_rects, chip_at};
 use super::buttons::{Pressed, button_at};
 use super::draw::{ComposerRects, LABEL_CELLS, buttons_for, horizontal_skip, layout};
 use super::form::{ComposeForm, Field, Progress};
@@ -41,9 +43,15 @@ pub fn handle_pointer(form: &mut ComposeForm, event: &InputEvent, main: Rect) ->
 /// over its buttons and the rows of an open list, the text pointer over a
 /// field and the body.
 pub fn pointer_shape(form: &ComposeForm, main: Rect, at: (u16, u16)) -> PointerShape {
+    if let Some(prompt) = &form.path {
+        return prompt.pointer_shape(main, at);
+    }
     let Some(rects) = layout(main) else {
         return PointerShape::Arrow;
     };
+    if over_attach_target(form, &rects, at) {
+        return PointerShape::Hand;
+    }
     let on_button = buttons_for(&rects, form).and_then(|found| button_at(&found, at.0, at.1)).is_some();
     let on_row = open_popup(form, &rects, main).is_some_and(|open| row_at(&open, at.0, at.1).is_some());
     if on_button || on_row {
@@ -54,6 +62,14 @@ pub fn pointer_shape(form: &ComposeForm, main: Rect, at: (u16, u16)) -> PointerS
     }
     let on_field = rects.fields.iter().any(|rect| inside(*rect, at));
     if on_field || inside(rects.body, at) { PointerShape::Text } else { PointerShape::Arrow }
+}
+
+/// Whether the cell is on a button or a chip of the Attach row, or on the empty row.
+fn over_attach_target(form: &ComposeForm, rects: &ComposerRects, at: (u16, u16)) -> bool {
+    inside(rects.attach, at) && at.0 >= rects.attach.x + LABEL_CELLS && {
+        let parts = attach_rects(rects.attach, form);
+        inside(parts.add, at) || parts.remove.is_some_and(|remove| inside(remove, at)) || chip_at(&parts, at.0, at.1).is_some() || form.files().is_empty()
+    }
 }
 
 fn inside(rect: Rect, (col, row): (u16, u16)) -> bool {
@@ -76,14 +92,16 @@ fn press(form: &mut ComposeForm, rects: &ComposerRects, main: Rect, at: (u16, u1
         form.from_menu = None;
         return Outcome::Changed;
     }
+    if let Some(outcome) = attach_press(form, rects, at) {
+        return outcome;
+    }
     match buttons {
         Some(Pressed::Send) => return Outcome::Send,
         Some(Pressed::Cancel) => return escape(form),
         None => {}
     }
     form.notice = None;
-    form.discard_armed = false;
-    form.close_armed = false;
+    form.disarm();
     focus_and_place(form, rects, at, extend)
 }
 

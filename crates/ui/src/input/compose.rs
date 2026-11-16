@@ -10,6 +10,7 @@ use model::{Command, Event, MessageId};
 use surface::InputEvent;
 
 use crate::app_view::AppView;
+use crate::composer::attach_input::path_box_input;
 use crate::composer::draw::pane;
 use crate::composer::input::{Outcome, handle_key, handle_text};
 use crate::composer::mouse::handle_pointer;
@@ -50,13 +51,16 @@ impl AppView {
         let Some(form) = self.composer.as_mut() else {
             return false;
         };
-        let outcome = match event {
-            InputEvent::Key(key) => handle_key(form, key, pane),
-            InputEvent::Text(text) | InputEvent::Paste(text) => handle_text(form, text, pane),
-            InputEvent::Button { .. } | InputEvent::PointerMoved { .. } | InputEvent::Wheel { .. } => {
-                handle_pointer(form, event, main)
-            }
-            _ => Outcome::Ignored,
+        let outcome = match path_box_input(form, event, main) {
+            Some(boxed) => boxed,
+            None => match event {
+                InputEvent::Key(key) => handle_key(form, key, pane),
+                InputEvent::Text(text) | InputEvent::Paste(text) => handle_text(form, text, pane),
+                InputEvent::Button { .. } | InputEvent::PointerMoved { .. } | InputEvent::Wheel { .. } => {
+                    handle_pointer(form, event, main)
+                }
+                _ => Outcome::Ignored,
+            },
         };
         match outcome {
             Outcome::Ignored => false,
@@ -85,6 +89,10 @@ impl AppView {
         form.close_armed = false;
         form.suggest = None;
         form.from_menu = None;
+        if let Some(wait) = form.hold_send() {
+            form.notice = Some(wait);
+            return;
+        }
         match form.to_outgoing() {
             Err(problem) => form.notice = Some(problem),
             Ok(message) => {
@@ -92,6 +100,26 @@ impl AppView {
                 form.notice = None;
                 self.queue.push(Command::Send { message });
             }
+        }
+    }
+
+    /// The paths the user typed in the composer's path box, once, for the
+    /// program to read the files they name (it answers with `file_attached`).
+    pub fn take_attach_asks(&mut self) -> Vec<crate::composer::AttachAsk> {
+        self.composer.as_mut().map(|form| form.take_attach_asks()).unwrap_or_default()
+    }
+
+    /// The program's answer about a file the user named: the file, to be
+    /// attached, or why it was not read.
+    pub fn file_attached(&mut self, result: Result<model::OutgoingAttachment, String>) {
+        let Some(form) = self.composer.as_mut() else {
+            return;
+        };
+        match result {
+            Ok(file) => {
+                form.add_file(file);
+            }
+            Err(reason) => form.notice = Some(reason),
         }
     }
 

@@ -19,6 +19,8 @@ impl AppView {
             Action::ViewHeaders => self.view_raw(RawPart::Headers),
             Action::ViewSource => self.view_raw(RawPart::Source),
             Action::OpenInBrowser => self.open_in_browser(),
+            Action::NextAttachment => self.step_attachment(true),
+            Action::PreviousAttachment => self.step_attachment(false),
             Action::Extend(direction) if self.focus == Focus::Reader => self.extend_selection(direction, grid),
             Action::Extend(direction) => self.act(direction.plain(), grid),
             Action::Search if self.focus == Focus::Reader && self.reader_content().is_some() => self.start_find(),

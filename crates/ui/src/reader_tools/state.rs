@@ -3,6 +3,7 @@
 
 use model::{MessageId, RawPart};
 
+use super::attachment_state::AttachmentState;
 use super::find::FindState;
 use super::raw_view::RawView;
 use super::selection::TextSelection;
@@ -28,6 +29,9 @@ pub struct ReaderTools {
     /// The address a press on the text was on: a release in the same place
     /// opens it, and a drag from it selects instead.
     pub pending_link: Option<String>,
+    /// The attachments of the open message: the cursor, the downloads asked
+    /// for and the files that arrived.
+    pub attachments: AttachmentState,
 }
 
 impl ReaderTools {

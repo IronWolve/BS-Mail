@@ -23,6 +23,7 @@ use crate::state_file::State;
 use crate::ticker::Ticker;
 
 mod addresses;
+mod attachments;
 mod links;
 mod pages;
 mod remember;
@@ -67,6 +68,8 @@ pub struct Screen {
     pages: Option<HtmlStore>,
     /// How many remote items the page being opened has left out of it.
     page_removed: Option<u32>,
+    /// Where attachments are saved and how the files the user names are read.
+    attachments: attachments::Attachments,
 }
 
 impl Screen {
@@ -97,6 +100,7 @@ impl Screen {
             addresses: None,
             pages: None,
             page_removed: None,
+            attachments: attachments::Attachments::default(),
         }
     }
 

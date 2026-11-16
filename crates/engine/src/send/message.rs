@@ -12,13 +12,15 @@
 
 use std::fmt;
 
-use model::{Address, OutgoingMessage};
+use model::{Address, OutgoingAttachment, OutgoingMessage};
 
 use super::check::{Mailbox, Refusal, check_mailbox, check_subject};
+use super::check_files::check_files;
 use super::date::rfc5322;
 use super::flowed::flow;
 use super::header_block::{HeaderParts, bcc_line, header_block};
 use super::limits::{MAX_MESSAGE_BYTES, MAX_RECIPIENTS};
+use super::multipart;
 use super::random::random_hex;
 use super::reply_ids::ReplyIds;
 use super::transfer::{Encoding, choose, encode};
@@ -40,6 +42,7 @@ pub struct Checked {
     envelope: Vec<String>,
     subject: String,
     body: String,
+    files: Vec<OutgoingAttachment>,
 }
 
 /// A message with all its headers, waiting for the server's capabilities to
@@ -52,6 +55,9 @@ pub struct Prepared {
     bcc_line: String,
     message_id: String,
     flowed: String,
+    files: Vec<OutgoingAttachment>,
+    /// The line between the parts of a message with files; empty without.
+    boundary: String,
 }
 
 /// The bytes to send, and whether they are 8 bit text. Its debug output shows
@@ -63,13 +69,13 @@ pub struct Rendered {
 
 impl fmt::Debug for Checked {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Checked({} recipients, {} text bytes)", self.envelope.len(), self.body.len())
+        write!(f, "Checked({} recipients, {} text bytes, {} files)", self.envelope.len(), self.body.len(), self.files.len())
     }
 }
 
 impl fmt::Debug for Prepared {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Prepared({} recipients, {} text bytes)", self.recipients.len(), self.flowed.len())
+        write!(f, "Prepared({} recipients, {} text bytes, {} files)", self.recipients.len(), self.flowed.len(), self.files.len())
     }
 }
 
@@ -89,7 +95,9 @@ pub fn check(sender: Sender<'_>, message: &OutgoingMessage) -> Result<Checked, R
     let envelope = envelope_of(&[&to, &cc, &bcc])?;
     check_subject(&message.subject)?;
     check_body(&message.body)?;
-    Ok(Checked { from, to, cc, bcc, envelope, subject: message.subject.clone(), body: message.body.clone() })
+    check_files(&message.attachments, message.body.len())?;
+    let files = message.attachments.clone();
+    Ok(Checked { from, to, cc, bcc, envelope, subject: message.subject.clone(), body: message.body.clone(), files })
 }
 
 fn check_all(role: &str, people: &[Address]) -> Result<Vec<Mailbox>, Refusal> {
@@ -172,6 +180,7 @@ impl Checked {
             message_id: &message_id,
             reply,
         });
+        let boundary = if self.files.is_empty() { String::new() } else { format!("=_{}", random_hex::<16>().map_err(Refusal::new)?) };
         Ok(Prepared {
             sender: self.from.address,
             recipients: self.envelope,
@@ -179,6 +188,8 @@ impl Checked {
             bcc_line: bcc_line(&self.bcc),
             message_id,
             flowed: flow(&self.body),
+            files: self.files,
+            boundary,
         })
     }
 
@@ -190,6 +201,9 @@ impl Checked {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         let people = [&self.to, &self.cc, &self.bcc];
         (&self.from.address, &self.subject, &self.body).hash(&mut hasher);
+        for file in &self.files {
+            (&file.name, &file.content_type, file.data.len(), file.data.as_slice()).hash(&mut hasher);
+        }
         for (role, list) in people.iter().enumerate() {
             for who in list.iter() {
                 (role, &who.name, &who.address).hash(&mut hasher);
@@ -236,12 +250,17 @@ impl Prepared {
     pub fn render(&self, eight_bit_ok: bool) -> Result<Rendered, Refusal> {
         let encoding = choose(&self.flowed, eight_bit_ok);
         let body = encode(&self.flowed, encoding);
+        let text_headers =
+            format!("Content-Type: text/plain; charset=utf-8; format=flowed\r\nContent-Transfer-Encoding: {}\r\n\r\n", encoding.name());
         let mut bytes = Vec::with_capacity(self.headers.len() + body.len() + 160);
         bytes.extend_from_slice(self.headers.as_bytes());
-        bytes.extend_from_slice(b"MIME-Version: 1.0\r\n");
-        bytes.extend_from_slice(b"Content-Type: text/plain; charset=utf-8; format=flowed\r\n");
-        bytes.extend_from_slice(format!("Content-Transfer-Encoding: {}\r\n\r\n", encoding.name()).as_bytes());
-        bytes.extend_from_slice(&body);
+        if self.files.is_empty() {
+            bytes.extend_from_slice(b"MIME-Version: 1.0\r\n");
+            bytes.extend_from_slice(text_headers.as_bytes());
+            bytes.extend_from_slice(&body);
+        } else {
+            bytes.extend(multipart::assemble(&self.boundary, &text_headers, &body, &self.files));
+        }
         if bytes.len() > MAX_MESSAGE_BYTES {
             return Err(too_big());
         }

@@ -46,6 +46,7 @@ impl AppView {
             return match ask {
                 Ask::Name(_) => self.name_pointer_shape(col, row, grid),
                 Ask::Tag(_) => hand_if(self.tag_row_under(col, row, grid)),
+                Ask::Path(prompt) => prompt.pointer_shape(Rect::new(0, 0, grid.0, grid.1), (col, row)),
                 Ask::Confirm(prompt) => {
                     let rects = prompt_rects_for(Rect::new(0, 0, grid.0, grid.1), prompt.yes, prompt.no);
                     hand_if(rects.and_then(|rects| prompt_button_at(&rects, col, row)).is_some())
@@ -79,7 +80,9 @@ impl AppView {
         match self.hit(layout, col, row) {
             Hit::Message(_) | Hit::Folder(_) | Hit::KeyBar(_) => true,
             Hit::Account(_) => self.account_row_switches(layout, col, row),
-            Hit::Reader => self.link_under(layout, col, row).is_some() || self.over_find_word(layout, col, row),
+            Hit::Reader => {
+                self.link_under(layout, col, row).is_some() || self.over_find_word(layout, col, row) || self.attachment_at(layout, col, row).is_some()
+            }
             Hit::Nothing => self.footer_span_at(layout, col, row).is_some(),
             Hit::Sidebar | Hit::ListChrome => false,
         }

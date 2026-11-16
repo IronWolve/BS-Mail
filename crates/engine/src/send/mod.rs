@@ -3,18 +3,24 @@
 //! modules.
 
 pub(crate) mod base64;
+mod attachment_header;
 mod check;
+mod check_files;
 mod date;
 mod flowed;
 mod header_block;
 mod idn;
 mod limits;
 mod message;
+mod multipart;
 pub(crate) mod random;
 mod reply_ids;
 mod smtp;
 mod transfer;
 mod word;
+
+#[cfg(test)]
+pub(crate) use transfer::quoted_printable as quoted_printable_for_tests;
 
 pub use date::now_unix;
 pub use message::{Checked, Prepared, Sender, check};

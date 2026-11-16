@@ -3,6 +3,9 @@
 
 pub mod address_book;
 pub mod address_list;
+pub(crate) mod attach_input;
+pub mod attach_line;
+pub mod attachments;
 pub mod buttons;
 pub mod cursor_moves;
 pub mod draw;
@@ -25,6 +28,7 @@ pub mod wrap;
 mod wrap_cache;
 
 pub use address_book::AddressBook;
+pub use attachments::AttachAsk;
 pub use editor_buffer::{EditorBuffer, Pos};
 pub use form::{ComposeForm, Field, Progress};
 pub use mailto::{MailtoDraft, MailtoError, looks_like_address, parse_mailto};

@@ -4,6 +4,12 @@
 /// The most a whole message may weigh once built, in bytes (25 MB).
 pub const MAX_MESSAGE_BYTES: usize = 25 * 1024 * 1024;
 
+/// The most files one message takes.
+pub const MAX_FILES: usize = 100;
+
+/// The longest file name, in characters.
+pub const MAX_FILE_NAME_CHARS: usize = 200;
+
 /// The most recipients (To, Cc and Bcc together, each address once).
 pub const MAX_RECIPIENTS: usize = 100;
 
@@ -15,3 +21,6 @@ pub const MAX_NAME_CHARS: usize = 200;
 
 /// The longest mail address, in bytes (RFC 5321 path limit).
 pub const MAX_ADDRESS_BYTES: usize = 254;
+
+#[cfg(test)]
+include!("limits.tests.rs");

@@ -85,6 +85,13 @@ impl BodyText {
         self.body.rows.get(row).map_or(0, |pieces| pieces.iter().fold(0u16, |sum, piece| sum.saturating_add(cells(&piece.text))))
     }
 
+    /// The line (not the wrapped row) that `row` is a part of, counted from the
+    /// first line of the body view: lines that were wrapped take several rows.
+    pub fn line_of_row(&self, row: usize) -> usize {
+        let starts = (0..=row.min(self.len().saturating_sub(1))).filter(|at| !self.continues(*at)).count();
+        starts.saturating_sub(1)
+    }
+
     /// Whether a row carries on the line before it, which was wrapped.
     fn continues(&self, row: usize) -> bool {
         self.body.continued.get(row).copied().unwrap_or(false)

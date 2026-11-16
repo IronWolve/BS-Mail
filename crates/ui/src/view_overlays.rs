@@ -14,6 +14,7 @@ use crate::composer::draw::draw_composer;
 use crate::delete_prompt::draw::draw_delete_prompt;
 use crate::layout::Layout;
 use crate::move_picker::draw::draw_picker;
+use crate::path_entry::draw_path_prompt;
 use crate::search::draw::draw_search_bar;
 use crate::view_state::OverlayKind;
 use crate::widgets::{DrawContext, draw_help, draw_menu};
@@ -35,6 +36,7 @@ impl AppView {
             Some(Ask::Name(prompt)) => draw_name_prompt(frame, ctx, area, prompt),
             Some(Ask::Confirm(prompt)) => draw_confirm(frame, ctx, area, prompt),
             Some(Ask::Tag(picker)) => draw_tag_picker(frame, ctx, area, picker),
+            Some(Ask::Path(prompt)) => draw_path_prompt(frame, ctx, area, prompt),
             None => {}
         }
         if let Some(bar) = &self.search_bar {

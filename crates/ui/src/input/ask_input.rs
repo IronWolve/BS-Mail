@@ -12,7 +12,7 @@ use crate::ask::Ask;
 impl AppView {
     /// Whether the open box has a line to type in, so a letter is for the box.
     pub(crate) fn ask_takes_text(&self) -> bool {
-        matches!(self.ask, Some(Ask::Name(_) | Ask::Tag(_)))
+        matches!(self.ask, Some(Ask::Name(_) | Ask::Tag(_) | Ask::Path(_)))
     }
 
     /// Input while a box is open. Returns whether the screen changed.
@@ -32,6 +32,7 @@ impl AppView {
             Some(Ask::Name(_)) => self.name_input(event, grid),
             Some(Ask::Confirm(_)) => self.confirm_input(event, grid),
             Some(Ask::Tag(_)) => self.tag_input(event, grid),
+            Some(Ask::Path(_)) => self.path_ask_input(event, grid),
             None => false,
         }
     }

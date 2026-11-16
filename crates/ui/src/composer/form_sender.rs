@@ -85,12 +85,18 @@ impl ComposeForm {
     }
 
     /// The field after or before the focused one, leaving out the From line
-    /// when there is no other account to choose.
+    /// when there is no other account to choose and the Attach row while there
+    /// is nothing on it.
     pub fn step_focus(&mut self, forward: bool) {
         let mut field = self.focus;
         loop {
             field = if forward { field.next() } else { field.previous() };
-            if field != Field::From || self.can_choose_sender() {
+            let usable = match field {
+                Field::From => self.can_choose_sender(),
+                Field::Attach => self.can_focus_attach(),
+                _ => true,
+            };
+            if usable {
                 break;
             }
         }

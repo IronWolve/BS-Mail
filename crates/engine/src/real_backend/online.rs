@@ -9,6 +9,7 @@ use model::{Command, ConnectionState, Event};
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::time::{Instant, MissedTickBehavior, interval_at};
 
+use super::attachment_fetch::OPERATION;
 use super::lifecycle::connection;
 use super::raw_views::operation_of;
 use super::unsupported::change_operation;
@@ -142,6 +143,10 @@ impl Worker {
             Command::PrepareHtml { message } => {
                 let page = self.prepare_html(session, message).await;
                 self.settle("open in browser", page)
+            }
+            Command::FetchAttachment { message, attachment } => {
+                let file = self.fetch_attachment(session, message, attachment).await;
+                self.settle(OPERATION, file)
             }
             Command::SyncNow { account } => {
                 let synced = self.sync_now(session, &account).await;

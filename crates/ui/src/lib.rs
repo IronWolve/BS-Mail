@@ -14,6 +14,7 @@ pub mod layout;
 pub mod delete_prompt;
 pub mod move_picker;
 pub mod options;
+pub mod path_entry;
 pub mod reader_tools;
 pub mod search;
 pub mod setup;
@@ -30,7 +31,7 @@ pub use app_identity::AppIdentity;
 pub use app_view::AppView;
 pub use composer::AddressBook;
 pub use options::{AccountSummary, OptionsAction, OptionsPaths};
-pub use reader_tools::HtmlPage;
+pub use reader_tools::{AttachmentFile, HtmlPage, Want};
 pub use setup::{AccountPrefill, SavedClient};
 
 #[cfg(test)]

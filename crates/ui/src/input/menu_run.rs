@@ -9,6 +9,7 @@ use super::menu_tables::MenuAction;
 use super::menus::MenuTarget;
 use crate::app_view::AppView;
 use crate::input::compose::ComposeKind;
+use crate::reader_tools::Want;
 use crate::view_state::Focus;
 use crate::OptionsAction;
 
@@ -59,6 +60,10 @@ impl AppView {
             (MenuAction::SyncNow, MenuTarget::Account(id)) => self.sync_account(id),
             (MenuAction::SyncNow, _) => self.refresh(),
             (MenuAction::EditAccount, MenuTarget::Account(id)) => self.queue_options_action(OptionsAction::EditAccount(id.0)),
+            (MenuAction::SaveAttachment, MenuTarget::Attachment(at)) => self.save_attachment(Some(at), Want::Save),
+            (MenuAction::SaveAttachmentOfMessage, _) => self.save_attachment(None, Want::Save),
+            (MenuAction::SaveAttachmentAs, MenuTarget::Attachment(at)) => self.ask_save_as(Some(at)),
+            (MenuAction::OpenAttachment, MenuTarget::Attachment(at)) => self.save_attachment(Some(at), Want::Open),
             (MenuAction::OpenLink, MenuTarget::Link(address)) => self.open_link(address),
             (MenuAction::CopyLink, MenuTarget::Link(address)) => self.put_on_clipboard(Some("the link"), address),
             _ => {}

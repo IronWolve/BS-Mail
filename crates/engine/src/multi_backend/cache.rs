@@ -32,6 +32,7 @@ impl MemberCache {
             | Event::BodyReady { .. }
             | Event::RawText { .. }
             | Event::HtmlPage { .. }
+            | Event::AttachmentData { .. }
             | Event::FlagsChanged { .. }
             | Event::TagsChanged { .. }
             | Event::SearchResults { .. }

@@ -3,19 +3,21 @@
 
 use surface::{CursorRequest, CursorShape, Frame, Modifier, Rect};
 
+use super::attach_line::draw_attach;
 use super::buttons::{ButtonRects, button_rects, draw_buttons};
 use super::editor_buffer::{EditorBuffer, Pos};
 use super::form::{ComposeForm, Field, Progress};
 use super::graphemes::{cells_between, count, list, width};
 use super::input::Pane;
 use super::popup::{draw_popup, open_popup};
+use crate::path_entry::draw_path_prompt;
 use crate::theme::roles;
 use crate::widgets::{DrawContext, fill_cells, put_text};
 
 /// Cells the field labels take, including the gap before the text.
 pub(super) const LABEL_CELLS: u16 = 10;
-/// Rows above the body: title, from, four fields and the rule.
-const HEADER_ROWS: u16 = 7;
+/// Rows above the body: title, from, four fields, the attachments and the rule.
+const HEADER_ROWS: u16 = 8;
 /// The last row holds the notice, so the body needs at least this much more.
 const MIN_BODY_ROWS: u16 = 3;
 /// What the From line says while it has focus and more than one account can
@@ -29,6 +31,8 @@ pub struct ComposerRects {
     pub from: Rect,
     /// To, Cc, Bcc and Subject, in order.
     pub fields: [Rect; 4],
+    /// The Attach row, whole: its label, the chips and the buttons.
+    pub attach: Rect,
     pub rule: Rect,
     pub body: Rect,
     pub notice: Rect,
@@ -47,7 +51,8 @@ pub fn layout(main: Rect) -> Option<ComposerRects> {
         title: row(0),
         from: row(1),
         fields: [field(2), field(3), field(4), field(5)],
-        rule: row(6),
+        attach: row(6),
+        rule: row(7),
         body: Rect::new(text.x, text.y + HEADER_ROWS, text.width, main.height - HEADER_ROWS - 1),
         notice: row(main.height - 1),
     })
@@ -76,6 +81,7 @@ pub fn draw_composer(frame: &mut Frame, ctx: &DrawContext<'_>, main: Rect, form:
     for (rect, field) in rects.fields.iter().zip([Field::To, Field::Cc, Field::Bcc, Field::Subject]) {
         draw_field(frame, ctx, *rect, field, form);
     }
+    draw_attach(frame, ctx, rects.attach, form);
     draw_rule(frame, ctx, rects.rule);
     draw_body(frame, ctx, rects.body, form);
     draw_notice(frame, ctx, rects.notice, form);
@@ -84,6 +90,9 @@ pub fn draw_composer(frame: &mut Frame, ctx: &DrawContext<'_>, main: Rect, form:
     }
     if let Some(open) = open_popup(form, &rects, main) {
         draw_popup(frame, ctx, &open);
+    }
+    if let Some(prompt) = &form.path {
+        draw_path_prompt(frame, ctx, main, prompt);
     }
 }
 
@@ -168,10 +177,12 @@ fn draw_body(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, form: &Compos
 }
 
 fn draw_notice(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, form: &ComposeForm) {
-    let (text, style) = match (&form.notice, form.progress) {
-        (Some(notice), _) => (notice.as_str(), ctx.fg(roles::FOOTER_ERROR)),
-        (None, Progress::Sending) => ("Sending\u{2026}", ctx.fg(roles::FOOTER_TEXT)),
-        (None, Progress::Writing) => return,
+    let original = form.original_note();
+    let (text, style) = match (&form.notice, form.progress, &original) {
+        (Some(notice), _, _) => (notice.as_str(), ctx.fg(roles::FOOTER_ERROR)),
+        (None, Progress::Sending, _) => ("Sending\u{2026}", ctx.fg(roles::FOOTER_TEXT)),
+        (None, Progress::Writing, Some(note)) => (note.as_str(), ctx.fg(roles::FOOTER_TEXT)),
+        (None, Progress::Writing, None) => return,
     };
     put_text(frame, rect, rect.x, rect.y, text, style);
 }
@@ -193,7 +204,7 @@ fn is_selected(selection: Option<(Pos, Pos)>, at: Pos) -> bool {
 
 fn cursor_request(rects: &ComposerRects, form: &ComposeForm) -> Option<CursorRequest> {
     let (col, row) = match form.focus {
-        Field::From => return None,
+        Field::From | Field::Attach => return None,
         Field::Body => {
             let (visual_row, cell) = form.body.cursor_cell(usize::from(rects.body.width));
             let row = visual_row.checked_sub(form.body_scroll)?;
@@ -222,7 +233,7 @@ fn field_index(field: Field) -> usize {
         Field::To => 0,
         Field::Cc => 1,
         Field::Bcc => 2,
-        Field::Subject | Field::Body | Field::From => 3,
+        Field::Subject | Field::Body | Field::From | Field::Attach => 3,
     }
 }
 

@@ -35,7 +35,8 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
         .with_settings(scene.settings.clone())
         .with_link_opener(opener_for(data_dir.as_deref()));
     if let (Some(dir), true) = (&data_dir, scene.live.is_some()) {
-        screen = screen.keep_addresses_in(dir.clone()).keep_pages_in(dir);
+        let secrets = options.account.iter().cloned().collect();
+        screen = screen.keep_addresses_in(dir.clone()).keep_pages_in(dir).keep_attachments_in(dir, secrets);
     }
     if let (Some(dir), Some(state)) = (data_dir, remembered) {
         screen = screen.remember_layout_in(dir, state);

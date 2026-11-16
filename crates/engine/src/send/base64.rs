@@ -21,5 +21,16 @@ pub fn encode(data: &[u8]) -> String {
     out
 }
 
+/// `data` as base64 in lines of 76 characters, each ended with CRLF (the way a
+/// mail attachment is written). Nothing for no data.
+pub fn encode_wrapped(data: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(data.len().div_ceil(3) * 4 + data.len().div_ceil(57) * 2);
+    for line in data.chunks(57) {
+        out.extend_from_slice(encode(line).as_bytes());
+        out.extend_from_slice(b"\r\n");
+    }
+    out
+}
+
 #[cfg(test)]
 include!("base64.tests.rs");

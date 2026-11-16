@@ -80,7 +80,7 @@ pub fn draw_buttons(frame: &mut Frame, ctx: &DrawContext<'_>, title: Rect, rects
     draw_one(frame, ctx, title, rects.cancel, (CANCEL_KEY, CANCEL_LABEL), rects.labels, false);
 }
 
-fn draw_one(frame: &mut Frame, ctx: &DrawContext<'_>, clip: Rect, rect: Rect, (key, label): (&str, &str), labels: bool, dim: bool) {
+pub(super) fn draw_one(frame: &mut Frame, ctx: &DrawContext<'_>, clip: Rect, rect: Rect, (key, label): (&str, &str), labels: bool, dim: bool) {
     let cap_cells = cells(key) + 2;
     let cap_style = if dim { ctx.full(roles::KEYBAR_CAP).add_modifier(surface::Modifier::DIM) } else { ctx.full(roles::KEYBAR_CAP) };
     put_text(frame, clip, rect.x, rect.y, &format!(" {key} "), cap_style);

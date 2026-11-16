@@ -85,6 +85,10 @@ pub(super) fn plan(command: Command, slot_of: SlotOf<'_>) -> Plan {
             Some((slot, message)) => Plan::to(slot, Command::PrepareHtml { message }),
             None => Plan::not_an_id(),
         },
+        Command::FetchAttachment { message, attachment } => match decode_message(message) {
+            Some((slot, message)) => Plan::to(slot, Command::FetchAttachment { message, attachment }),
+            None => Plan::not_an_id(),
+        },
         Command::SetFlags { messages, change } => {
             split_by_slot(messages, |messages| Command::SetFlags { messages, change })
         }
@@ -191,6 +195,7 @@ fn plan_send(message: OutgoingMessage, slot_of: SlotOf<'_>) -> Plan {
         subject,
         body,
         in_reply_to,
+        attachments,
     } = message;
     let in_reply_to = in_reply_to
         .and_then(decode_message)
@@ -204,6 +209,7 @@ fn plan_send(message: OutgoingMessage, slot_of: SlotOf<'_>) -> Plan {
         subject,
         body,
         in_reply_to,
+        attachments,
     };
     Plan::to(slot, Command::Send { message })
 }

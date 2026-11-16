@@ -1,13 +1,15 @@
 //! The message being written: its fields, which one has focus, and the
 //! message they make.
 
-use model::{AccountId, Address, MessageId, OutgoingMessage};
+use model::{AccountId, Address, MessageId, OutgoingAttachment, OutgoingMessage};
 
 use super::address_list::{format, parse};
+use super::attachments::AttachAsk;
 use super::editor_buffer::EditorBuffer;
 use super::reply::Draft;
 use super::sender::Sender;
 use super::suggest::Suggestions;
+use crate::path_entry::PathPrompt;
 
 /// The fields, in the order Tab visits them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,11 +21,14 @@ pub enum Field {
     Cc,
     Bcc,
     Subject,
+    /// The files attached: a row to choose among, not text. Tab stops on it
+    /// only once there is a file on it.
+    Attach,
     Body,
 }
 
 impl Field {
-    pub const ALL: [Field; 6] = [Field::From, Field::To, Field::Cc, Field::Bcc, Field::Subject, Field::Body];
+    pub const ALL: [Field; 7] = [Field::From, Field::To, Field::Cc, Field::Bcc, Field::Subject, Field::Attach, Field::Body];
 
     pub fn next(self) -> Self {
         Self::ALL[(self.index() + 1) % Self::ALL.len()]
@@ -44,6 +49,7 @@ impl Field {
             Self::Cc => "Cc:",
             Self::Bcc => "Bcc:",
             Self::Subject => "Subject:",
+            Self::Attach => "Attach:",
             Self::Body => "",
         }
     }
@@ -77,6 +83,8 @@ pub struct ComposeForm {
     pub from_menu: Option<usize>,
     /// The From line as a buffer, so every field has one; it is never edited.
     pub(super) from_line: EditorBuffer,
+    /// The Attach row as a buffer, so every field has one; it is never edited.
+    pub(super) attach_line: EditorBuffer,
     pub to: EditorBuffer,
     pub cc: EditorBuffer,
     pub bcc: EditorBuffer,
@@ -98,6 +106,22 @@ pub struct ComposeForm {
     pub close_armed: bool,
     /// The first screen line of the body shown.
     pub body_scroll: usize,
+    /// The files attached, and for each whether it came from the message being
+    /// forwarded.
+    pub(super) files: Vec<OutgoingAttachment>,
+    pub(super) forwarded: Vec<bool>,
+    /// The file the Attach row's cursor is on.
+    pub attach_cursor: Option<usize>,
+    /// The original's attachments still being fetched, by name.
+    pub(super) fetching: Vec<String>,
+    /// The original's attachments that could not be attached, each with why.
+    pub(super) missing: Vec<String>,
+    /// Send was pressed with some missing: once more sends without them.
+    pub(super) missing_armed: bool,
+    /// The path box, while it is open.
+    pub path: Option<PathPrompt>,
+    /// Paths accepted in the path box, waiting for the program to read them.
+    pub(super) attach_asks: Vec<AttachAsk>,
     /// The matches for the address being typed, while there are any.
     pub suggest: Option<Suggestions>,
     /// The field and text for which the user closed the matches; they stay
@@ -136,6 +160,7 @@ impl ComposeForm {
             sender: 0,
             from_menu: None,
             from_line: EditorBuffer::single_line(&from),
+            attach_line: EditorBuffer::single_line(""),
             from,
             to: EditorBuffer::single_line(&format(&draft.to)),
             cc: EditorBuffer::single_line(&format(&draft.cc)),
@@ -151,6 +176,14 @@ impl ComposeForm {
             discard_armed: false,
             close_armed: false,
             body_scroll: 0,
+            files: Vec::new(),
+            forwarded: Vec::new(),
+            attach_cursor: None,
+            fetching: Vec::new(),
+            missing: Vec::new(),
+            missing_armed: false,
+            path: None,
+            attach_asks: Vec::new(),
             suggest: None,
             suggest_off: None,
             drag: None,
@@ -174,6 +207,7 @@ impl ComposeForm {
     pub fn focused(&mut self) -> &mut EditorBuffer {
         match self.focus {
             Field::From => &mut self.from_line,
+            Field::Attach => &mut self.attach_line,
             Field::To => &mut self.to,
             Field::Cc => &mut self.cc,
             Field::Bcc => &mut self.bcc,
@@ -185,6 +219,7 @@ impl ComposeForm {
     pub fn buffer(&self, field: Field) -> &EditorBuffer {
         match field {
             Field::From => &self.from_line,
+            Field::Attach => &self.attach_line,
             Field::To => &self.to,
             Field::Cc => &self.cc,
             Field::Bcc => &self.bcc,
@@ -194,9 +229,11 @@ impl ComposeForm {
     }
 
     pub(super) fn fingerprint(&self) -> String {
+        let attached: Vec<&str> = self.files.iter().zip(&self.forwarded).filter(|(_, from_original)| !**from_original).map(|(file, _)| file.name.as_str()).collect();
         [&self.to, &self.cc, &self.bcc, &self.subject, &self.body]
             .iter()
             .map(|buffer| buffer.text())
+            .chain(std::iter::once(attached.join("\u{1e}")))
             .collect::<Vec<_>>()
             .join("\u{1f}")
     }
@@ -241,6 +278,7 @@ impl ComposeForm {
             subject: self.subject.text(),
             body: self.body.text(),
             in_reply_to: self.in_reply_to,
+            attachments: self.files.clone(),
         })
     }
 }

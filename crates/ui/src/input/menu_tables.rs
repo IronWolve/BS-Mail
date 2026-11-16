@@ -40,6 +40,12 @@ pub enum MenuAction {
     EditAccount,
     OpenLink,
     CopyLink,
+    /// Save an attachment of the open message: the one the cursor is on, or
+    /// the first (an entry of the message and reader menus).
+    SaveAttachmentOfMessage,
+    SaveAttachment,
+    SaveAttachmentAs,
+    OpenAttachment,
 }
 
 /// Which menu: what was pointed at.
@@ -50,6 +56,7 @@ pub enum MenuKind {
     Folder,
     Account,
     Link,
+    Attachment,
 }
 
 /// One row of a table: what it does, how it reads and its letter.
@@ -88,6 +95,7 @@ const MESSAGE_ROWS: &[Row] = &[
     row(ViewHeaders, "View headers", 'h'),
     row(ViewSource, "View source", 'v'),
     row(OpenInBrowser, "Open in browser", 'w'),
+    row(SaveAttachmentOfMessage, "Save attachment", 'n'),
 ];
 
 const FOLDER_ROWS: &[Row] = &[
@@ -105,6 +113,8 @@ const ACCOUNT_ROWS: &[Row] = &[row(EditAccount, "Edit account", 'e'), row(SyncNo
 
 const LINK_ROWS: &[Row] = &[row(OpenLink, "Open", 'o'), row(CopyLink, "Copy link", 'c')];
 
+const ATTACHMENT_ROWS: &[Row] = &[row(SaveAttachment, "Save", 's'), row(SaveAttachmentAs, "Save as...", 'a'), row(OpenAttachment, "Open", 'o')];
+
 /// The table of a menu.
 pub fn rows(kind: MenuKind) -> &'static [Row] {
     match kind {
@@ -112,6 +122,7 @@ pub fn rows(kind: MenuKind) -> &'static [Row] {
         MenuKind::Folder => FOLDER_ROWS,
         MenuKind::Account => ACCOUNT_ROWS,
         MenuKind::Link => LINK_ROWS,
+        MenuKind::Attachment => ATTACHMENT_ROWS,
     }
 }
 
@@ -129,6 +140,9 @@ pub struct MenuFacts {
     pub folder: Option<FolderRole>,
     /// How many messages are marked; the menu says so in its title.
     pub marked: usize,
+    /// How many attachments the open message has; the entry that saves one is
+    /// in the menu only when there is any.
+    pub attachments: usize,
 }
 
 /// The words of a row for `facts`.
@@ -148,6 +162,9 @@ fn label(row: &Row, facts: &MenuFacts) -> &'static str {
 /// top-level folder; the special folders are not renamed or deleted; only the
 /// Trash and Spam are emptied.
 fn applies(row: &Row, facts: &MenuFacts) -> bool {
+    if row.action == SaveAttachmentOfMessage && facts.attachments == 0 {
+        return false;
+    }
     let Some(role) = facts.folder else {
         return true;
     };
