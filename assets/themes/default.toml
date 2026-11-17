@@ -30,6 +30,9 @@ orange     = "#f7b52a"   # alert subject text
 red        = "#ff5a66"   # warning triangle, alert tag, Alerts and Spam icons
 magenta    = "#e07fe6"   # tags, Drafts icon, branch-name tokens
 on_accent  = "#04121c"   # dark text on cyan and keycap blocks
+link_hover   = "#0f4a50"   # a link under the pointer: a dark teal band behind cyan text (6.5:1)
+link_pressed = "#1a6f78"   # the button is down on it: the same teal, stronger (5.5:1 with `text`)
+link_focus   = "#5a2468"   # the link the keys are on: a plum, another hue than the pointer's (10.4:1 with `text`)
 
 [roles]
 # Window and frame lines.
@@ -135,9 +138,9 @@ on_accent  = "#04121c"   # dark text on cyan and keycap blocks
 "body.token"             = { fg = "cyan" }
 "body.path"              = { fg = "magenta" }
 "body.link"              = { fg = "cyan", underline = true }
-"body.link.hover"        = { fg = "on_accent", bg = "cyan", bold = true, underline = true }   # a link under the pointer: a cyan block, every piece of it
-"body.link.pressed"      = { fg = "on_accent", bg = "ice", bold = true, underline = true }    # the button is down on it, no selection yet
-"body.link.focus"        = { fg = "on_accent", bg = "cyan", bold = true, underline = true }   # not drawn yet: the link the keys are on
+"body.link.hover"        = { fg = "cyan", bg = "link_hover", underline = true }               # a link under the pointer: a teal band, every piece of it; not bold
+"body.link.pressed"      = { fg = "text", bg = "link_pressed", bold = true, underline = true } # the button is down on it, no selection yet
+"body.link.focus"        = { fg = "text", bg = "link_focus", bold = true, underline = true }   # the link the keys are on (l and L), every piece of it
 "body.signature"         = { fg = "green" }
 "reader.selection"       = { fg = "text", bg = "blue_sel" }
 "reader.found"           = { fg = "on_accent", bg = "yellow" }
@@ -183,3 +186,6 @@ orange    = "yellow"
 red       = "bright-red"
 magenta   = "bright-magenta"
 on_accent = "black"
+link_hover   = "bright-black"
+link_pressed = "blue"
+link_focus   = "magenta"

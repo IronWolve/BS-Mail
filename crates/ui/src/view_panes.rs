@@ -6,7 +6,7 @@
 use surface::Frame;
 
 use crate::app_view::AppView;
-use crate::input::link_light::LitLink;
+use crate::input::link_light::LitLinks;
 use crate::layout::{ListRegion, ReaderRegion};
 use crate::options::empty_hint::draw_no_account_hint;
 use crate::view_state::ListPage;
@@ -75,7 +75,7 @@ impl AppView {
         })
     }
 
-    pub(crate) fn draw_reader(&self, frame: &mut Frame, ctx: &DrawContext<'_>, reader: &ReaderRegion, lit: Option<&LitLink>) {
+    pub(crate) fn draw_reader(&self, frame: &mut Frame, ctx: &DrawContext<'_>, reader: &ReaderRegion, lit: &LitLinks) {
         let title = self.shown_page().and_then(|page| self.reader_title_data(page));
         draw_reader_title(frame, ctx, reader.title, title.as_ref());
         draw_reader_headers(frame, ctx, reader.headers, self.selected_envelope());

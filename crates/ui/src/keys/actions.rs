@@ -68,6 +68,8 @@ pub const REBINDABLE: &[Rebindable] = &[
     bind("browser", Action::OpenInBrowser, &[KeySpec::ch('b')]),
     bind("next_attachment", Action::NextAttachment, &[KeySpec::ch('x')]),
     bind("previous_attachment", Action::PreviousAttachment, &[KeySpec::ch('X')]),
+    bind("next_link", Action::NextLink, &[KeySpec::ch('l')]),
+    bind("previous_link", Action::PreviousLink, &[KeySpec::ch('L')]),
     bind("sort", Action::SortNext, &[KeySpec::ch('o')]),
     bind("sort_reverse", Action::SortReverse, &[KeySpec::ch('O')]),
     bind("threads", Action::ToggleThreads, &[KeySpec::ch('T')]),

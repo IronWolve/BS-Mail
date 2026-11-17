@@ -40,6 +40,7 @@ pub mod hover;
 pub mod html_keys;
 pub mod hit;
 pub mod line_edit;
+pub mod link_keys;
 pub mod link_light;
 pub mod links;
 pub mod list_sort;

@@ -1,9 +1,10 @@
-//! The link under the pointer: which one it is, whether the pointer may light
-//! it, and what the footer says about it. The click, the hand pointer and the
-//! light all ask `link_hit_at`, which asks the body's own hit test, so they
-//! agree on which cells are a link. Nothing here is stored but the footer note
-//! that was showing when the pointer came onto a link, so the hint knows which
-//! notes arrived after it.
+//! The link under the pointer and the link the keys are on: which they are,
+//! whether they may be lit, and what the footer says about the one it speaks of.
+//! The click, the hand pointer and the light all ask `link_hit_at`, which asks
+//! the body's own hit test, so they agree on which cells are a link. Nothing
+//! here is stored but the footer note that was showing when the pointer came
+//! onto a link (or the keys onto one), so the hint knows which notes arrived
+//! after it.
 
 use super::hit::Hit;
 use crate::app_view::AppView;
@@ -12,11 +13,36 @@ use crate::reader_tools::Basis;
 use crate::view_facts::ReaderContent;
 use crate::widgets::{BodyView, DrawContext, HighlightRules, LinkHint, LinkHit, LinkState, body_link_hit};
 
-/// The link the pointer lights, as the screen draws it.
+/// A link the reader lights, as the screen draws it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct LitLink {
     pub hit: LinkHit,
     pub state: LinkState,
+}
+
+/// The links lit in one drawing: the one the pointer is on and the one the
+/// keys are on, which may be two links, or one.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct LitLinks {
+    pub pointer: Option<LitLink>,
+    pub keys: Option<LitLink>,
+}
+
+impl LitLinks {
+    /// The links as the drawing wants them. The pointer's goes first, so on a
+    /// link both are on it is the pointer's light that shows.
+    pub(crate) fn lights(&self) -> Vec<(usize, LinkState)> {
+        [&self.pointer, &self.keys].into_iter().flatten().map(|lit| (lit.hit.index, lit.state)).collect()
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.pointer.is_none() && self.keys.is_none()
+    }
+
+    /// The link the footer says where it goes: the pointer's, else the keys'.
+    fn spoken_of(&self) -> Option<&LitLink> {
+        self.pointer.as_ref().or(self.keys.as_ref())
+    }
 }
 
 impl AppView {
@@ -68,10 +94,15 @@ impl AppView {
         self.reading.link_answers.answer(basis, || self.link_hit_in(layout, &content, col, row).map(|hit| hit.index))
     }
 
+    /// The links lit now, for drawing.
+    pub(crate) fn lit_links(&self, layout: &Layout) -> LitLinks {
+        LitLinks { pointer: self.lit_link(layout), keys: self.key_link().filter(|_| !layout.too_small) }
+    }
+
     /// The link the pointer is lighting now, worked out from where the pointer
     /// is, for drawing: never from a kept answer, so what is drawn is what the
     /// body drawn in the same frame holds.
-    pub(crate) fn lit_link(&self, layout: &Layout) -> Option<LitLink> {
+    fn lit_link(&self, layout: &Layout) -> Option<LitLink> {
         let (col, row) = self.memory.hover?;
         if layout.too_small || !self.link_light_allowed() || self.hit(layout, col, row) != Hit::Reader {
             return None;
@@ -88,14 +119,14 @@ impl AppView {
         self.mail.error.as_deref().or(self.mail.setup_problem.as_deref()).or(self.mail.done_text.as_deref()).or(self.config_problem.as_deref())
     }
 
-    /// What the footer says about the lit link, while it is lit. A note that
-    /// came while the pointer rested on the link (the browser is being opened,
-    /// none was found) is what the footer shows, not this: it is the one the
-    /// user must read. This beats an older note, the notice of new mail and
-    /// the usual segments. Worked out at each drawing and kept nowhere, so it
-    /// is gone in the frame the pointer leaves.
-    pub(crate) fn link_hint(&self, lit: Option<&LitLink>) -> Option<LinkHint> {
-        let lit = lit?;
+    /// What the footer says about the lit link, while it is lit: the one the
+    /// pointer is on, else the one the keys are on. A note that came while it
+    /// was lit (the browser is being opened, none was found) is what the footer
+    /// shows, not this: it is the one the user must read. This beats an older
+    /// note, the notice of new mail and the usual segments. Worked out at each
+    /// drawing and kept nowhere, so it is gone in the frame the link goes out.
+    pub(crate) fn link_hint(&self, lit: &LitLinks) -> Option<LinkHint> {
+        let lit = lit.spoken_of()?;
         let newer = self.footer_note().is_some_and(|note| self.memory.hint_note.as_deref() != Some(note));
         (!newer).then(|| LinkHint::for_address(&lit.hit.address))
     }

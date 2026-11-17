@@ -21,6 +21,10 @@ impl AppView {
             Action::OpenInBrowser => self.open_in_browser(),
             Action::NextAttachment => self.step_attachment(true),
             Action::PreviousAttachment => self.step_attachment(false),
+            // The find box owns the reader's keys while it is open.
+            Action::NextLink | Action::PreviousLink if self.find_is_open() => {}
+            Action::NextLink => self.step_link(true, grid),
+            Action::PreviousLink => self.step_link(false, grid),
             Action::Extend(direction) if self.focus == Focus::Reader => self.extend_selection(direction, grid),
             Action::Extend(direction) => self.act(direction.plain(), grid),
             Action::Search if self.focus == Focus::Reader && self.reader_content().is_some() => self.start_find(),

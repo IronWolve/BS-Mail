@@ -89,6 +89,9 @@ impl AppView {
         if self.attachment_mode() && self.attachment_mode_key(key) {
             return true;
         }
+        if self.link_mode() && self.link_mode_key(key) {
+            return true;
+        }
         match self.keys.action(key) {
             Some(action) => {
                 self.act(action, grid);

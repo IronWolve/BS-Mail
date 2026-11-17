@@ -39,6 +39,7 @@ impl AppView {
             return;
         };
         self.reading.attachments.cursor = Some((message, at));
+        self.reading.link_cursor = None;
         self.focus = Focus::Reader;
         self.open_menu(MenuKind::Attachment, MenuTarget::Attachment(at), anchor);
     }

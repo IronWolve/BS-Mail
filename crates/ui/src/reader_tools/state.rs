@@ -6,6 +6,7 @@ use model::{MessageId, RawPart};
 use super::attachment_state::AttachmentState;
 use super::find::FindState;
 use super::link_answers::LinkAnswers;
+use super::link_cursor::LinkCursor;
 use super::raw_view::RawView;
 use super::selection::TextSelection;
 
@@ -35,6 +36,8 @@ pub struct ReaderTools {
     pub attachments: AttachmentState,
     /// Which link the pointer is over, kept between its moves.
     pub link_answers: LinkAnswers,
+    /// The link the keys are on (`l` and `L`), when one is chosen.
+    pub link_cursor: Option<LinkCursor>,
 }
 
 impl ReaderTools {
@@ -47,6 +50,9 @@ impl ReaderTools {
     pub fn forget_other_than(&mut self, selected: Option<MessageId>) {
         if self.raw.as_ref().is_some_and(|raw| Some(raw.message) != selected) {
             self.raw = None;
+        }
+        if self.link_cursor.as_ref().is_some_and(|cursor| !cursor.is_on(selected)) {
+            self.link_cursor = None;
         }
     }
 

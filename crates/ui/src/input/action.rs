@@ -95,6 +95,11 @@ pub enum Action {
     /// Enter saves it, `o` opens it and `a` asks where to save it.
     NextAttachment,
     PreviousAttachment,
+    /// `l`: the keys to the next link of the open message (the first when
+    /// they are on none); `L` the one before. While they are on one, Enter
+    /// opens it as a click does and Esc lets it go.
+    NextLink,
+    PreviousLink,
     /// `o`: sort the list by the next column.
     SortNext,
     /// `O`: reverse the order of the sort.

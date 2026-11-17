@@ -53,8 +53,8 @@ pub use list_header::{column_align, column_label, draw_list_header};
 pub use list_rows::{ListRowsView, column_label_for, draw_list_rows};
 pub use list_title::draw_list_title;
 pub use reader_body::{
-    BodyPos, BodyText, BodyView, Highlights, LinkHit, LinkState, Match, body_link_at, body_link_hit, body_pos_at, body_text,
-    draw_highlights, draw_link_light, draw_reader_body, visual_len,
+    BodyPos, BodyText, BodyView, Highlights, LinkHit, LinkLights, LinkSpan, LinkState, Match, body_link_at, body_link_hit, body_links,
+    body_pos_at, body_text, draw_highlights, draw_link_light, draw_reader_body, visual_len,
 };
 pub use reader_headers::draw_reader_headers;
 pub use reader_title::{ReaderTitleData, draw_reader_title};

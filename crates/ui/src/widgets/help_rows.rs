@@ -76,7 +76,7 @@ pub const HELP_ROWS: &[HelpRow] = &[
     row("{search} (reader)", "find in the message: Enter or n next match, N previous, Esc closes"),
     row("drag  Shift+arrows", "select text; {copy} copies it, or the whole message (the subject in the list); {copy_sender} copies the sender's address"),
     row("{headers}  {source}  {browser}", "show the raw headers, the whole source (Esc brings the message back); {browser} opens its HTML in your browser"),
-    row("{next_attachment}  {previous_attachment}", "attachments: cursor to the next, previous one; then Enter saves it, o opens it, a saves it as"),
+    row("{next_attachment}  {previous_attachment}  {next_link}  {previous_link}", "choose next, previous attachment (Enter saves, o opens, a saves as) or link (Enter opens); Esc leaves"),
     row("{compose}  F2", "write a new message"),
     row("{reply}  {reply_all}  {forward}", "reply, reply to everyone, forward"),
     row("{edit_as_new}", "copy a message as a new one to edit; Enter on a draft goes on writing it"),

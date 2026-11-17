@@ -29,11 +29,21 @@ orange     = "#ffff00"
 red        = "#ffff00"
 magenta    = "#00ffff"
 on_accent  = "#000000"
+link_hover   = "#00ffff"   # the link under the pointer: a cyan block
+link_pressed = "#ffffff"   # the button is down on it: a white block
+link_focus   = "#262626"   # the link the keys are on: bold yellow text on a dark band
 
 [roles]
-# `ice` and `cyan` are the same here, so the pressed link takes a white block
-# (black text on white, 21:1) to differ from the hovered one (black on cyan).
-"body.link.pressed"      = { fg = "on_accent", bg = "text" }
+# The three states of a link are told apart by more than one color. The pointer's
+# are blocks with black text, bold and underlined: hovered on cyan (16.8:1),
+# pressed on white (21:1). The keyboard's is bold yellow text on a dark band
+# (14.1:1), also underlined. `ice` and `cyan` are the same color here and the
+# default theme's teal and plum are no accents of this one, so each state is
+# written out. Nothing else is yellow text on a dark band: the find's matches are
+# black on yellow and the selection is on blue.
+"body.link.hover"        = { fg = "on_accent", bg = "link_hover", bold = true, underline = true }
+"body.link.pressed"      = { fg = "on_accent", bg = "link_pressed", bold = true, underline = true }
+"body.link.focus"        = { fg = "yellow", bg = "link_focus", bold = true, underline = true }
 "footer.error"           = { underline = true }
 "reader.found.current"   = { underline = true }
 "strip.offline"          = { underline = true }
@@ -61,3 +71,6 @@ orange    = "bright-yellow"
 red       = "bright-yellow"
 magenta   = "bright-cyan"
 on_accent = "black"
+link_hover   = "bright-cyan"
+link_pressed = "bright-white"
+link_focus   = "black"

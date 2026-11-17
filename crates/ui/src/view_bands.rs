@@ -5,7 +5,7 @@ use surface::Frame;
 
 use crate::app_view::AppView;
 use crate::format::display_width;
-use crate::input::link_light::LitLink;
+use crate::input::link_light::LitLinks;
 use crate::layout::{Layout, MIN_COLS, MIN_ROWS, SectionKind};
 use crate::theme::roles;
 use crate::view_state::Focus;
@@ -15,7 +15,7 @@ use crate::widgets::{
 };
 
 impl AppView {
-    pub(crate) fn draw_bands(&self, frame: &mut Frame, ctx: &DrawContext<'_>, layout: &Layout, lit: Option<&LitLink>) {
+    pub(crate) fn draw_bands(&self, frame: &mut Frame, ctx: &DrawContext<'_>, layout: &Layout, lit: &LitLinks) {
         let mailbox = self.mailbox_summary();
         if let Some(rect) = layout.banner {
             draw_banner(frame, ctx, rect, &self.identity);

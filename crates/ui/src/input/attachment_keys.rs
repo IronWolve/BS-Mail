@@ -59,6 +59,8 @@ impl AppView {
             (Some(at), false) => (at + count - 1) % count,
         };
         self.reading.attachments.cursor = Some((message, next));
+        // One cursor at a time in the reader: the link's goes.
+        self.reading.link_cursor = None;
         self.focus = Focus::Reader;
         self.scroll.reader = self.scroll.reader.min(next);
         let name = self.reader_attachments().get(next).map(|each| each.name.clone()).unwrap_or_default();

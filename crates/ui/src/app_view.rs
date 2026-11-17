@@ -357,8 +357,8 @@ impl AppView {
             return frame;
         }
         draw_chrome_lines(&mut frame, &ctx, &layout);
-        let lit = self.lit_link(&layout);
-        self.draw_bands(&mut frame, &ctx, &layout, lit.as_ref());
+        let lit = self.lit_links(&layout);
+        self.draw_bands(&mut frame, &ctx, &layout, &lit);
         if let Some(sidebar) = &layout.sidebar {
             self.draw_sidebar(&mut frame, &ctx, sidebar);
         }
@@ -366,7 +366,7 @@ impl AppView {
             self.draw_list(&mut frame, &ctx, list);
         }
         if let Some(reader) = &layout.reader {
-            self.draw_reader(&mut frame, &ctx, reader, lit.as_ref());
+            self.draw_reader(&mut frame, &ctx, reader, &lit);
         }
         self.mark_focus(&mut frame, &layout);
         self.draw_hover(&mut frame, &ctx, &layout);
