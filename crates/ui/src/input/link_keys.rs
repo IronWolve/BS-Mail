@@ -29,14 +29,14 @@ use crate::widgets::{BodyView, DrawContext, HighlightRules, LinkHit, LinkSpan, L
 
 /// The place among `links` (not empty, in the order they come in the body)
 /// that a first press takes, with the cursor on none: the first link that
-/// starts at or after row `first` for `l`, the last that starts before row
-/// `last` (the last row in view) for `L`, and the first or the last link when
-/// there is none that way.
+/// starts at or after row `first` for `l`, the last that starts at or before
+/// row `last` (the last row in view) for `L`, and the first or the last link
+/// when there is none that way.
 fn first_taken(links: &[LinkSpan], forward: bool, (first, last): (usize, usize)) -> usize {
     if forward {
         links.iter().position(|link| link.rows.0 >= first).unwrap_or(0)
     } else {
-        links.iter().rposition(|link| link.rows.0 < last).unwrap_or(links.len() - 1)
+        links.iter().rposition(|link| link.rows.0 <= last).unwrap_or(links.len() - 1)
     }
 }
 
