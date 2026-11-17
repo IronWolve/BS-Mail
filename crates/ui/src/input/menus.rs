@@ -1,6 +1,7 @@
 //! Context menus: a right click on a message row, a folder, an account, a
 //! link or the reader opens a menu at the pointer, and the Menu key and `.`
-//! open the menu of the selected item. The menu is the one widget in
+//! open the menu of the selected item (in the reader, the chosen link's, see
+//! `link_menu`). The menu is the one widget in
 //! `widgets/context_menu`; what each menu holds is in `menu_tables` and what an
 //! entry does is in `menu_run`. While a menu is open it takes every key and
 //! click: Up and Down and Home and End move the highlight, Enter or a click
@@ -126,6 +127,10 @@ impl AppView {
                 let (Some(reader), true) = (layout.reader.as_ref(), self.has_selected_message()) else {
                     return false;
                 };
+                // The link the keys are on has a menu of its own, the right click's.
+                if self.open_link_menu(&layout) {
+                    return true;
+                }
                 let anchor = (reader.body.x + 2, reader.body.y);
                 match self.attachment_cursor() {
                     Some(at) => self.open_attachment_menu(at, anchor),

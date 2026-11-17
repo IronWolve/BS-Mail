@@ -59,7 +59,7 @@ pub const HELP_ROWS: &[HelpRow] = &[
     row("click flag or star cell", "toggle read or star of that message"),
     row("Ctrl click  Shift click", "mark a row; mark every row from the last one clicked"),
     row("drag rows", "drop them on a folder to move them; Esc cancels"),
-    row("right click  {context_menu}  Menu", "the menu of the item under the pointer or selected"),
+    row("right click  {context_menu}  Menu", "the menu of the item under the pointer or selected; on a chosen link: Open, Copy link"),
     row("wheel", "scroll the pane under the pointer"),
     row("Down (last folder)", "go on into the accounts; Enter switches account"),
     row("Space (list)", "mark a message; {read} {star} {delete} {archive} {spam} {move} then act on all marked"),

@@ -1,15 +1,22 @@
 //! The links of the open message from the keyboard. `l` puts the keys on the
-//! first link (the next one, and `L` the one before; past the last comes the
-//! first and before the first the last, as `x` and `X` go round the
-//! attachments), whichever pane had the focus, and the reader then reads two
-//! keys as its own: `Enter` opens the link as a click on it does (a web address
-//! in the browser, a mail address in the composer) and `Esc` lets it go. The
-//! link is drawn as the keyboard's link (see `link_light`) with the footer
-//! saying where it goes, and the pane scrolls by the least that shows all of it.
-//! The cursor belongs to one message; another message opening lets it go.
+//! next link (and `L` on the one before; past the last comes the first and
+//! before the first the last, as `x` and `X` go round the attachments),
+//! whichever pane had the focus, and the reader then reads two keys as its
+//! own: `Enter` opens the link as a click on it does (a web address in the
+//! browser, a mail address in the composer) and `Esc` lets it go. The link is
+//! drawn as the keyboard's link (see `link_light`) with the footer saying
+//! where it goes, and the pane scrolls by the least that shows all of it. The
+//! cursor belongs to one message; another message opening lets it go.
+//!
+//! With the cursor on none, the first press starts where the reader is, so a
+//! reader who has scrolled down does not jump back to the top: `l` takes the
+//! first link that starts at or after the first row in view and `L` the last
+//! link that starts before the last row in view; where there is none that way
+//! they go round, to the first and the last link of the message.
 //!
 //! `y` is the copy key of the reader (the selected text, or the whole message),
-//! so it does not copy the link: that is in the menu a right click on it opens.
+//! so it does not copy the link: the menu keys open the link's menu while it is
+//! chosen (see `link_menu`), and Copy link is in it, as in the right-click menu.
 
 use surface::{KeyEvent, LogicalKey, NamedKey};
 
@@ -20,6 +27,19 @@ use crate::reader_tools::LinkCursor;
 use crate::view_state::Focus;
 use crate::widgets::{BodyView, DrawContext, HighlightRules, LinkHit, LinkSpan, LinkState, body_links};
 
+/// The place among `links` (not empty, in the order they come in the body)
+/// that a first press takes, with the cursor on none: the first link that
+/// starts at or after row `first` for `l`, the last that starts before row
+/// `last` (the last row in view) for `L`, and the first or the last link when
+/// there is none that way.
+fn first_taken(links: &[LinkSpan], forward: bool, (first, last): (usize, usize)) -> usize {
+    if forward {
+        links.iter().position(|link| link.rows.0 >= first).unwrap_or(0)
+    } else {
+        links.iter().rposition(|link| link.rows.0 < last).unwrap_or(links.len() - 1)
+    }
+}
+
 /// What the footer says when the open message has no link to choose.
 const NO_LINKS: &str = "No links";
 /// What it says while the raw headers or source take the place of the message.
@@ -28,7 +48,7 @@ const RAW_VIEW: &str = "No links to choose in the raw view";
 impl AppView {
     /// The links of the message the reader shows, in the order they come in it,
     /// as the reader's body is wrapped in `layout`.
-    fn reader_links(&self, layout: &Layout) -> Vec<LinkSpan> {
+    pub(super) fn reader_links(&self, layout: &Layout) -> Vec<LinkSpan> {
         let (Some(reader), Some(content)) = (layout.reader.as_ref(), self.reader_content()) else {
             return Vec::new();
         };
@@ -83,8 +103,7 @@ impl AppView {
         let count = links.len();
         let on = self.reading.link_cursor.as_ref().filter(|cursor| cursor.is_on(Some(message)));
         let next = match (on.and_then(|cursor| links.iter().position(|link| link.index == cursor.index)), forward) {
-            (None, true) => 0,
-            (None, false) => count - 1,
+            (None, forward) => first_taken(&links, forward, self.rows_in_view(&layout)),
             (Some(at), true) => (at + 1) % count,
             (Some(at), false) => (at + count - 1) % count,
         };
@@ -95,6 +114,14 @@ impl AppView {
         self.show_link(chosen, &layout);
         self.mail.set_note(None);
         self.memory.hint_note = self.footer_note().map(str::to_owned);
+    }
+
+    /// The first and the last wrapped row of the message in view in the reader,
+    /// as the scroll holds it (never past the last page).
+    pub(super) fn rows_in_view(&self, layout: &Layout) -> (usize, usize) {
+        let (lines, height) = self.reader_extent(layout).unwrap_or((0, 0));
+        let first = self.scroll.reader.min(lines.saturating_sub(height));
+        (first, first + height.saturating_sub(1))
     }
 
     /// Scrolls the reader by the least that shows all of `link`; a link taller
