@@ -158,9 +158,7 @@ impl AppView {
             Action::Right => self.focus = deeper(self.focus),
             Action::Left if self.focus == Focus::Sidebar => self.close_folder_or_go_up(),
             Action::Left => self.focus = shallower(self.focus),
-            Action::SpaceDown if self.focus == Focus::Reader => {
-                self.act(Action::PageDown, grid);
-            }
+            Action::SpaceDown if self.focus == Focus::Reader => self.read_on(grid),
             Action::SpaceUp if self.focus == Focus::Reader => self.act(Action::PageUp, grid),
             Action::SpaceDown if self.focus == Focus::List => self.mark_and_move(Action::Down, grid),
             Action::SpaceUp if self.focus == Focus::List => self.mark_and_move(Action::Up, grid),

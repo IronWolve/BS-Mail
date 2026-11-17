@@ -47,7 +47,7 @@ const fn row_needing(keys: &'static str, meaning: &'static str, needs: Needs) ->
 /// shows as it is; the other keys are fixed and written as they are.
 pub const HELP_ROWS: &[HelpRow] = &[
     row("Up Down  {down} {up}", "move in the pane that has focus"),
-    row("PgUp PgDn  Space", "a page at a time (Space in the reader)"),
+    row("PgUp PgDn  Space", "a page at a time; Space in the reader, at the end of a message, shows the next unread one"),
     row("Home End", "first and last"),
     row("Tab  Shift+Tab", "change pane"),
     row("Enter  Esc", "go in a pane, come back out"),
@@ -65,7 +65,7 @@ pub const HELP_ROWS: &[HelpRow] = &[
     row("Space (list)", "mark a message; {read} {star} {delete} {archive} {spam} {move} then act on all marked"),
     row("{mark_all}  {unmark_all}  {invert_marks}", "mark all shown, clear the marks (Esc too), invert the marks"),
     row("{sort}  {sort_reverse}  {threads}", "sort by the next column, reverse the order (or click a column header); threads on or off"),
-    row("{next_message}  {previous_message}  {next_unread}", "next, previous and next unread message (list or reader)"),
+    row("{next_message}  {previous_message}  {next_unread}", "show the next, previous, next unread message; the focus stays in the pane you are in"),
     row("{read}  {star}  {alert}", "mark read or unread; star or unstar; set the alert mark, or clear it when they all have it"),
     row("{tag}", "tag: pick a tag or type a new one; Enter sets it, or clears it when they all have it"),
     row("{delete}  Delete", "delete: asks first; to the Trash, in the Trash for good"),

@@ -22,6 +22,7 @@ impl Default for KeyBarConfig {
                 "reply_all",
                 "forward",
                 "delete",
+                "next_unread",
                 "search",
                 "move",
                 "sync",
@@ -31,3 +32,6 @@ impl Default for KeyBarConfig {
         }
     }
 }
+
+#[cfg(test)]
+include!("key_bar.tests.rs");

@@ -22,8 +22,8 @@ const OPTIONS: &str = "options";
 
 /// A button's default key text and label; the `[keys]` table replaces the key
 /// text of an action it moved (`KeyMap::cap_text`). The default bar (`[keybar] buttons`) offers the ten
-/// buttons of the reference picture; the others (Edit as new, Archive, Spam,
-/// Mark all, Unmark all, Invert marks, Next unread, Tag, Alert) are there for
+/// buttons of the reference picture and Next unread; the others (Edit as new,
+/// Archive, Spam, Mark all, Unmark all, Invert marks, Tag, Alert) are there for
 /// a bar that lists them.
 #[derive(Debug, PartialEq, Eq)]
 struct Button {

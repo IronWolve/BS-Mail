@@ -23,8 +23,9 @@ pub enum Action {
     /// folder, elsewhere they go in and out like Enter and Escape.
     Right,
     Left,
-    /// Space: a page down while reading, and in the list it marks the row and
-    /// moves on; elsewhere it does nothing.
+    /// Space: a page down while reading, and at the end of the message on to
+    /// the next unread one; in the list it marks the row and moves on;
+    /// elsewhere it does nothing.
     SpaceDown,
     SpaceUp,
     ToggleRead,
