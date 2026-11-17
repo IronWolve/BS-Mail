@@ -12,12 +12,12 @@ use super::flow::SetupFlow;
 impl SetupFlow {
     /// Starts listening for the browser, shows the link and opens it in the
     /// user's browser at once; the page keeps Open and Copy for when nothing
-    /// appears. The tokens will be kept in the account's own folder.
+    /// appears. The tokens will be kept in the vault.
     pub(super) fn start_browser(&mut self, plan: Plan, view: &mut AppView) {
-        let config = plan.config.clone().with_state_dir(&plan.folder);
+        let config = plan.trial_config();
         match self.logins.start(&config) {
             Ok(login) => {
-                self.token = plan.token_file();
+                self.token = plan.token_place();
                 let url = login.url().to_string();
                 view.setup_browser_link(&url);
                 self.opener.open(&url);

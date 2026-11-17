@@ -43,6 +43,13 @@ impl VaultError {
     pub fn can_start_over(&self) -> bool {
         matches!(self, Self::Damaged | Self::KeyMissing | Self::KeyMismatch | Self::Contents)
     }
+
+    /// Whether the error is one of writing the vault (as against opening it),
+    /// so a caller that asked for nothing to be written can tell a read that
+    /// found nothing usable from a write that failed.
+    pub fn while_saving(&self) -> bool {
+        matches!(self, Self::Write(_) | Self::Random | Self::Crypto | Self::TooBig)
+    }
 }
 
 impl fmt::Display for VaultError {

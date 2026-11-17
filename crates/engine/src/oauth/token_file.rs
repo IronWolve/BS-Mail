@@ -1,36 +1,18 @@
-//! The token file: the access token, the refresh token and when the access
-//! token ends, as TOML. It is written to a temporary name in the same folder
-//! with owner-only permissions and then renamed into place, so a reader never
-//! sees half a file; on Unix a file that others can read is refused.
+//! The token file an older version wrote, `oauth/<id>.token` beside the
+//! account file: the access token, the refresh token and when the access token
+//! ends, as TOML. Nothing writes one any more: it is read when the vault has no
+//! sign-in for the account, and removed once the tokens are in the vault. On
+//! Unix a file that others can read is refused, as it always was.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use model::Secret;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
-use crate::private_fs::{make_folder, sync_folder, write_new};
-use crate::send::random;
+use super::token_store::{StoreError, TokenRecord};
 use crate::sign_in_advice::sign_in_again;
 
-/// The tokens of one account.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TokenRecord {
-    pub access_token: Secret,
-    pub refresh_token: Secret,
-    /// Unix seconds at which the access token stops working.
-    pub expires_at: i64,
-}
-
-/// Why the file could not be read or written.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FileError {
-    /// There is no file: the account has not been signed in.
-    Missing,
-    /// Another problem, as one sentence.
-    Failed(String),
-}
-
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 struct OnDisk {
     access_token: String,
     refresh_token: String,
@@ -38,20 +20,20 @@ struct OnDisk {
 }
 
 /// Reads the token file at `path`.
-pub fn read(path: &Path) -> Result<TokenRecord, FileError> {
+pub fn read(path: &Path) -> Result<TokenRecord, StoreError> {
     let meta = match std::fs::metadata(path) {
         Ok(meta) => meta,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Err(FileError::Missing),
-        Err(error) => return Err(FileError::Failed(format!("cannot read the token file {}: {error}", path.display()))),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Err(StoreError::Missing),
+        Err(error) => return Err(StoreError::Failed(format!("cannot read the token file {}: {error}", path.display()))),
     };
     check_private(path, &meta)?;
     let text = std::fs::read_to_string(path)
-        .map_err(|error| FileError::Failed(format!("cannot read the token file {}: {error}", path.display())))?;
+        .map_err(|error| StoreError::Failed(format!("cannot read the token file {}: {error}", path.display())))?;
     let parsed: OnDisk = toml::from_str(&text).map_err(|_| {
-        FileError::Failed(format!("the token file {} is not valid; {}", path.display(), sign_in_again()))
+        StoreError::Failed(format!("the token file {} is not valid; {}", path.display(), sign_in_again()))
     })?;
     if parsed.access_token.is_empty() || parsed.refresh_token.is_empty() {
-        return Err(FileError::Failed(format!(
+        return Err(StoreError::Failed(format!(
             "the token file {} has an empty token; {}",
             path.display(),
             sign_in_again()
@@ -65,11 +47,11 @@ pub fn read(path: &Path) -> Result<TokenRecord, FileError> {
 }
 
 #[cfg(unix)]
-fn check_private(path: &Path, meta: &std::fs::Metadata) -> Result<(), FileError> {
+fn check_private(path: &Path, meta: &std::fs::Metadata) -> Result<(), StoreError> {
     use std::os::unix::fs::PermissionsExt;
     let mode = meta.permissions().mode() & 0o777;
     if mode & 0o077 != 0 {
-        return Err(FileError::Failed(format!(
+        return Err(StoreError::Failed(format!(
             "the token file {p} holds sign-in tokens and is readable by other users (mode {mode:o}); run: chmod 600 {p}",
             p = path.display()
         )));
@@ -78,38 +60,22 @@ fn check_private(path: &Path, meta: &std::fs::Metadata) -> Result<(), FileError>
 }
 
 #[cfg(not(unix))]
-fn check_private(_path: &Path, _meta: &std::fs::Metadata) -> Result<(), FileError> {
+fn check_private(_path: &Path, _meta: &std::fs::Metadata) -> Result<(), StoreError> {
     Ok(())
 }
 
-/// Writes `record` to `path`: the folder is made when missing, the text goes
-/// to a new owner-only file beside it, and that file is renamed over `path`.
-/// On any failure the temporary file is removed and `path` is untouched. After
-/// the rename the folder is flushed too, so a power loss right after a refresh
-/// cannot bring the old file back (the provider may have ended its tokens).
-pub fn write(path: &Path, record: &TokenRecord) -> Result<(), FileError> {
-    let fail = |what: &str, error: &dyn std::fmt::Display| {
-        FileError::Failed(format!("cannot save the sign-in tokens to {}: {what}: {error}", path.display()))
-    };
-    let dir = path.parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
-    make_folder(dir).map_err(|e| fail("the folder", &e))?;
-    let text = toml::to_string(&OnDisk {
-        access_token: record.access_token.expose().to_owned(),
-        refresh_token: record.refresh_token.expose().to_owned(),
-        expires_at: record.expires_at,
-    })
-    .map_err(|e| fail("the text", &e))?;
-    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    let suffix = random::random_hex::<6>().map_err(|e| fail("a temporary name", &e))?;
-    let temp: PathBuf = dir.join(format!(".{name}.{suffix}.tmp"));
-    let result = write_new(&temp, text.as_bytes()).and_then(|()| std::fs::rename(&temp, path));
-    if let Err(error) = result {
-        let _ = std::fs::remove_file(&temp);
-        return Err(fail("writing the file", &error));
+/// Removes the token file at `path` and the `oauth` folder it was in when that
+/// is empty now. A file that is not there is nothing to do; a failure is not
+/// reported here (the start-up move says what is left, with its name).
+pub fn remove(path: &Path) {
+    if path.as_os_str().is_empty() {
+        return;
     }
-    // The file is in place; a folder that cannot be flushed changes nothing.
-    let _ = sync_folder(dir);
-    Ok(())
+    if std::fs::remove_file(path).is_ok()
+        && let Some(folder) = path.parent()
+    {
+        let _ = std::fs::remove_dir(folder);
+    }
 }
 
 #[cfg(test)]

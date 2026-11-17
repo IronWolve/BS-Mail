@@ -8,7 +8,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use engine::AccountConfig;
+use engine::{AccountConfig, TokenPlace};
 use engine::vault::VaultView;
 
 use super::id::{is_valid_id, unique_id};
@@ -28,10 +28,11 @@ pub struct Plan {
     pub config: AccountConfig,
     /// The account file.
     pub file: PathBuf,
-    /// The folder the account lives in, which is also where its tokens go.
+    /// The folder the account lives in.
     pub folder: PathBuf,
     /// The folder the vault and its key file are in; the account's passwords
-    /// go there when it is saved.
+    /// and client secret go there when it is saved, and its sign-in tokens
+    /// as soon as it has signed in.
     pub secrets: PathBuf,
     /// An existing account is being changed.
     pub edit: bool,
@@ -51,10 +52,16 @@ impl std::fmt::Debug for Plan {
 }
 
 impl Plan {
-    /// The token file this account's browser sign-in writes, when it signs in
-    /// that way.
-    pub fn token_file(&self) -> Option<PathBuf> {
-        self.config.clone().with_state_dir(&self.folder).oauth.map(|oauth| oauth.token_file)
+    /// The account as it is tried: given its own folder and the vault folder,
+    /// which is where an OAuth2 account's sign-in tokens go.
+    pub fn trial_config(&self) -> AccountConfig {
+        self.config.clone().with_state_dir(&self.folder).with_secrets_dir(&self.secrets)
+    }
+
+    /// The place this account's browser sign-in saves its tokens, when it
+    /// signs in that way.
+    pub fn token_place(&self) -> Option<TokenPlace> {
+        self.trial_config().oauth.map(|oauth| oauth.token_place)
     }
 }
 

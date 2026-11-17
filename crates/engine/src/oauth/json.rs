@@ -5,8 +5,9 @@
 
 const MAX_DEPTH: usize = 16;
 
-/// A parsed JSON value.
-#[derive(Debug, Clone, PartialEq)]
+/// A parsed JSON value. The token endpoint's reply is one of these, so the
+/// debug output never shows a text: only how long it is.
+#[derive(Clone, PartialEq)]
 pub enum Value {
     Null,
     Bool(bool),
@@ -15,6 +16,19 @@ pub enum Value {
     List(Vec<Value>),
     /// Members in the order written; when a name repeats, the last wins.
     Object(Vec<(String, Value)>),
+}
+
+impl std::fmt::Debug for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Null => f.write_str("Null"),
+            Self::Bool(flag) => write!(f, "Bool({flag})"),
+            Self::Number(number) => write!(f, "Number({number})"),
+            Self::Text(text) => write!(f, "Text(<{} characters, not shown>)", text.chars().count()),
+            Self::List(items) => f.debug_list().entries(items).finish(),
+            Self::Object(members) => f.debug_map().entries(members.iter().map(|(name, value)| (name, value))).finish(),
+        }
+    }
 }
 
 impl Value {

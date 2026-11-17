@@ -52,7 +52,7 @@ pub(super) fn remove_account(view: &mut AppView, backend: &mut Box<dyn MailBacke
         Ok(()) => match accounts::forget_secrets(&live.place.secrets_folder(), id) {
             Ok(()) => view.options_info(&format!("Removed {address}.")),
             Err(reason) => view.options_problem(&format!(
-                "Removed {address}, but its password could not be taken out of the vault: {reason}"
+                "Removed {address}, but its secrets could not be taken out of the vault: {reason}"
             )),
         },
         Err(reason) => view.options_problem(&format!(

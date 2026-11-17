@@ -22,9 +22,10 @@ impl SetupFlow {
             self.restore_token();
             return view.setup_failed(&reason);
         }
-        // The account file is saved: the new sign-in is the account's own.
-        if let Some(file) = self.token.take() {
-            previous_token::discard(&file);
+        // The account file and its vault entries are saved: the new sign-in is
+        // the account's own.
+        if let Some(place) = self.token.take() {
+            previous_token::discard(&place);
         }
         self.created = None;
         self.remember_client(&plan, view);

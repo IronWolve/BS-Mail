@@ -4,7 +4,6 @@
 //! ```toml
 //! [google]
 //! client_id = "..."
-//! client_secret = "..."   # only if the provider gave one
 //!
 //! [microsoft]
 //! client_id = "..."
@@ -16,33 +15,47 @@
 //! when the provider has none yet. A provider's entry is never replaced by the
 //! program, and the file is written whole or not at all, readable by its owner
 //! only.
+//!
+//! A client id is not a secret and stays in the file. A client SECRET, when the
+//! provider gave one, is kept in the vault as
+//! `oauth_clients.<provider>.client_secret`, and the program never writes a
+//! `client_secret` line into this file. A file written by an older version may
+//! still hold one: it is moved into the vault at start (`accounts/migrate`)
+//! and, until then (a run on `--account`, which moves nothing), still read.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use model::Secret;
 use toml_edit::{DocumentMut, value};
 use ui::SavedClient;
 
 use crate::account_writer::save_account;
+use crate::accounts::{provider_secret, put_provider_secret};
+use crate::paths::SECRETS_DIR_NAME;
 
 pub const CLIENTS_FILE: &str = "oauth_clients.toml";
 
 /// The longest client id or secret taken; real ones are far shorter.
 const MAX_TEXT: usize = 512;
 
-/// The file of client ids in one data folder.
+/// The file of client ids in one data folder, and the vault beside it that
+/// holds their secrets.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientStore {
     file: PathBuf,
+    secrets: PathBuf,
 }
 
 impl ClientStore {
     pub fn in_folder(folder: &Path) -> Self {
-        Self { file: folder.join(CLIENTS_FILE) }
+        Self { file: folder.join(CLIENTS_FILE), secrets: folder.join(SECRETS_DIR_NAME) }
     }
 
-    /// The client ids saved. A missing or unreadable file, and an entry that
-    /// is not a usable client id, count as nothing saved.
+    /// The client ids saved, with their secrets from the vault. A missing or
+    /// unreadable file, and an entry that is not a usable client id, count as
+    /// nothing saved; a secret the vault cannot give is left empty, and the
+    /// form asks for it.
     pub fn load(&self) -> Vec<SavedClient> {
         let Ok(text) = fs::read_to_string(&self.file) else {
             return Vec::new();
@@ -55,19 +68,28 @@ impl ClientStore {
             .filter_map(|(provider, entry)| {
                 let entry = entry.as_table()?;
                 let client_id = entry.get("client_id")?.as_str().filter(|text| usable(text))?;
-                let client_secret = entry.get("client_secret").and_then(toml::Value::as_str).filter(|text| usable(text));
+                // The vault's secret; a line an older version left in the file
+                // only when the vault has none (it is moved at the next start).
+                let in_file = entry.get("client_secret").and_then(toml::Value::as_str).filter(|text| usable(text));
+                let client_secret = provider_secret(&self.secrets, provider)
+                    .map(|secret| secret.expose().to_string())
+                    .filter(|text| usable(text))
+                    .or_else(|| in_file.map(str::to_string));
                 Some(SavedClient {
                     provider: provider.clone(),
                     client_id: client_id.to_string(),
-                    client_secret: client_secret.unwrap_or_default().to_string(),
+                    client_secret: client_secret.unwrap_or_default(),
                 })
             })
             .collect()
     }
 
     /// Saves the client id for `provider` unless the provider has one
-    /// already. `Ok(true)` when the file was written, `Ok(false)` when there
-    /// was nothing to do. A file that is not TOML is left alone and said so.
+    /// already, and its secret (when there is one) into the vault, first: a
+    /// secret that cannot be saved there stops the whole save, so the file
+    /// never holds an id whose secret was lost, and it never holds a secret.
+    /// `Ok(true)` when the file was written, `Ok(false)` when there was nothing
+    /// to do. A file that is not TOML is left alone and said so.
     pub fn remember(&self, provider: &str, client_id: &str, client_secret: Option<&str>) -> Result<bool, String> {
         let secret = client_secret.filter(|text| !text.is_empty());
         let fits = !provider.is_empty()
@@ -94,7 +116,7 @@ impl ClientStore {
             .ok_or_else(|| format!("{} has \"{provider}\" set to something other than a table", self.file.display()))?;
         table.insert("client_id", value(client_id));
         if let Some(secret) = secret {
-            table.insert("client_secret", value(secret));
+            put_provider_secret(&self.secrets, provider, Secret::new(secret))?;
         }
         save_account(&self.file, &document.to_string())?;
         Ok(true)

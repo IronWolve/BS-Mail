@@ -27,7 +27,7 @@ impl SetupFlow {
     /// Starts the account on a backend of its own. The old attempt, if any,
     /// is already gone.
     pub(super) fn start_trial(&mut self, plan: Plan) {
-        let config = plan.config.clone().with_state_dir(&plan.folder);
+        let config = plan.trial_config();
         let backend = self.backends.start(config);
         self.attempt = Some(Attempt { plan, stage: Stage::Trial { backend, kept: Vec::new() } });
     }

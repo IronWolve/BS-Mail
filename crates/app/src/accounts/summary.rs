@@ -58,10 +58,10 @@ pub fn summaries_in_order(found: &[Found], order: &[AccountId]) -> Vec<AccountSu
     sorted.into_iter().map(summary_of).collect()
 }
 
-/// The form's starting point for an account. The password (from the account
-/// file, or from the vault when the file says it is there) and the client
-/// secret are part of it; they travel only into the form's hidden fields, so
-/// an account whose password is saved shows it as dots, as it always did.
+/// The form's starting point for an account. The password and the client
+/// secret (from the account file, or from the vault when the file says they are
+/// there) are part of it; they travel only into the form's hidden fields, so an
+/// account whose password is saved shows it as dots, as it always did.
 pub fn prefill_of(found: &Found) -> Result<AccountPrefill, String> {
     let table = found.table.as_ref().ok_or(UNREADABLE)?;
     let get = |key: &str| text_of(table, key);
@@ -87,7 +87,9 @@ pub fn prefill_of(found: &Found) -> Result<AccountPrefill, String> {
         smtp_trust: get("smtp_trust").unwrap_or_default(),
         browser_provider: browser,
         client_id: get("oauth_client_id").unwrap_or_default(),
-        client_secret: get("oauth_client_secret").unwrap_or_default(),
+        client_secret: get("oauth_client_secret")
+            .or_else(|| found.vault_client_secret.as_ref().map(|secret| secret.expose().to_string()))
+            .unwrap_or_default(),
         allow_changes: table.get("read_only").and_then(toml::Value::as_bool) == Some(false),
         poll_seconds: table.get("poll_seconds").and_then(toml::Value::as_integer).and_then(|seconds| u32::try_from(seconds).ok()),
         save_sent: table.get("save_sent").and_then(toml::Value::as_bool),

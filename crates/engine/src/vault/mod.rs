@@ -1,8 +1,9 @@
 //! The encrypted vault the program keeps secrets in: one file,
 //! `<data dir>/secrets/vault`, holding named secret texts such as
-//! `accounts.<id>.password`. This file only declares and re-exports the
-//! modules; the format is described in `format.rs` and in section 9.1 of the
-//! plan.
+//! `accounts.<id>.password`. Every change in the program goes through the one
+//! shared handle on the folder (`shared.rs`). This file only declares and
+//! re-exports the modules; the format is described in `format.rs` and in
+//! section 9.1 of the plan.
 
 mod crypto;
 mod entries;
@@ -12,12 +13,17 @@ mod format;
 mod key_file;
 mod key_source;
 mod names;
+mod shared;
 mod store;
 mod view;
 
 pub use error::VaultError;
 pub use format::{MAX_VAULT_BYTES, Mode};
 pub use key_source::{KEY_FILE_NAME, KeySource};
-pub use names::{account_prefix, password_name, smtp_password_name};
-pub use store::{VAULT_FILE_NAME, Vault};
+pub use names::{
+    TokenNames, account_prefix, attempt_name, client_secret_name, earlier_token_names, password_name,
+    provider_client_secret_name, smtp_password_name, token_names,
+};
+pub use shared::SharedVault;
+pub use store::{SECRETS_FOLDER_NAME, VAULT_FILE_NAME, Vault};
 pub use view::VaultView;

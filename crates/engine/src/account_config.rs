@@ -1,13 +1,13 @@
 //! The account file the real backend reads: where the mail server is and how
 //! to sign in.
 //!
-//! The password is not kept in this file by the program any more: it lives in
-//! the encrypted vault (`vault/`), and the file says `secrets = "vault"`. A
-//! file written by an older version, or by hand, may still hold `password` (and
-//! `smtp_password`) in plain text, which keeps working until the program moves
-//! it into the vault at its next start (see `account_secrets.rs`). A file that
-//! holds a password or client secret is refused on Unix when other users can
-//! read it.
+//! The password and the client secret are not kept in this file by the program
+//! any more: they live in the encrypted vault (`vault/`), and the file says
+//! `secrets = "vault"`. A file written by an older version, or by hand, may
+//! still hold `password` (and `smtp_password`, `oauth_client_secret`) in plain
+//! text, which keeps working until the program moves it into the vault at its
+//! next start (see `account_secrets.rs`). A file that holds a password or
+//! client secret is refused on Unix when other users can read it.
 //!
 //! The file is flat TOML:
 //!
@@ -48,8 +48,9 @@
 //! `password` needed) is described in `account_oauth.rs`: the keys
 //! `oauth_provider`, `oauth_client_id`, `oauth_client_secret`,
 //! `oauth_auth_url`, `oauth_token_url`, `oauth_scopes` and
-//! `oauth_redirect_host`. The tokens are kept in `oauth/<id>.token` beside
-//! the account file.
+//! `oauth_redirect_host`. The tokens are kept in the vault, under the
+//! account's id (`oauth/<id>.token` beside the account file was where older
+//! versions kept them).
 //!
 //! `security = "none"` (no TLS at all) and `trust = "any"` (accept any
 //! certificate, for a local bridge with a self-signed one) are allowed for
@@ -75,6 +76,7 @@ use serde::Deserialize;
 pub use crate::account_error::ConfigError;
 use crate::account_folders::FolderPaths;
 use crate::account_oauth::{AuthKind, OAuthSettings, RawOAuth, token_file_in};
+use crate::vault::SECRETS_FOLDER_NAME;
 use crate::account_secrets::{self, Given};
 pub use crate::account_signature::clean_signature;
 use crate::account_smtp::RawSmtp;
@@ -114,9 +116,10 @@ pub struct AccountConfig {
     /// The folders the file names as Sent, Drafts, Trash, Archive and Spam,
     /// which win over the guessed roles. See `account_folders`.
     pub folders: FolderPaths,
-    /// The folder this account keeps what it must not lose in: its sign-in
-    /// tokens and the copies of sent mail not yet saved on the server. `None`
-    /// for text parsed in memory, which has no folder of its own.
+    /// The folder this account keeps what it must not lose in: the copies of
+    /// sent mail not yet saved on the server (and where an older version kept
+    /// its sign-in tokens). `None` for text parsed in memory, which has no
+    /// folder of its own.
     pub state_dir: Option<PathBuf>,
 }
 
@@ -215,8 +218,8 @@ fn mailbox_password(given: Option<Secret>, oauth: bool) -> Result<Secret, Config
 impl AccountConfig {
     /// Reads and checks the account file at `path`, with no vault: a file
     /// that says its password is in the vault is refused with the sentence for
-    /// a password that is not there. An OAuth2 account keeps its tokens in
-    /// `oauth/<id>.token` in the same folder.
+    /// a password that is not there. An OAuth2 account keeps its tokens in the
+    /// vault in the `secrets` folder beside the file.
     pub fn from_file(path: &Path) -> Result<Self, ConfigError> {
         Self::from_file_with_vault(path, &VaultView::none())
     }
@@ -230,18 +233,34 @@ impl AccountConfig {
         let parsed = Self::from_toml_str_with_vault(&text, vault);
         // The file text holds the password and the client secret.
         wipe_text(&mut text);
-        parsed.map(|config| config.with_state_dir(folder))
+        // The tokens go to the vault the secrets were read from; with none, to
+        // the `secrets` folder beside the file (the `--account` convention).
+        let secrets = vault.dir().map_or_else(|| folder.join(SECRETS_FOLDER_NAME), Path::to_path_buf);
+        parsed.map(|config| config.with_state_dir(folder).with_secrets_dir(&secrets))
     }
 
-    /// Gives the account its folder: an OAuth2 account keeps its tokens in
-    /// `<dir>/oauth/<id>.token`, and any account keeps the copies of sent mail
-    /// it has not yet saved in `<dir>/sent_copies`. For text parsed in
-    /// memory, which has no folder of its own.
+    /// Gives the account its folder: any account keeps the copies of sent mail
+    /// it has not yet saved in `<dir>/sent_copies`, and an OAuth2 account's
+    /// token file of an older version, `<dir>/oauth/<id>.token`, is read from
+    /// there and moved into the vault. For text parsed in memory, which has no
+    /// folder of its own.
     pub fn with_state_dir(mut self, dir: &Path) -> Self {
         self.state_dir = Some(dir.to_path_buf());
         let file = token_file_in(dir, &self.id);
         if let Some(oauth) = self.oauth.as_mut() {
-            oauth.token_file = file;
+            oauth.token_place.set_id(&self.id);
+            oauth.token_place.set_legacy_file(&file);
+        }
+        self
+    }
+
+    /// Gives an OAuth2 account the folder of the vault its sign-in tokens are
+    /// kept in (the `secrets` folder of the data folder). Nothing for a
+    /// password account.
+    pub fn with_secrets_dir(mut self, dir: &Path) -> Self {
+        if let Some(oauth) = self.oauth.as_mut() {
+            oauth.token_place.set_id(&self.id);
+            oauth.token_place.set_vault_dir(dir);
         }
         self
     }
@@ -259,9 +278,16 @@ impl AccountConfig {
             Security::Implicit => 993,
             Security::Starttls | Security::None => 143,
         };
-        let oauth = resolve_oauth(&mut raw)?;
-        let given = Given { password: raw.password.take(), smtp_password: raw.smtp_password.take() };
+        let mut oauth = resolve_oauth(&mut raw)?;
+        let given = Given {
+            password: raw.password.take(),
+            smtp_password: raw.smtp_password.take(),
+            client_secret: oauth.as_mut().and_then(|settings| settings.client_secret.take()),
+        };
         let given = account_secrets::resolve(&raw.id, raw.secrets.as_deref(), oauth.is_some(), given, vault)?;
+        if let Some(settings) = oauth.as_mut() {
+            settings.client_secret = given.client_secret;
+        }
         raw.smtp_password = given.smtp_password;
         let password = mailbox_password(given.password, oauth.is_some())?;
         let smtp = SmtpSettings::resolve(

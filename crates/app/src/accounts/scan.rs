@@ -8,7 +8,7 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use engine::vault::{VaultView, password_name};
+use engine::vault::{VaultView, client_secret_name, password_name};
 use engine::{AccountConfig, MARKER_KEY, MARKER_VALUE};
 use model::Secret;
 
@@ -33,6 +33,9 @@ pub struct Found {
     /// none of its own; it is what the form starts with when the account is
     /// edited.
     pub vault_password: Option<Secret>,
+    /// The same for the OAuth2 client secret (`oauth_client_secret` in an older
+    /// file): what the form starts with when the account is edited.
+    pub vault_client_secret: Option<Secret>,
     /// For the account list: from the file when it could be read, else the id.
     pub name: String,
     pub address: String,
@@ -149,19 +152,30 @@ fn read_account(file: &Path, folder: &Path, folder_id: Option<&str>, vault: &Vau
             table.as_ref().and_then(|table| text_of(table, "address")).unwrap_or_else(|| id.clone()),
         ),
     };
-    let vault_password = vault_password_of(table.as_ref(), &id, vault);
-    Found { id, folder: folder.to_path_buf(), file: file.to_path_buf(), config, table, vault_password, name, address }
+    let vault_password = vault_secret_of(table.as_ref(), vault, "password", &password_name(&id));
+    let vault_client_secret = vault_secret_of(table.as_ref(), vault, "oauth_client_secret", &client_secret_name(&id));
+    Found {
+        id,
+        folder: folder.to_path_buf(),
+        file: file.to_path_buf(),
+        config,
+        table,
+        vault_password,
+        vault_client_secret,
+        name,
+        address,
+    }
 }
 
-/// The vault's password for account `id` when its file says the password is
-/// there and holds none itself.
-fn vault_password_of(table: Option<&toml::Table>, id: &str, vault: &VaultView) -> Option<Secret> {
+/// The vault's entry `name` for an account whose file says its secrets are
+/// there and holds none under `key` itself.
+fn vault_secret_of(table: Option<&toml::Table>, vault: &VaultView, key: &str, name: &str) -> Option<Secret> {
     let table = table?;
     let in_vault = table.get(MARKER_KEY).and_then(toml::Value::as_str) == Some(MARKER_VALUE);
-    if !in_vault || text_of(table, "password").is_some() {
+    if !in_vault || text_of(table, key).is_some() {
         return None;
     }
-    vault.get(&password_name(id)).ok().flatten()
+    vault.get(name).ok().flatten()
 }
 
 /// A non-empty text value of a table.

@@ -98,7 +98,7 @@ fn keep_old(target: &Path, dir: &Path, name: &str) -> Result<Option<PathBuf>, St
 /// without any comment that mentions one, whether it has a line of its own or
 /// follows a setting on the same line; `None` when the text is not TOML, or
 /// when what is left is not (nothing is kept that cannot be told to be clean).
-fn without_secrets(text: &str) -> Option<String> {
+pub(crate) fn without_secrets(text: &str) -> Option<String> {
     let mut document: DocumentMut = text.parse().ok()?;
     strip_secrets(document.as_table_mut());
     let redacted = without_comments_that_mention(&document.to_string(), mentions_a_secret);
@@ -115,14 +115,32 @@ fn without_comments_that_mention(text: &str, mentions: fn(&str) -> bool) -> Stri
         .collect()
 }
 
-/// The text of an account file without any comment that mentions a password,
-/// for a file whose password has just moved into the vault: a comment that
-/// quotes the old one must not stay behind. The text is unchanged when
-/// dropping them would leave something that is not TOML.
-pub(crate) fn without_password_comments(text: &str) -> String {
-    let cleaned = without_comments_that_mention(text, mentions_a_password);
+/// The text of an account file without any comment that mentions a password or
+/// a secret, for a file whose passwords and client secret have just moved into
+/// the vault: a comment that quotes an old one must not stay behind. The text
+/// is unchanged when dropping them would leave something that is not TOML.
+pub(crate) fn without_secret_comments(text: &str) -> String {
+    let cleaned = without_comments_that_mention(text, mentions_a_secret);
     if cleaned.parse::<DocumentMut>().is_ok() { cleaned } else { text.to_owned() }
 }
+
+/// Replaces the text of `path` (a backup being cleaned of its secrets) with
+/// `text`, whole or not at all and owner-only: the new text goes into a
+/// temporary file beside it and is renamed over it, and no second copy of the
+/// old text is kept anywhere.
+pub(crate) fn replace_without_backup(path: &Path, text: &str) -> Result<(), String> {
+    let dir = path.parent().filter(|dir| !dir.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+    let temp = dir.join(SCRUB_TEMP);
+    write_private(&temp, text)?;
+    fs::rename(&temp, path).map_err(|error| {
+        let _ = fs::remove_file(&temp);
+        failed(path, "replace", &error)
+    })
+}
+
+/// The temporary name a cleaned backup is written under; it matches neither
+/// `account.toml.bak*` nor `*.token*`, so it is never mistaken for a backup.
+const SCRUB_TEMP: &str = "scrub.tmp";
 
 /// Where the scan of a TOML text is: in plain text, or inside one of the four
 /// kinds of string, where a `#` is text and not a comment.
@@ -221,11 +239,6 @@ fn strip_secrets(table: &mut dyn TableLike) {
 /// kept and holds none.
 fn is_vault_marker(item: Option<&Item>, key: &str) -> bool {
     key == engine::MARKER_KEY && item.and_then(Item::as_str) == Some(engine::MARKER_VALUE)
-}
-
-/// Whether `text` names a password, in any letter case.
-fn mentions_a_password(text: &str) -> bool {
-    text.to_ascii_lowercase().contains("password")
 }
 
 /// Whether `text` names a password or a secret, in any letter case.

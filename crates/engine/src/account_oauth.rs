@@ -1,12 +1,15 @@
 //! The OAuth2 half of the account file: which provider signs the person in,
-//! the client id, and where the tokens are kept (plan section 9.1a).
+//! the client id, and where the tokens are kept (plan section 9.1a). The client
+//! secret is not kept in the file any more: the program writes it to the vault
+//! (`accounts.<id>.client_secret`), and a file written by an older version may
+//! still hold it as `oauth_client_secret`, which is read and moved.
 //!
 //! ```toml
 //! auth = "oauth2"                  # password (default) | oauth2
 //! oauth_provider = "..."           # a key of the provider table; guessed from
 //!                                  # `imap_host` when omitted
 //! oauth_client_id = "..."          # required
-//! oauth_client_secret = "..."      # optional
+//! oauth_client_secret = "..."      # optional; older files only (now in the vault)
 //!
 //! # For a provider that is not in the table:
 //! oauth_auth_url = "https://..."   # the authorization page
@@ -24,8 +27,8 @@ use model::Secret;
 use serde::Deserialize;
 
 use crate::account_config::{ConfigError, is_loopback_host};
-use crate::oauth::Url;
 use crate::oauth::provider_table::{self, ProviderEntry};
+use crate::oauth::{TokenPlace, Url};
 
 /// How the account signs in to the mail server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
@@ -83,9 +86,10 @@ pub struct OAuthSettings {
     pub client_id: String,
     /// Never shown in debug output.
     pub client_secret: Option<Secret>,
-    /// Where the tokens live. Empty until the account is read from a file or
-    /// given a folder with `AccountConfig::with_state_dir`.
-    pub token_file: PathBuf,
+    /// Where the tokens live: the vault and the account's id in it. Empty
+    /// until the account is read from a file or given its folders with
+    /// `AccountConfig::with_state_dir` and `with_secrets_dir`.
+    pub token_place: TokenPlace,
 }
 
 /// `<dir>/oauth/<id>.token`.
@@ -124,7 +128,7 @@ impl OAuthSettings {
                 .unwrap_or_default(),
             client_id,
             client_secret: raw.client_secret,
-            token_file: PathBuf::new(),
+            token_place: TokenPlace::default(),
         };
         settings.validate()?;
         Ok(settings)

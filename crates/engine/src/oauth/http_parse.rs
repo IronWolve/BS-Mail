@@ -22,11 +22,20 @@ pub struct Head {
     pub length: usize,
 }
 
-/// The body so far.
-#[derive(Debug, PartialEq, Eq)]
+/// The body so far. Its debug output shows only the size: it may hold tokens.
+#[derive(PartialEq, Eq)]
 pub enum Body {
     Complete(Vec<u8>),
     More,
+}
+
+impl std::fmt::Debug for Body {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Complete(bytes) => write!(f, "Complete(<{} bytes>)", bytes.len()),
+            Self::More => f.write_str("More"),
+        }
+    }
 }
 
 /// Reads the head from the start of `buf`; `None` until the blank line has

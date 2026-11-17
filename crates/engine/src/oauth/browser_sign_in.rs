@@ -1,7 +1,7 @@
 //! The sign-in that needs a person with a browser. `start` binds the local
 //! listener, builds the link and returns at once; one thread, with a small
 //! runtime of its own, waits for the browser's return, trades the code for
-//! tokens and writes the token file. The caller shows `url()`, calls `poll()`
+//! tokens and saves them to the vault. The caller shows `url()`, calls `poll()`
 //! now and then, and may `cancel()`; dropping the value cancels too, so no
 //! thread or port is left behind. The program never opens the browser.
 
@@ -51,7 +51,7 @@ impl SignInLimits {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SignInPoll {
     Waiting,
-    /// The tokens are in the token file.
+    /// The tokens are in the vault.
     Done,
     /// It ended without tokens; the sentence says why.
     Failed(String),
@@ -97,9 +97,9 @@ impl BrowserSignIn {
         let settings = config.oauth.clone().ok_or_else(|| {
             "this account does not use OAuth2 sign-in; set auth = \"oauth2\" in the account file".to_owned()
         })?;
-        if settings.token_file.as_os_str().is_empty() {
+        if !settings.token_place.is_set() {
             return Err("this account has no place set for its sign-in tokens (it must be read from a file, \
-                        or given a state folder)"
+                        or given a vault folder)"
                 .to_owned());
         }
         let (listener, listener6) = bind_loopback(&settings.redirect_host)?;
@@ -240,10 +240,10 @@ async fn flow(job: Job) -> Result<(), String> {
     };
     let traded = exchange_code(&settings, &code, pkce.verifier(), &redirect_uri, &limits.http);
     let tokens = until_cancelled(&mut cancelled, traded).await?.map_err(|error| error.to_string())?;
-    // The token file may be waiting on the lock of a refresh. Giving up must
-    // not leave this thread to write the file after the caller has cleaned up:
-    // the write itself is one step after the lock is had, so a cancel either
-    // comes first (nothing is written) or finds it done.
+    // The vault may be waiting on the lock of a refresh. Giving up must not
+    // leave this thread to save the tokens after the caller has cleaned up: the
+    // save itself is one step after the lock is had, so a cancel either comes
+    // first (nothing is saved) or finds it done.
     let stored = until_cancelled(&mut cancelled, store_sign_in(&settings, tokens)).await?;
     stored.map_err(|error| error.to_string())
 }

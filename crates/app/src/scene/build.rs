@@ -8,7 +8,7 @@ use ui::theme::Theme;
 use ui::theme::roles;
 use ui::{AppView, OptionsPaths};
 
-use crate::accounts::{Migration, Place, Scan, move_passwords_into_vault, recover, scan};
+use crate::accounts::{Migration, Place, Scan, move_secrets_into_vault, recover, scan};
 use crate::address_file;
 use crate::cli::Options;
 use crate::config_io::{self, CONFIG_NAME};
@@ -35,7 +35,7 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
     // sign-ins and write, so only one copy at a time gets to.
     let lock = hold_data_folder(&source)?;
     let recovered = put_right_after_a_hard_stop(&source);
-    let moved = move_passwords(&source);
+    let moved = move_secrets(&source);
     if moved.moved > 0
         && let Source::Accounts(root) = &source
     {
@@ -110,17 +110,19 @@ fn hold_data_folder(source: &Source) -> Result<Option<DataLock>, AppError> {
 /// touched: a folder named by `--account` is shared with other runs.
 fn put_right_after_a_hard_stop(source: &Source) -> Vec<String> {
     match source {
-        Source::Accounts(root) | Source::Empty(root) => recover(root),
+        Source::Accounts(root) | Source::Empty(root) => recover(root, &Place::Root(root.clone()).secrets_folder()),
         Source::Mock(_) | Source::Account(_) | Source::Setup(_) => Vec::new(),
     }
 }
 
-/// Moves the plain-text passwords of the data folder's account files into the
-/// encrypted vault, now that this run holds the data folder. Only a data folder
-/// of its own is touched, as with `put_right_after_a_hard_stop`.
-fn move_passwords(source: &Source) -> Migration {
+/// Moves the plain-text secrets of the data folder (the account files'
+/// passwords and client secrets, the sign-in tokens and the client secrets of
+/// `oauth_clients.toml`) into the encrypted vault, now that this run holds the
+/// data folder. Only a data folder of its own is touched, as with
+/// `put_right_after_a_hard_stop`.
+fn move_secrets(source: &Source) -> Migration {
     match source {
-        Source::Accounts(root) => move_passwords_into_vault(root, &Place::Root(root.clone()).secrets_folder()),
+        Source::Accounts(root) => move_secrets_into_vault(root, &Place::Root(root.clone()).secrets_folder()),
         Source::Empty(_) | Source::Mock(_) | Source::Account(_) | Source::Setup(_) => Migration::default(),
     }
 }

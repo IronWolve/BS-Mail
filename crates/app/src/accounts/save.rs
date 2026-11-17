@@ -1,7 +1,7 @@
 //! Writing an account file the plan settled: whole or not at all, readable by
-//! its owner only, with an old file kept as a backup beside it. The password
-//! never goes into the file: it goes into the vault first, and the file says
-//! `secrets = "vault"` in its place.
+//! its owner only, with an old file kept as a backup beside it. A password or
+//! client secret never goes into the file: it goes into the vault first, and
+//! the file says `secrets = "vault"` in its place.
 
 use std::fs;
 use std::path::PathBuf;
@@ -41,11 +41,12 @@ pub fn save(plan: &Plan) -> Result<Saved, String> {
     Ok(Saved { file: plan.file.clone(), kept_old_as: saved.kept_old_as })
 }
 
-/// The text for the file, with the passwords taken out and put in the vault,
-/// and whether the vault holds any of this account's now.
+/// The text for the file, with the passwords and the client secret taken out
+/// and put in the vault, and whether the vault holds any of this account's now.
 fn move_passwords(plan: &Plan, text: &str) -> Result<(String, bool), String> {
     let taken = take_passwords(text)?;
-    let vaulted = vault_store::put(&plan.secrets, &plan.id, !plan.edit, taken.password, taken.smtp_password)?;
+    let vaulted =
+        vault_store::put(&plan.secrets, &plan.id, !plan.edit, taken.password, taken.smtp_password, taken.client_secret)?;
     Ok((with_marker(&taken.text, vaulted)?, vaulted))
 }
 

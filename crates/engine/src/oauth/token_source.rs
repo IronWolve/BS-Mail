@@ -1,18 +1,20 @@
-//! The one place that hands out access tokens. Each call reads the token
-//! file, refreshes when fewer than 60 seconds are left, writes the new tokens
-//! back, and returns the access token. A process-wide lock covers the whole
-//! check-refresh-write, so two connections that find the token ending do not
-//! both refresh: the second one reads what the first wrote.
+//! The one place that hands out access tokens. Each call reads the account's
+//! tokens from the vault, refreshes when fewer than 60 seconds are left, saves
+//! the new tokens back, and returns the access token. A process-wide lock
+//! covers the whole check-refresh-save, so two connections that find the token
+//! ending do not both refresh: the second one reads what the first saved. That
+//! lock is only about refreshing; the vault has its own, held for the file work
+//! alone and never across the network (`vault/shared.rs`).
 //!
 //! A mail server can refuse a token the local clock still thinks is good (the
 //! clock stepped back, or the data folder came from a machine whose clock was
 //! behind). `after_refusal` is for that: it gives a token to try once more.
 //!
-//! New tokens are never dropped on the floor: a write that fails is tried
+//! New tokens are never dropped on the floor: a save that fails is tried
 //! again, and if it keeps failing the tokens are kept in memory and used
-//! instead of the old file (see `unsaved_tokens`).
+//! instead of the vault's old ones (see `unsaved_tokens`), and the error says
+//! so, which reaches the footer.
 
-use std::path::Path;
 use std::time::Duration;
 
 use model::Secret;
@@ -22,7 +24,8 @@ use super::error::TokenError;
 use super::http::HttpLimits;
 use super::previous_token;
 use super::token_endpoint::{self, Tokens};
-use super::token_file::{self, FileError, TokenRecord};
+use super::token_place::TokenPlace;
+use super::token_store::{self, StoreError, TokenRecord};
 use super::unsaved_tokens;
 use crate::account_config::AccountConfig;
 use crate::account_oauth::OAuthSettings;
@@ -32,11 +35,13 @@ use crate::sign_in_advice::sign_in_first;
 /// An access token with fewer seconds than this left is refreshed first.
 pub const REFRESH_BELOW_SECONDS: i64 = 60;
 
-/// How often a write of new tokens is tried, and the pause between tries.
+/// How often a save of new tokens is tried, and the pause between tries.
 const WRITE_TRIES: u32 = 3;
 const WRITE_PAUSE: Duration = Duration::from_millis(100);
 
-/// Held while the token file is read, refreshed and written.
+/// Held while the tokens are read, refreshed and saved; never held while the
+/// vault's own lock is, so a save of a password is not kept waiting for a
+/// provider.
 pub(super) static REFRESH_LOCK: Mutex<()> = Mutex::const_new(());
 
 /// Gives out access tokens for one account.
@@ -73,13 +78,13 @@ impl TokenSource {
 
     /// Like `access_token`, and says whether the token is brand new.
     pub async fn issue(&self) -> Result<Issued, TokenError> {
-        let path = self.place()?;
+        let place = self.place()?;
         let _held = REFRESH_LOCK.lock().await;
-        let record = current(path).await?;
+        let record = current(place).await?;
         if record.expires_at - now_unix() >= REFRESH_BELOW_SECONDS {
             return Ok(Issued { token: record.access_token, renewed: false });
         }
-        let token = self.renew(path, &record).await?;
+        let token = self.renew(place, &record).await?;
         Ok(Issued { token, renewed: true })
     }
 
@@ -88,54 +93,56 @@ impl TokenSource {
     /// the provider. Asking for it is the caller's decision, made once per
     /// sign-in, so a server that refuses every token costs one request.
     pub async fn after_refusal(&self, refused: &Secret) -> Result<Secret, TokenError> {
-        let path = self.place()?;
+        let place = self.place()?;
         let _held = REFRESH_LOCK.lock().await;
-        let record = current(path).await?;
+        let record = current(place).await?;
         let has_time = record.expires_at - now_unix() >= REFRESH_BELOW_SECONDS;
         if has_time && record.access_token != *refused {
             return Ok(record.access_token);
         }
-        self.renew(path, &record).await
+        self.renew(place, &record).await
     }
 
-    fn place(&self) -> Result<&Path, TokenError> {
-        let path = &self.settings.token_file;
-        if path.as_os_str().is_empty() {
+    fn place(&self) -> Result<&TokenPlace, TokenError> {
+        let place = &self.settings.token_place;
+        if !place.is_set() {
             return Err(TokenError::Permanent(
                 "this account has no place set for its sign-in tokens (the account must be read from a file)".to_owned(),
             ));
         }
-        Ok(path)
+        Ok(place)
     }
 
     /// Trades the refresh token for new tokens and saves them. The caller
-    /// holds the lock.
-    async fn renew(&self, path: &Path, old: &TokenRecord) -> Result<Secret, TokenError> {
+    /// holds the refresh lock; the vault's own lock is taken only inside
+    /// `save`, after the network is done with.
+    async fn renew(&self, place: &TokenPlace, old: &TokenRecord) -> Result<Secret, TokenError> {
         let fresh = token_endpoint::refresh(&self.settings, &old.refresh_token, &self.limits).await?;
         let renewed = renewed_record(old, fresh);
-        save(path, &renewed).await?;
+        save(place, &renewed).await?;
         Ok(renewed.access_token)
     }
 }
 
 /// The tokens to work from: the ones kept after a failed save (saved now, or
-/// the error says why not), else the token file.
-async fn current(path: &Path) -> Result<TokenRecord, TokenError> {
-    match unsaved_tokens::waiting(path) {
-        Some(kept) => save(path, &kept).await.map(|()| kept),
-        None => token_file::read(path).map_err(read_failure),
+/// the error says why not), else the vault's.
+async fn current(place: &TokenPlace) -> Result<TokenRecord, TokenError> {
+    match unsaved_tokens::waiting(place) {
+        Some(kept) => save(place, &kept).await.map(|()| kept),
+        None => token_store::read(place).map_err(read_failure),
     }
 }
 
-/// Writes `record`, trying a few times. A write that never works leaves the
+/// Saves `record`, trying a few times. A save that never works leaves the
 /// record in memory, so the next call saves it first and the old refresh
-/// token is not used again; the error is transient because that call may work.
-async fn save(path: &Path, record: &TokenRecord) -> Result<(), TokenError> {
+/// token is not used again; the error is transient because that call may work,
+/// and it says the new sign-in is only in memory (it reaches the footer).
+async fn save(place: &TokenPlace, record: &TokenRecord) -> Result<(), TokenError> {
     let mut failure = None;
     for attempt in 0..WRITE_TRIES {
-        match token_file::write(path, record) {
+        match token_store::write(place, record) {
             Ok(()) => {
-                unsaved_tokens::forget(path);
+                unsaved_tokens::forget(place);
                 return Ok(());
             }
             Err(error) => failure = Some(error),
@@ -144,16 +151,16 @@ async fn save(path: &Path, record: &TokenRecord) -> Result<(), TokenError> {
             tokio::time::sleep(WRITE_PAUSE).await;
         }
     }
-    unsaved_tokens::keep(path, record.clone());
-    let words = failure.map_or_else(|| "the file could not be written".to_owned(), file_words);
+    unsaved_tokens::keep(place, record.clone());
+    let words = failure.map_or_else(|| "the vault could not be saved".to_owned(), store_words);
     Err(TokenError::Transient(format!(
-        "could not save the new sign-in ({words}); it is kept until the file can be written"
+        "could not save the new sign-in ({words}); it is kept in memory until the vault can be saved"
     )))
 }
 
 /// Saves the tokens of a fresh sign-in, under the same lock the refresh uses.
-/// The token file that was there is set aside first (`previous_token`), so
-/// giving up can put it back; if the write fails it is put back at once.
+/// The tokens that were there are set aside first (`previous_token`), so
+/// giving up can put them back; if the save fails they are put back at once.
 pub async fn store_sign_in(settings: &OAuthSettings, tokens: Tokens) -> Result<(), TokenError> {
     let Some(refresh_token) = tokens.refresh_token else {
         return Err(TokenError::Permanent("the provider gave no lasting sign-in (no refresh token)".to_owned()));
@@ -163,13 +170,13 @@ pub async fn store_sign_in(settings: &OAuthSettings, tokens: Tokens) -> Result<(
         refresh_token,
         expires_at: now_unix().saturating_add(i64::try_from(tokens.expires_in).unwrap_or(i64::MAX)),
     };
-    let path = &settings.token_file;
+    let place = &settings.token_place;
     let _held = REFRESH_LOCK.lock().await;
-    previous_token::keep(path).map_err(TokenError::Permanent)?;
-    unsaved_tokens::forget(path);
-    if let Err(error) = token_file::write(path, &record) {
-        let _ = previous_token::restore(path);
-        return Err(TokenError::Permanent(file_words(error)));
+    previous_token::keep(place).map_err(TokenError::Permanent)?;
+    unsaved_tokens::forget(place);
+    if let Err(error) = token_store::write(place, &record) {
+        let _ = previous_token::restore(place);
+        return Err(TokenError::Permanent(store_words(error)));
     }
     Ok(())
 }
@@ -184,17 +191,24 @@ fn renewed_record(old: &TokenRecord, fresh: Tokens) -> TokenRecord {
     }
 }
 
-fn read_failure(error: FileError) -> TokenError {
+/// An account with no sign-in in the vault, or whose vault cannot be read,
+/// needs the person to sign in again, and only that account: the sentence
+/// says so, and that the mail itself is safe on the server.
+fn read_failure(error: StoreError) -> TokenError {
     match error {
-        FileError::Missing => TokenError::Permanent(format!("not signed in yet, {}", sign_in_first())),
-        FileError::Failed(text) => TokenError::Permanent(text),
+        StoreError::Missing => TokenError::Permanent(format!(
+            "this account has no saved sign-in (it was never made here, or it was lost with the vault); \
+             the mail is on the server and nothing is lost; {}",
+            sign_in_first()
+        )),
+        StoreError::Failed(text) => TokenError::Permanent(text),
     }
 }
 
-fn file_words(error: FileError) -> String {
+fn store_words(error: StoreError) -> String {
     match error {
-        FileError::Missing => "the token file is missing".to_owned(),
-        FileError::Failed(text) => text,
+        StoreError::Missing => "the sign-in is missing".to_owned(),
+        StoreError::Failed(text) => text,
     }
 }
 

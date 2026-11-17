@@ -22,11 +22,11 @@ pub struct SetupFlow {
     /// The id of an account folder that this flow's tries made. If nothing is
     /// saved in it, giving up removes it, and nothing else.
     pub(super) created: Option<String>,
-    /// The token file a browser sign-in of this flow may have replaced. A new
-    /// sign-in sets the earlier tokens aside before it writes (see
-    /// `engine::previous_token`); giving up, a refused account or a failed
+    /// The place of the tokens a browser sign-in of this flow may have
+    /// replaced. A new sign-in sets the earlier tokens aside before it saves
+    /// (see `engine::previous_token`); giving up, a refused account or a failed
     /// save puts them back, and saving the account lets them go.
-    pub(super) token: Option<std::path::PathBuf>,
+    pub(super) token: Option<engine::TokenPlace>,
     pub(super) logins: Box<dyn BrowserLoginStarter>,
     pub(super) opener: Box<dyn LinkOpener>,
     /// The page opened is the provider's registration page, not a sign-in
@@ -82,8 +82,8 @@ impl SetupFlow {
     /// for an account that was never saved), if a try replaced it. The
     /// attempt, and with it the sign-in's own thread, is gone before this.
     pub(super) fn restore_token(&mut self) {
-        if let Some(file) = self.token.take() {
-            let _ = previous_token::restore(&file);
+        if let Some(place) = self.token.take() {
+            let _ = previous_token::restore(&place);
         }
     }
 

@@ -108,11 +108,17 @@ fn split_authority(authority: &str, https: bool) -> Result<(String, u16), String
     Ok((host.to_owned(), port))
 }
 
-/// A reply the client accepted: its status and body.
-#[derive(Debug)]
+/// A reply the client accepted: its status and body. The body of a token
+/// endpoint's reply holds tokens, so the debug output shows only its size.
 pub struct Response {
     pub status: u16,
     pub body: Vec<u8>,
+}
+
+impl std::fmt::Debug for Response {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Response").field("status", &self.status).field("body", &format_args!("<{} bytes>", self.body.len())).finish()
+    }
 }
 
 /// Why a request did not give a reply to read.

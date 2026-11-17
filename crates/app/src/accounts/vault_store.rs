@@ -1,72 +1,113 @@
-//! Writing an account's passwords into the vault, and taking them out again.
+//! Writing an account's secrets into the vault, and taking them out again.
 //!
-//! The vault is opened afresh for each change and saved whole, so nothing here
-//! keeps a copy that could go stale, and a save that fails changes nothing.
+//! The secrets are the mailbox password, the separate sending password and the
+//! OAuth2 client secret. Every change goes through the process's one handle on
+//! the vault (`engine::vault::SharedVault`), which reads the vault from disk
+//! under its lock, so a save of the form and a refresh of a sign-in at the same
+//! moment never lose each other's entries, and a save that fails changes
+//! nothing.
 
 use std::path::Path;
 
-use engine::vault::{KeySource, Vault, VaultError, account_prefix, password_name, smtp_password_name};
+use engine::vault::{
+    SharedVault, VaultError, account_prefix, client_secret_name, password_name, provider_client_secret_name,
+    smtp_password_name,
+};
 use model::Secret;
 
-/// Puts the passwords (the mailbox one and the separate sending one, when
-/// there is one) into the vault in `dir` under account `id` and says whether the vault now holds any password of that account (so the
-/// file has to say `secrets = "vault"`).
+/// Puts the secrets (the mailbox password, the separate sending password and
+/// the OAuth2 client secret, when there are any) into the vault in `dir` under
+/// account `id` and says whether the vault now holds any of them for that
+/// account (so the file has to say `secrets = "vault"`).
 ///
-/// A new account (`fresh`) starts with none of an earlier account's entries of
-/// the same id. An edit with no password given takes the old one out (the
-/// account no longer uses one). A password that is already there is not
-/// written again. A vault that is lost (its key is gone) or damaged is set
-/// aside and a new one started, since the user is giving a password now and
-/// the other accounts ask for theirs in their own words. Nothing is changed
-/// when the vault cannot be saved, and the error is a sentence for the form.
-pub fn put(dir: &Path, id: &str, fresh: bool, password: Option<Secret>, smtp_password: Option<Secret>) -> Result<bool, String> {
-    let given = password.is_some() || smtp_password.is_some();
-    let source = KeySource::key_file_in(dir);
-    let mut vault = match Vault::open_or_create(dir, source.clone()) {
-        Ok(vault) => vault,
+/// A new account (`fresh`) starts with none of an earlier account's passwords
+/// or client secret of the same id; its sign-in entries are left alone, because
+/// a browser sign-in saves its tokens before the account is saved, and those
+/// are this account's own. An edit that gives no password or client secret
+/// takes the old one out (the account no longer uses one). A secret that is
+/// already there is not written again. A vault that is lost (its key is gone) or damaged is set
+/// aside and a new one started, since the user is giving a secret now and the
+/// other accounts ask for theirs in their own words. Nothing is changed when
+/// the vault cannot be saved, and the error is a sentence for the form.
+pub fn put(
+    dir: &Path,
+    id: &str,
+    fresh: bool,
+    password: Option<Secret>,
+    smtp_password: Option<Secret>,
+    client_secret: Option<Secret>,
+) -> Result<bool, String> {
+    let given = password.is_some() || smtp_password.is_some() || client_secret.is_some();
+    let (mailbox, sending, client) = (password_name(id), smtp_password_name(id), client_secret_name(id));
+    let outcome = SharedVault::for_dir(dir).update_or_start_over(given, |vault| {
+        let mut changed = false;
+        match password {
+            Some(password) => changed |= put_entry(vault, &mailbox, password),
+            None => changed |= vault.remove(&mailbox),
+        }
+        match smtp_password {
+            Some(password) => changed |= put_entry(vault, &sending, password),
+            None if fresh => changed |= vault.remove(&sending),
+            None => {}
+        }
+        match client_secret {
+            Some(secret) => changed |= put_entry(vault, &client, secret),
+            None => changed |= vault.remove(&client),
+        }
+        (vault.contains(&mailbox) || vault.contains(&sending) || vault.contains(&client), changed)
+    });
+    match outcome {
+        Ok(held) => Ok(held),
         // Nothing to write and nothing readable: the account has no entry to keep.
-        Err(_) if !given => return Ok(false),
-        Err(error) if error.can_start_over() => Vault::start_over(dir, source).map_err(|error| error.to_string())?,
-        Err(error) => return Err(error.to_string()),
-    };
-    let mut changed = fresh && vault.remove_prefix(&account_prefix(id)) > 0;
-    let (mailbox, sending) = (password_name(id), smtp_password_name(id));
-    match password {
-        Some(password) => changed |= put_entry(&mut vault, &mailbox, password),
-        None => changed |= vault.remove(&mailbox),
+        Err(error) if !given && !error.while_saving() => Ok(false),
+        Err(error) => Err(error.to_string()),
     }
-    if let Some(password) = smtp_password {
-        changed |= put_entry(&mut vault, &sending, password);
-    }
-    if changed {
-        vault.save().map_err(|error| error.to_string())?;
-    }
-    Ok(vault.contains(&mailbox) || vault.contains(&sending))
 }
 
 /// Sets an entry unless it already holds this text; whether it changed.
-fn put_entry(vault: &mut Vault, name: &str, password: Secret) -> bool {
-    if vault.get(name).is_some_and(|old| old == password) {
+fn put_entry(vault: &mut engine::vault::Vault, name: &str, secret: Secret) -> bool {
+    if vault.get(name).is_some_and(|old| old == secret) {
         return false;
     }
-    vault.set(name, password);
+    vault.set(name, secret);
     true
 }
 
-/// Takes every entry of account `id` out of the vault in `dir`. A folder with
-/// no vault, or one whose entries cannot be read at all (its key is lost), has
-/// nothing to take out.
+/// Takes every entry of account `id` out of the vault in `dir`: its passwords,
+/// its client secret and its sign-in tokens, an attempt's included. A folder
+/// with no vault, or one whose entries cannot be read at all (its key is lost),
+/// has nothing to take out.
 pub fn forget(dir: &Path, id: &str) -> Result<(), String> {
-    let vault = Vault::open_or_create(dir, KeySource::key_file_in(dir));
-    let mut vault = match vault {
-        Ok(vault) => vault,
-        Err(error) if error.can_start_over() => return Ok(()),
-        Err(error) => return Err(error.to_string()),
-    };
-    if vault.remove_prefix(&account_prefix(id)) == 0 {
-        return Ok(());
+    let outcome = SharedVault::for_dir(dir).update(|vault| {
+        let removed = vault.remove_prefix(&account_prefix(id));
+        ((), removed > 0)
+    });
+    match outcome {
+        Ok(()) => Ok(()),
+        Err(error) if error.can_start_over() => Ok(()),
+        Err(error) => Err(error.to_string()),
     }
-    vault.save().map_err(|error: VaultError| error.to_string())
+}
+
+/// Keeps the client secret of a sign-in provider (`google`...) for the form to
+/// offer to the next account; whether the vault was written. The caller does
+/// this only for a provider that has no client id saved, so a secret already
+/// there belongs to an id that is gone and is replaced; one that is the same is
+/// not written again.
+pub fn put_provider_secret(dir: &Path, provider: &str, secret: Secret) -> Result<bool, String> {
+    let name = provider_client_secret_name(provider);
+    SharedVault::for_dir(dir)
+        .update_or_start_over(true, |vault| {
+            let changed = put_entry(vault, &name, secret);
+            (changed, changed)
+        })
+        .map_err(|error: VaultError| error.to_string())
+}
+
+/// The client secret kept for `provider`; `None` when there is none or the
+/// vault cannot be opened (the form then asks for it).
+pub fn provider_secret(dir: &Path, provider: &str) -> Option<Secret> {
+    SharedVault::for_dir(dir).read(|vault| vault.get(&provider_client_secret_name(provider))).ok().flatten()
 }
 
 #[cfg(test)]

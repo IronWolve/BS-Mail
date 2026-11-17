@@ -38,5 +38,8 @@ pub use mime_render::{body_preference, set_body_preference};
 pub use mock::{Fixture, FixtureError};
 pub use mock_backend::MockBackend;
 pub use multi_backend::{Member, MembersHandle, MultiBackend};
-pub use oauth::{BrowserSignIn, HttpLimits, SignInLimits, SignInPoll, TokenError, TokenSource, previous_token};
+pub use oauth::{
+    BrowserSignIn, HttpLimits, SignInLimits, SignInPoll, StoreError, TokenError, TokenPlace, TokenRecord, TokenSource,
+    legacy_attempt, previous_token, token_file, token_store,
+};
 pub use real_backend::RealBackend;

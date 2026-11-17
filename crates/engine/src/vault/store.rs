@@ -16,6 +16,10 @@ use super::key_source::KeySource;
 /// The vault's file name inside its folder.
 pub const VAULT_FILE_NAME: &str = "vault";
 
+/// The folder the vault and its key are in, inside the data folder (and beside
+/// the file for `--account <file>`).
+pub const SECRETS_FOLDER_NAME: &str = "secrets";
+
 /// The name an unreadable vault is set aside under when a fresh one is
 /// started.
 const UNREADABLE_NAME: &str = "vault.unreadable";
@@ -97,6 +101,11 @@ impl Vault {
 
     pub fn is_empty(&self) -> bool {
         self.entries.len() == 0
+    }
+
+    /// The folder the vault and its key are in.
+    pub fn dir(&self) -> &Path {
+        &self.dir
     }
 
     /// The vault file's place.
