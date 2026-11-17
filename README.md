@@ -13,12 +13,12 @@ Get the latest release from the [Releases page](../../releases).
 
 | System | File |
 | --- | --- |
-| Linux, 64-bit (Ubuntu 22.04 or newer, and most other current distributions) | `BS-Mail_linux-x64_v0.9.2.AppImage` |
-| Windows 10 or 11, 64-bit | `BS-Mail_windows-x64_v0.9.2.zip` |
+| Linux, 64-bit (Ubuntu 22.04 or newer, and most other current distributions) | `BS-Mail_linux-x64_v0.9.3.AppImage` |
+| Windows 10 or 11, 64-bit | `BS-Mail_windows-x64_v0.9.3.zip` |
 
 Each file has a `.sha256` file beside it so you can check the download.
 
-- **Linux:** make the file executable (`chmod +x BS-Mail_linux-x64_v0.9.2.AppImage`) and run it
+- **Linux:** make the file executable (`chmod +x BS-Mail_linux-x64_v0.9.3.AppImage`) and run it
   in your terminal. If it does not start, your system may need FUSE: install `libfuse2`
   (`libfuse2t64` on Ubuntu 24.04).
 - **Windows:** unzip, then run `bs-mail.exe` in Windows Terminal, PowerShell or the Command
@@ -54,6 +54,8 @@ it needs a client ID that you make once with the provider.
 - **Many at once:** mark several messages (`Space`, Ctrl or Shift click) and delete, move, tag,
   mark read, star or archive them together. Delete always asks first.
 - **Folders:** make, rename and delete them, mark all read, empty the Trash or Spam.
+- **Keyboard first:** read a whole mailbox with `Space` and `N`, jump to any folder with `g` `g`,
+  and step through the links of a message with `l`. The pane that has the keys is marked in its title.
 - **Mouse and keyboard:** right-click menus, drag messages onto a folder, click links and addresses,
   select and copy text, find inside a message, view the headers or the whole source.
 - **Make it yours:** layout and panels in Options, any key rebound in `config.toml`, your own themes.
@@ -66,10 +68,15 @@ it needs a client ID that you make once with the provider.
 | --- | --- |
 | `j` `k` or arrows | move |
 | `Enter`, `Esc` | go in, come back out |
+| `Tab`, `1` `2` `3` | folders, message list, open message |
 | `c` | write a message |
 | `r`, `R`, `f` | reply, reply to everyone, forward |
 | `d` | delete (asks first) |
-| `Space` | mark a message; then act on all marked |
+| `Space` | in the list: mark a message, then act on all marked |
+| `Space` | in the open message: page down, then on to the next unread message |
+| `n`, `p`, `N` | next message, previous message, next unread (in the next folder with unread mail when this one is done) |
+| `g` `g` | go to any folder by typing its name |
+| `l`, `L` | choose the next or previous link in the message; `Enter` opens it, `.` shows its menu |
 | `/` | search |
 | `o`, `O`, `T` | sort, reverse the sort, threads on or off |
 | `t` | tag |
