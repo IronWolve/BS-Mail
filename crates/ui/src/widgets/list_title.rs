@@ -86,6 +86,15 @@ fn draw_hints(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, title_end: u
     }
 }
 
+/// The part of the title row `rect` that is the heading: the icon and the
+/// title text, which is where `draw_list_title` writes them; the key hints at
+/// the right edge are not part of it.
+pub fn heading_extent(rect: Rect, mailbox: Option<&MailboxSummary>, order: Option<&str>) -> Rect {
+    let title_x = rect.x.saturating_add(TITLE_AT);
+    let end = title_x.saturating_add(cells(&title_text(mailbox, order))).min(rect.right());
+    Rect::new(rect.x, rect.y, end.saturating_sub(rect.x), rect.height)
+}
+
 /// Draws the title into the one-row `rect` (the list's text width). `mailbox`
 /// is the folder shown; without one the title is just `Messages`. `order`
 /// says how the rows are arranged (`threads, sorted by size (loaded mail

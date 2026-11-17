@@ -2,7 +2,10 @@
 //!
 //! `ALL` lists every role a widget may ask for; a theme must define each one.
 //! Three are reserved: no widget asks for them yet (marked `not drawn yet`
-//! below), so a theme that changes them changes no frame.
+//! below), so a theme that changes them changes no frame. Three more are
+//! optional for a theme written before them: the focus cue's (`title.focused`,
+//! `list.selected.unfocused`, `sidebar.selected.unfocused`) are asked for only
+//! when the theme has them, and without them the screen looks as it did.
 //! A role is named for its place and meaning (`list.selected`), never for its
 //! color. A child name (`list.date.recent`) starts from its parent's style.
 
@@ -24,6 +27,7 @@ roles! {
     BORDER_DRAG = "border.drag"; // not drawn yet
     BORDER_RULE = "border.rule";
     SEPARATOR = "separator";
+    TITLE_FOCUSED = "title.focused"; // the title of the pane that has the keys
 
     // Title banner.
     BANNER_SLASHES = "banner.slashes";
@@ -49,6 +53,7 @@ roles! {
     SIDEBAR_COUNT = "sidebar.count";
     SIDEBAR_CHEVRON = "sidebar.chevron";
     SIDEBAR_SELECTED = "sidebar.selected";
+    SIDEBAR_SELECTED_UNFOCUSED = "sidebar.selected.unfocused"; // the folder or account bar while the keys are in another pane
     SIDEBAR_HOVER = "sidebar.hover";
     SIDEBAR_ACCOUNT = "sidebar.account";
     SIDEBAR_ACCOUNT_ACTIVE = "sidebar.account.active";
@@ -84,6 +89,7 @@ roles! {
     LIST_ROW_UNREAD = "list.row.unread"; // not drawn yet
     LIST_ROW_HOVER = "list.row.hover"; // a message row under the pointer
     LIST_SELECTED = "list.selected";
+    LIST_SELECTED_UNFOCUSED = "list.selected.unfocused"; // the selected message's bar while the keys are in another pane
     LIST_MARKED = "list.marked"; // not drawn yet: a marked row reverses its number cell
     LIST_FLAG_UNREAD = "list.flag.unread";
     LIST_FLAG_ALERT = "list.flag.alert";

@@ -6,12 +6,10 @@ use surface::Frame;
 use crate::app_view::AppView;
 use crate::format::display_width;
 use crate::input::link_light::LitLinks;
-use crate::layout::{Layout, MIN_COLS, MIN_ROWS, SectionKind};
+use crate::layout::{Layout, MIN_COLS, MIN_ROWS};
 use crate::theme::roles;
-use crate::view_state::Focus;
 use crate::widgets::{
-    DrawContext, FooterData, MailboxSummary, StripData, draw_account_strip, draw_banner, draw_footer_with_hint, draw_key_bar,
-    mark_focused, put_text,
+    DrawContext, FooterData, MailboxSummary, StripData, draw_account_strip, draw_banner, draw_footer_with_hint, draw_key_bar, put_text,
 };
 
 impl AppView {
@@ -50,20 +48,6 @@ impl AppView {
         }
     }
 
-    /// Underlines the title of the pane that has focus.
-    pub(crate) fn mark_focus(&self, frame: &mut Frame, layout: &Layout) {
-        let title = match self.focus {
-            Focus::Sidebar => {
-                let kind = if self.account_cursor_row().is_some() { SectionKind::Accounts } else { SectionKind::Folders };
-                layout.sidebar.as_ref().and_then(|sidebar| sidebar.section(kind)).map(|section| section.title)
-            }
-            Focus::List => layout.list.as_ref().map(|list| list.title),
-            Focus::Reader => layout.reader.as_ref().map(|reader| reader.title),
-        };
-        if let Some(title) = title {
-            mark_focused(frame, title);
-        }
-    }
 }
 
 /// The one line shown when the grid is under the minimum size.

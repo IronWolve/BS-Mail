@@ -9,7 +9,9 @@ use crate::app_view::AppView;
 use crate::input::link_light::LitLinks;
 use crate::layout::{ListRegion, ReaderRegion};
 use crate::options::empty_hint::draw_no_account_hint;
-use crate::view_state::ListPage;
+use crate::theme::roles;
+use crate::view_focus::FocusLook;
+use crate::view_state::{Focus, ListPage};
 use crate::widgets::{
     BodyView, DrawContext, HighlightRules, ListRowsView, ReaderTitleData, column_label_for, draw_list_header,
     draw_list_rows, draw_list_title, draw_scrollbar, draw_reader_body, draw_reader_headers, draw_reader_title,
@@ -22,7 +24,7 @@ impl AppView {
         self.shown_page()?.envelopes.get(self.selection.message_index)
     }
 
-    pub(crate) fn draw_list(&self, frame: &mut Frame, ctx: &DrawContext<'_>, list: &ListRegion) {
+    pub(crate) fn draw_list(&self, frame: &mut Frame, ctx: &DrawContext<'_>, list: &ListRegion, look: FocusLook) {
         let mailbox = self.list_summary();
         draw_list_title(frame, ctx, list.title, mailbox.as_ref(), self.order_note().as_deref());
         let page = self.shown_page();
@@ -43,6 +45,7 @@ impl AppView {
             folders: &self.mail.folders,
             columns: &list.columns,
             selected: Some(selected),
+            bar: look.bar(ctx, look.pane == Focus::List, roles::LIST_SELECTED, roles::LIST_SELECTED_UNFOCUSED),
             offset: page.offset,
             first: self.list_view_first(visible, page.envelopes.len()),
             now: self.now,
@@ -64,7 +67,7 @@ impl AppView {
         column_label_for(&self.mail.folders, page.map_or(&[], |page| page.envelopes.as_slice()), folder_role)
     }
 
-    fn reader_title_data<'a>(&'a self, page: &'a ListPage) -> Option<ReaderTitleData<'a>> {
+    pub(crate) fn reader_title_data<'a>(&'a self, page: &'a ListPage) -> Option<ReaderTitleData<'a>> {
         let envelope = page.envelopes.get(self.selection.message_index)?;
         let unread = self.list_summary().map_or(0, |mailbox| mailbox.unread);
         Some(ReaderTitleData {

@@ -33,6 +33,8 @@ on_accent  = "#04121c"   # dark text on cyan and keycap blocks
 link_hover   = "#0f4a50"   # a link under the pointer: a dark teal band behind cyan text (6.5:1)
 link_pressed = "#1a6f78"   # the button is down on it: the same teal, stronger (5.5:1 with `text`)
 link_focus   = "#5a2468"   # the link the keys are on: a plum, another hue than the pointer's (10.4:1 with `text`)
+blue_dim     = "#1a2a4a"   # the selected message's bar while the keys are in another pane: a muted slate blue, 1.4:1 against the page, `text` 13.4:1 and red 4.7:1 on it
+green_dim    = "#3a9560"   # the selected folder's bar while the keys are in another pane: a muted green, `on_accent` 5.1:1 on it and 5.4:1 against the page
 
 [roles]
 # Window and frame lines.
@@ -43,6 +45,7 @@ link_focus   = "#5a2468"   # the link the keys are on: a plum, another hue than 
 "border.drag"            = { fg = "yellow", bold = true }   # not drawn yet
 "border.rule"            = {}
 "separator"              = { fg = "text" }
+"title.focused"          = { fg = "cyan", bold = true }     # the title of the pane that has the keys (the underline is added to it)
 
 # Title banner.
 "banner.slashes"         = { fg = "lime", italic = true }
@@ -68,6 +71,7 @@ link_focus   = "#5a2468"   # the link the keys are on: a plum, another hue than 
 "sidebar.count"          = { fg = "text" }
 "sidebar.chevron"        = { fg = "text" }
 "sidebar.selected"       = { fg = "on_accent", bg = "green_hi", bold = true }
+"sidebar.selected.unfocused" = { fg = "on_accent", bg = "green_dim", bold = false } # the folder or account bar while the keys are in another pane: dimmer and not bold
 "sidebar.hover"          = { bg = "bg_raised" }
 "sidebar.account"        = { fg = "text" }
 "sidebar.account.active" = { fg = "cyan", bold = true }
@@ -103,6 +107,7 @@ link_focus   = "#5a2468"   # the link the keys are on: a plum, another hue than 
 "list.row.unread"        = { fg = "text" }                  # not drawn yet
 "list.row.hover"         = { bg = "bg_raised" }             # a message row under the pointer
 "list.selected"          = { fg = "text", bg = "blue_sel", bold = true }
+"list.selected.unfocused" = { fg = "text", bg = "blue_dim", bold = false } # the selected message's bar while the keys are in another pane: muted and not bold
 "list.marked"            = { bg = "bg_raised", bold = true } # not drawn yet; a marked row reverses its number cell
 "list.flag.unread"       = { fg = "green" }
 "list.flag.alert"        = { fg = "yellow", bold = true }
@@ -189,3 +194,5 @@ on_accent = "black"
 link_hover   = "bright-black"
 link_pressed = "blue"
 link_focus   = "magenta"
+blue_dim     = "blue"
+green_dim    = "green"

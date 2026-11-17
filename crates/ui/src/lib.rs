@@ -24,6 +24,7 @@ pub mod setup;
 pub mod theme;
 pub mod view_bands;
 pub mod view_facts;
+pub mod view_focus;
 pub mod view_overlays;
 pub mod view_panes;
 pub mod view_sidebar;

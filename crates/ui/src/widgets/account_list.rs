@@ -19,7 +19,7 @@ const ICON_AT: u16 = 1;
 const ADDRESS_AT: u16 = 5;
 
 /// Draws one row per account, as many as fit in `body`. `cursor` is the row
-/// the keyboard is on, if any.
+/// the keyboard is on, if any, drawn in the role `bar`.
 pub fn draw_account_list(
     frame: &mut Frame,
     ctx: &DrawContext<'_>,
@@ -27,6 +27,7 @@ pub fn draw_account_list(
     accounts: &[Account],
     selected: Option<&AccountId>,
     cursor: Option<usize>,
+    bar: &str,
 ) {
     for (index, account) in accounts.iter().enumerate() {
         let Ok(dy) = u16::try_from(index) else { break };
@@ -42,10 +43,10 @@ pub fn draw_account_list(
         };
         let under_cursor = cursor == Some(index);
         if under_cursor {
-            fill_cells(frame, Rect::new(body.x, y, body.width, 1), ctx.full(roles::SIDEBAR_SELECTED));
+            fill_cells(frame, Rect::new(body.x, y, body.width, 1), ctx.full(bar));
         }
         let (icon_style, text_style) = if under_cursor {
-            (ctx.fg(roles::SIDEBAR_SELECTED), ctx.fg(roles::SIDEBAR_SELECTED))
+            (ctx.fg(bar), ctx.fg(bar))
         } else {
             (ctx.fg(icon_role), ctx.fg(text_role))
         };
@@ -56,7 +57,7 @@ pub fn draw_account_list(
         let room = count_x.saturating_sub(gap).saturating_sub(x);
         put_cut(frame, body, x, y, &account.address, room, text_style);
         if let Some(text) = count {
-            let style = if under_cursor { ctx.fg(roles::SIDEBAR_SELECTED) } else { ctx.fg(roles::SIDEBAR_COUNT) };
+            let style = if under_cursor { ctx.fg(bar) } else { ctx.fg(roles::SIDEBAR_COUNT) };
             put_text(frame, body, count_x, y, &text, style);
         }
     }

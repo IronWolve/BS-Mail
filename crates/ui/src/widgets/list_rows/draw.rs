@@ -8,7 +8,6 @@ use super::party::{names_recipient, role_of};
 use super::row_style::RowStyle;
 use crate::layout::ColumnLayout;
 use crate::list_order::RowMeta;
-use crate::theme::roles;
 use crate::widgets::DrawContext;
 use crate::widgets::cell_text::fill_cells;
 
@@ -24,6 +23,9 @@ pub struct ListRowsView<'a> {
     pub columns: &'a ColumnLayout,
     /// Index in `envelopes` of the selected row.
     pub selected: Option<usize>,
+    /// The role of the selection bar: `list.selected`, or its dimmer
+    /// `list.selected.unfocused` while the keys are in another pane.
+    pub bar: &'static str,
     /// Position in the folder of the page's first envelope, 0-based.
     pub offset: u32,
     /// Index in `envelopes` of the first row shown.
@@ -43,10 +45,10 @@ pub fn draw_list_rows(
     for (line, (index, envelope)) in shown.take(usize::from(rows.height)).enumerate() {
         let y = rows.y.saturating_add(u16::try_from(line).unwrap_or(u16::MAX));
         let selected = view.selected == Some(index);
-        let style = RowStyle::new(ctx, selected);
+        let style = RowStyle::with_bar(ctx, selected, view.bar);
         if selected {
             let bar = Rect::new(rows.x, y, rows.width, 1);
-            fill_cells(frame, bar, ctx.full(roles::LIST_SELECTED));
+            fill_cells(frame, bar, ctx.full(view.bar));
         }
         let info = RowInfo {
             envelope,

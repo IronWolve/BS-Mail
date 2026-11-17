@@ -36,6 +36,9 @@ pub struct FolderRowInfo<'a> {
 pub struct FolderTreeView<'a> {
     pub rows: &'a [FolderRowInfo<'a>],
     pub selected: Option<FolderId>,
+    /// The role of the selection bar: `sidebar.selected`, or its dimmer
+    /// `sidebar.selected.unfocused` while the keys are not in the folders.
+    pub bar: &'static str,
     pub spacing: FolderSpacing,
     /// Index of the first row shown.
     pub first: usize,
@@ -128,7 +131,7 @@ pub fn draw_folder_tree(
             break;
         }
         let selected = view.selected == Some(row.folder.id);
-        draw_row(frame, ctx, Rect::new(body.x, body.y + dy, body.width, 1), row, selected);
+        draw_row(frame, ctx, Rect::new(body.x, body.y + dy, body.width, 1), row, selected.then_some(view.bar));
     }
 }
 
@@ -156,17 +159,14 @@ fn draw_row(
     ctx: &DrawContext<'_>,
     line: Rect,
     row: &FolderRowInfo<'_>,
-    selected: bool,
+    bar: Option<&str>,
 ) {
-    if selected {
-        fill_cells(frame, line, ctx.full(roles::SIDEBAR_SELECTED));
+    if let Some(bar) = bar {
+        fill_cells(frame, line, ctx.full(bar));
     }
-    let pick = |role: &str| {
-        if selected {
-            ctx.fg(roles::SIDEBAR_SELECTED)
-        } else {
-            ctx.fg(role)
-        }
+    let pick = |role: &str| match bar {
+        Some(bar) => ctx.fg(bar),
+        None => ctx.fg(role),
     };
     let shift = INDENT.saturating_mul(row.depth);
     let (icon, icon_role) = icon_for(row);

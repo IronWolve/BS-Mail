@@ -41,6 +41,22 @@ fn counter_runs(ctx: &DrawContext<'_>, data: &ReaderTitleData<'_>) -> Vec<Run> {
     ]
 }
 
+/// Whether the counter is shown in `rect`, and the cell where the subject
+/// stops: before the counter and the blank that parts them, else at the edge.
+fn subject_end(ctx: &DrawContext<'_>, rect: Rect, counter_width: u16) -> (bool, u16) {
+    let title_x = rect.x.saturating_add(TITLE_AT);
+    let wanted = counter_width.saturating_add(1).saturating_add(MIN_TITLE);
+    let show = ctx.config.reader.show_counter && rect.right().saturating_sub(title_x) >= wanted;
+    (show, if show { rect.right() - counter_width - 1 } else { rect.right() })
+}
+
+/// The part of the title row `rect` that is the heading: the icon and the
+/// subject, without the counter at the right edge.
+pub fn heading_extent(ctx: &DrawContext<'_>, rect: Rect, data: Option<&ReaderTitleData<'_>>) -> Rect {
+    let end = data.map_or(rect.right(), |data| subject_end(ctx, rect, runs_width(&counter_runs(ctx, data))).1);
+    Rect::new(rect.x, rect.y, end.saturating_sub(rect.x), rect.height)
+}
+
 /// Draws the title into the one-row `rect` (the reader's text width). With no
 /// message only the icon is drawn. The counter is left out when
 /// `[reader] show_counter` is off or the row is too narrow for it.
@@ -60,10 +76,7 @@ pub fn draw_reader_title(
     let title_x = rect.x.saturating_add(TITLE_AT);
     let counter = counter_runs(ctx, data);
     let counter_width = runs_width(&counter);
-    let wanted = counter_width.saturating_add(1).saturating_add(MIN_TITLE);
-    let show = ctx.config.reader.show_counter
-        && rect.right().saturating_sub(title_x) >= wanted;
-    let right = if show { rect.right() - counter_width - 1 } else { rect.right() };
+    let (show, right) = subject_end(ctx, rect, counter_width);
     let base = ctx.fg(roles::READER_TITLE);
     let runs = subject_runs(ctx, data.subject, base, &|role| ctx.fg(role), false);
     put_runs_cut(frame, rect, title_x, rect.y, &runs, right.saturating_sub(title_x));

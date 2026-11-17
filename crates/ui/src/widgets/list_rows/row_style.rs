@@ -12,18 +12,27 @@ use crate::widgets::DrawContext;
 pub struct RowStyle<'a> {
     ctx: &'a DrawContext<'a>,
     selected: bool,
+    /// The role of the selection bar the selected row's text sits on.
+    bar: &'static str,
 }
 
 impl<'a> RowStyle<'a> {
+    /// The styles of a row on the list's own bar (`list.selected`).
     pub fn new(ctx: &'a DrawContext<'a>, selected: bool) -> Self {
-        Self { ctx, selected }
+        Self::with_bar(ctx, selected, roles::LIST_SELECTED)
+    }
+
+    /// The styles of a row whose bar is drawn in `bar`: the dimmer one while
+    /// the keys are in another pane.
+    pub fn with_bar(ctx: &'a DrawContext<'a>, selected: bool, bar: &'static str) -> Self {
+        Self { ctx, selected, bar }
     }
 
     /// Ordinary row text: the role's style, or the bar's style on the
     /// selected row.
     pub fn plain(&self, role: &str) -> Style {
         if self.selected {
-            self.ctx.full(roles::LIST_SELECTED)
+            self.ctx.full(self.bar)
         } else {
             self.ctx.fg(role)
         }
@@ -36,7 +45,7 @@ impl<'a> RowStyle<'a> {
         if !self.selected {
             return style;
         }
-        let bar = self.ctx.full(roles::LIST_SELECTED);
+        let bar = self.ctx.full(self.bar);
         let mut on_bar = style.add_modifier(bar.add_modifier);
         on_bar.bg = bar.bg;
         on_bar

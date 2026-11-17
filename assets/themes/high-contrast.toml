@@ -32,6 +32,8 @@ on_accent  = "#000000"
 link_hover   = "#00ffff"   # the link under the pointer: a cyan block
 link_pressed = "#ffffff"   # the button is down on it: a white block
 link_focus   = "#262626"   # the link the keys are on: bold yellow text on a dark band
+blue_dim     = "#404040"   # the selected message's bar while the keys are in another pane: grey, white text 10.4:1, 2:1 against the page
+green_dim    = "#404040"   # the selected folder's bar while the keys are in another pane: the same grey
 
 [roles]
 # The three states of a link are told apart by more than one color. The pointer's
@@ -44,6 +46,14 @@ link_focus   = "#262626"   # the link the keys are on: bold yellow text on a dar
 "body.link.hover"        = { fg = "on_accent", bg = "link_hover", bold = true, underline = true }
 "body.link.pressed"      = { fg = "on_accent", bg = "link_pressed", bold = true, underline = true }
 "body.link.focus"        = { fg = "yellow", bg = "link_focus", bold = true, underline = true }
+# The pane that has the keys is told from the others by more than color. Its
+# title is cyan, the other accent (the titles are yellow), bold and underlined.
+# Its selection bar keeps the theme's block and bold text; the bar of a pane
+# that does not have the keys is a grey band with regular weight text, white on
+# #404040 at 10.4:1 (every accent on it reads at 8.3:1 or better).
+"title.focused"          = { fg = "cyan", bold = true }
+"list.selected.unfocused" = { fg = "text", bg = "blue_dim", bold = false }
+"sidebar.selected.unfocused" = { fg = "text", bg = "green_dim", bold = false }
 "footer.error"           = { underline = true }
 "reader.found.current"   = { underline = true }
 "strip.offline"          = { underline = true }
@@ -74,3 +84,5 @@ on_accent = "black"
 link_hover   = "bright-cyan"
 link_pressed = "bright-white"
 link_focus   = "black"
+blue_dim     = "blue"
+green_dim    = "blue"
