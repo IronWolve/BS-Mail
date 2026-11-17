@@ -83,13 +83,22 @@ pub fn scan(root: &Path) -> Scan {
             return scan;
         }
     };
-    let mut folders: Vec<(String, PathBuf)> = entries
+    // What each entry is, without following a link: a link to a folder is listed so it can be
+    // reported, a link to anything else (or to nothing) is not a folder.
+    let mut folders: Vec<(String, PathBuf, bool)> = entries
         .filter_map(Result::ok)
-        .filter(|entry| entry.path().is_dir())
-        .map(|entry| (entry.file_name().to_string_lossy().into_owned(), entry.path()))
+        .filter_map(|entry| {
+            let link = entry.file_type().ok()?.is_symlink();
+            let wanted = if link { entry.path().is_dir() } else { entry.file_type().ok()?.is_dir() };
+            wanted.then(|| (entry.file_name().to_string_lossy().into_owned(), entry.path(), link))
+        })
         .collect();
     folders.sort();
-    for (name, folder) in folders {
+    for (name, folder, link) in folders {
+        if link {
+            scan.problems.push(format!("the folder \"{name}\" in the accounts folder is a link, not a folder; it was skipped"));
+            continue;
+        }
         if !is_valid_id(&name) {
             scan.problems.push(format!(
                 "the folder \"{name}\" in the accounts folder is not a usable account name \
@@ -98,8 +107,13 @@ pub fn scan(root: &Path) -> Scan {
             continue;
         }
         let file = folder.join(ACCOUNT_FILE);
-        if !file.is_file() {
-            continue;
+        match fs::symlink_metadata(&file) {
+            Ok(meta) if meta.file_type().is_symlink() => {
+                scan.problems.push(format!("account {name}: {ACCOUNT_FILE} is a link, not a file; it was skipped"));
+                continue;
+            }
+            Ok(meta) if meta.is_file() => {}
+            _ => continue,
         }
         let found = read_account(&file, &folder, Some(&name), &vault);
         if let Err(reason) = &found.config {
