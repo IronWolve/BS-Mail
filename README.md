@@ -88,8 +88,6 @@ it needs a client ID that you make once with the provider.
   you use the browser sign-in, and to your browser for links you click. It sends nothing to
   its author: no usage figures, no crash reports, no update checks, and it never loads remote
   images from messages.
-- Passwords are kept as plain text in the account file inside that folder, so do not copy the
-  folder to a place other people can read.
 - To remove everything, delete the program and that folder.
 
 ## Licence
