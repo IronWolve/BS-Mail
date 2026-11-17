@@ -1,6 +1,6 @@
 //! Which way the screen is shown this run.
 //!
-//! BS Mail is a terminal program. Unless a window is asked for with `--window`
+//! The program is a terminal program. Unless a window is asked for with `--window`
 //! (or a picture file with `--render-once`), the screen is drawn in the terminal
 //! the program was started from, on every system.
 

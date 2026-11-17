@@ -1,11 +1,11 @@
-# BS Mail
+# BS-Mail
 
 *Mail for Power Users*
 
 A fast, keyboard-first mail client for any IMAP and SMTP account that runs in your
 terminal. Everything works with the mouse too.
 
-![BS Mail: folders, message list and the open message](screenshots/main.png)
+![BS-Mail: folders, message list and the open message](screenshots/main.png)
 
 ## Download
 
@@ -13,12 +13,12 @@ Get the latest release from the [Releases page](../../releases).
 
 | System | File |
 | --- | --- |
-| Linux, 64-bit (Ubuntu 22.04 or newer, and most other current distributions) | `BSMail_linux-x64_v0.9.1.AppImage` |
-| Windows 10 or 11, 64-bit | `BSMail_windows-x64_v0.9.1.zip` |
+| Linux, 64-bit (Ubuntu 22.04 or newer, and most other current distributions) | `BS-Mail_linux-x64_v0.9.1.AppImage` |
+| Windows 10 or 11, 64-bit | `BS-Mail_windows-x64_v0.9.1.zip` |
 
 Each file has a `.sha256` file beside it so you can check the download.
 
-- **Linux:** make the file executable (`chmod +x BSMail_linux-x64_v0.9.1.AppImage`) and run it
+- **Linux:** make the file executable (`chmod +x BS-Mail_linux-x64_v0.9.1.AppImage`) and run it
   in your terminal. If it does not start, your system may need FUSE: install `libfuse2`
   (`libfuse2t64` on Ubuntu 24.04).
 - **Windows:** unzip, then run `bs-mail.exe` in Windows Terminal, PowerShell or the Command
@@ -30,7 +30,7 @@ instead, on Linux or Windows.
 
 ## First steps
 
-1. Start BS Mail. It opens with no account.
+1. Start BS-Mail. It opens with no account.
 2. Press `F10` (or click the Options button), choose **Accounts**, then **Add account**.
 3. Type your email address and pick your provider from the list: Gmail, Outlook, iCloud,
    Yahoo, Fastmail, GMX, Zoho, Proton Mail Bridge, 1&1 / IONOS and many more fill in the
@@ -81,7 +81,7 @@ it needs a client ID that you make once with the provider.
 
 ## Your data and privacy
 
-- Everything BS Mail keeps is in one folder and nowhere else: the `data` folder next to the
+- Everything BS-Mail keeps is in one folder and nowhere else: the `data` folder next to the
   program on Windows, and `~/.bs-mail` for the Linux AppImage. Mail itself is not stored on
   your computer; it is read from the server when you open it.
 - It talks only to the mail servers you set up (over TLS), to your provider's sign-in page if
@@ -94,7 +94,7 @@ it needs a client ID that you make once with the provider.
 
 ## Licence
 
-BS Mail is not open source. It is free for your own personal, non-commercial use. You may not
+BS-Mail is not open source. It is free for your own personal, non-commercial use. You may not
 copy or share it, change it, sell it, or use it commercially without written permission. See
 [LICENSE](LICENSE). The fonts and libraries it uses keep their own licenses, which come with
 each download in the file `NOTICE`.
