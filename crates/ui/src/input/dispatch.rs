@@ -20,6 +20,12 @@ impl AppView {
     /// Reacts to one input event on a `cols` x `rows` grid, once the text a
     /// command key brought with it has been set aside (see `paired_text`).
     pub(crate) fn dispatch_input(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
+        self.with_unread_hop(event, |view| view.route_input(event, grid))
+    }
+
+    /// Hands one event to whatever has the input: the screen that is open
+    /// over the mail, else the mail itself.
+    fn route_input(&mut self, event: &InputEvent, grid: (u16, u16)) -> bool {
         if matches!(event, InputEvent::Key(_)) {
             self.mail.done_text = None;
         }
@@ -145,8 +151,8 @@ impl AppView {
             return;
         }
         match action {
-            Action::FocusNext => self.change_focus(self.focus.next()),
-            Action::FocusPrevious => self.change_focus(self.focus.previous()),
+            Action::FocusNext => self.cycle_focus(true, grid),
+            Action::FocusPrevious => self.cycle_focus(false, grid),
             Action::Enter if self.focus == Focus::List && self.selected_is_draft() => {
                 self.start_compose(ComposeKind::Draft);
             }
@@ -193,6 +199,14 @@ impl AppView {
                 }
             }
         }
+    }
+
+    /// Tab and Shift+Tab: the next or previous pane, leaving out the sidebar
+    /// while it is switched off and so not on screen.
+    fn cycle_focus(&mut self, forward: bool, grid: (u16, u16)) {
+        let sidebar = self.layout(grid.0, grid.1).sidebar.is_some();
+        let next = if forward { self.focus.next_shown(sidebar) } else { self.focus.previous_shown(sidebar) };
+        self.change_focus(next);
     }
 
     /// Moves focus to another pane; the sidebar's account cursor stays behind.

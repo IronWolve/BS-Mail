@@ -33,6 +33,8 @@ impl AppView {
         self.mail.relocated.clear();
         self.mail.arrangement.open.clear();
         self.marked.clear();
+        self.memory.unread_hop = None;
+        self.memory.open_at_unread = None;
         self.queue.forget();
     }
 }

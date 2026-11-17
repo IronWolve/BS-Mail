@@ -78,6 +78,7 @@ pub mod text_select;
 pub mod thread_keys;
 pub mod thread_targets;
 pub mod tree;
+pub mod unread_hop;
 pub mod viewport;
 pub mod wheel;
 

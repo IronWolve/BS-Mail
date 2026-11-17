@@ -39,7 +39,8 @@ impl AppView {
 
     /// `N`: the next unread message after the selected one, going on from the
     /// top of the list when there is none below. Only the messages loaded so
-    /// far are looked at.
+    /// far are looked at. With none, the footer says where the next press
+    /// goes (the next folder with unread mail; see `unread_hop`).
     pub(crate) fn show_next_unread(&mut self, grid: (u16, u16)) {
         if self.focus == Focus::Sidebar || self.shown_page().is_none() {
             return;
@@ -49,7 +50,7 @@ impl AppView {
                 let layout = self.layout(grid.0, grid.1);
                 self.select_message(row, &layout);
             }
-            None => self.mail.set_note(Some("No more unread messages in this list".to_string())),
+            None => self.unread_elsewhere(),
         }
     }
 

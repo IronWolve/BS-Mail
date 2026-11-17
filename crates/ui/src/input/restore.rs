@@ -63,7 +63,7 @@ impl AppView {
     }
 
     /// Opens folder `id` and opens the folders above it, so it can be seen.
-    fn show_open_folder(&mut self, id: FolderId) {
+    pub(crate) fn show_open_folder(&mut self, id: FolderId) {
         let mut parent = self.mail.folder(id).and_then(|folder| folder.parent);
         for _ in 0..self.mail.folders.len() {
             let Some(up) = parent else {

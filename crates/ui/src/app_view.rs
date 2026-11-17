@@ -270,6 +270,7 @@ impl AppView {
         if folder.is_some() && self.selection.folder != folder {
             self.forget_folder_view();
         }
+        self.settle_unread_waits();
         // Another message is read from the top.
         if self.selection.message != message {
             self.scroll.reader = 0;

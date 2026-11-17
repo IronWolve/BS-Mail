@@ -25,6 +25,22 @@ impl Focus {
             Self::Reader => Self::List,
         }
     }
+
+    /// As `next`, going over the sidebar when it is not on screen.
+    pub fn next_shown(self, sidebar_shown: bool) -> Self {
+        match self.next() {
+            Self::Sidebar if !sidebar_shown => Self::Sidebar.next(),
+            next => next,
+        }
+    }
+
+    /// As `previous`, going over the sidebar when it is not on screen.
+    pub fn previous_shown(self, sidebar_shown: bool) -> Self {
+        match self.previous() {
+            Self::Sidebar if !sidebar_shown => Self::Sidebar.previous(),
+            previous => previous,
+        }
+    }
 }
 
 #[cfg(test)]
