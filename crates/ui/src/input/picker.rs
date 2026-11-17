@@ -3,13 +3,14 @@
 //! `m` opens it for the marked messages, or the selected one. Typed letters
 //! narrow the folders, the arrows move the highlight, Enter moves and Escape
 //! cancels. It only asks the backend; the list changes when the backend says
-//! the messages have moved.
+//! the messages have moved. The same box, opened by `gg`, goes to a folder
+//! instead (`folder_picker`): the keys are these, and Enter opens it.
 
 use model::{Command, FolderId, MessageId};
 use surface::{InputEvent, KeyEvent, LogicalKey, NamedKey};
 
 use crate::app_view::AppView;
-use crate::move_picker::MovePicker;
+use crate::move_picker::{MovePicker, Purpose};
 
 const READ_ONLY_NOTE: &str = "this account is read-only: set read_only = false in its file to change mail";
 
@@ -71,15 +72,16 @@ impl AppView {
             NamedKey::PageUp => (0..8).for_each(|_| picker.step(false, shown)),
             NamedKey::PageDown => (0..8).for_each(|_| picker.step(true, shown)),
             NamedKey::Backspace => picker.backspace(),
-            NamedKey::Enter => self.finish_move(),
+            NamedKey::Enter => self.finish_pick(),
             _ => return false,
         }
         true
     }
 
-    /// Asks for the move to the highlighted folder, and moves the selection
-    /// to the nearest message that stays so the user keeps their place.
-    pub(crate) fn finish_move(&mut self) {
+    /// Does what the picker is for with the highlighted folder: asks for the
+    /// move there, and moves the selection to the nearest message that stays
+    /// so the user keeps their place; or opens the folder.
+    pub(crate) fn finish_pick(&mut self) {
         let Some(picker) = self.picker.take() else {
             return;
         };
@@ -88,7 +90,10 @@ impl AppView {
             self.picker = Some(picker);
             return;
         };
-        self.move_targets(picker.targets, destination);
+        match picker.purpose {
+            Purpose::Move => self.move_targets(picker.targets, destination),
+            Purpose::Open => self.open_picked_folder(destination),
+        }
     }
 
     /// Asks for `targets` to move to `destination`, with the selection moved to

@@ -29,6 +29,7 @@ pub mod folder_actions;
 pub mod folder_change;
 pub mod forward_files;
 pub mod folder_keys;
+pub mod folder_picker;
 pub mod help_scroll;
 pub mod footer_clicks;
 pub mod goto_keys;

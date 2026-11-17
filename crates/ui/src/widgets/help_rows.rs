@@ -53,7 +53,7 @@ pub const HELP_ROWS: &[HelpRow] = &[
     row("Enter  Esc", "go in a pane, come back out"),
     row("Right  Left", "open and close a folder or a thread; in the other panes, in and out"),
     row("{focus_sidebar}  {focus_list}  {focus_reader}", "focus the folders, the list, the message"),
-    row("{go_to} then i s d a t j", "go to the Inbox, Sent, Drafts, Archive, Trash, Spam"),
+    row("{go_to} then i s d a t j", "go to the Inbox, Sent, Drafts, Archive, Trash, Spam; {go_to} again: pick any folder by name"),
     row("Ctrl+u  Ctrl+d", "half a page up and down in the pane that has focus"),
     row("click  double-click", "select a folder or message; a double-click opens the message"),
     row("click flag or star cell", "toggle read or star of that message"),

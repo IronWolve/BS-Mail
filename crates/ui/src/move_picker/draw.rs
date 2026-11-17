@@ -1,11 +1,12 @@
 //! The picker on screen: a box over the middle of the screen with the typed
-//! text, the folders that match it and the one highlighted.
+//! text, the folders that match it and the one highlighted. Its title and its
+//! hint say whether it is to move messages or to go to a folder.
 
 use model::Folder;
 use surface::{CursorRequest, CursorShape, Frame, Rect};
 
 use super::rows::rows_span;
-use super::state::MovePicker;
+use super::state::{MovePicker, Purpose};
 use crate::format::{ELLIPSIS_CHAR, display_width, truncate};
 use crate::theme::roles;
 use crate::widgets::help_overlay::overlaps;
@@ -14,7 +15,9 @@ use crate::widgets::{DrawContext, fill_cells, put_text};
 /// Folder rows shown at most; the list scrolls past this.
 const MAX_ROWS: u16 = 12;
 const WIDTH: u16 = 60;
-const HINT: &str = " Enter moves   Esc cancels ";
+const MOVE_HINT: &str = " Enter moves   Esc cancels ";
+const OPEN_HINT: &str = " Enter opens   Esc cancels ";
+const OPEN_TITLE: &str = " Go to folder ";
 
 /// The box for a grid: centered, as wide as is useful and no taller than the
 /// folders need.
@@ -39,12 +42,23 @@ pub fn draw_picker(frame: &mut Frame, ctx: &DrawContext<'_>, grid: Rect, picker:
     }
     frame.effects.retain(|effect| !overlaps(effect.area(), rect));
     fill_cells(frame, rect, ctx.full(roles::MENU_BASE));
-    let count = picker.targets.len();
-    let title = if count == 1 { " Move 1 message to ".to_string() } else { format!(" Move {count} messages to ") };
-    draw_frame(frame, ctx, rect, (&title, HINT));
+    let (title, hint) = labels(picker);
+    draw_frame(frame, ctx, rect, (&title, hint));
     let inner = Rect::new(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2);
     draw_filter_line(frame, ctx, inner, &picker.filter);
     draw_rows(frame, ctx, (rect, inner), picker, &candidates);
+}
+
+/// The title on the top edge and the hint on the bottom edge: what the folder
+/// chosen is for.
+fn labels(picker: &MovePicker) -> (String, &'static str) {
+    match picker.purpose {
+        Purpose::Open => (OPEN_TITLE.to_string(), OPEN_HINT),
+        Purpose::Move => match picker.targets.len() {
+            1 => (" Move 1 message to ".to_string(), MOVE_HINT),
+            count => (format!(" Move {count} messages to "), MOVE_HINT),
+        },
+    }
 }
 
 /// The border of a picker box with its title on the top edge and its hint on

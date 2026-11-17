@@ -1,5 +1,6 @@
-//! The mouse in the move picker: a click on a folder row moves the messages
-//! there, a click outside the box cancels, the wheel moves the highlight
+//! The mouse in the folder picker: a click on a folder row moves the messages
+//! there (or opens the folder, when the picker is for going to one), a click
+//! outside the box cancels, the wheel moves the highlight
 //! (and with it what shows), and the pointer over a row highlights it.
 
 use surface::{ButtonState, InputEvent, PointerButton, Rect};
@@ -25,7 +26,7 @@ impl AppView {
                 match row_at(area, (shown, cursor), pos.col, pos.row) {
                     Some(index) => {
                         self.set_picker_cursor(index);
-                        self.finish_move();
+                        self.finish_pick();
                     }
                     None if !inside_box(area, shown, pos.col, pos.row) => self.picker = None,
                     None => {}
