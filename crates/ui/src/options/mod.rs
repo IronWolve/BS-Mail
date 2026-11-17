@@ -1,8 +1,9 @@
-//! The in-app Options screen: pages for accounts, appearance and data. The
-//! screen only shows facts the program gives it and queues requests the
+//! The in-app Options screen: pages for accounts, appearance, data and about.
+//! The screen only shows facts the program gives it and queues requests the
 //! program takes; it never touches a file or a server. This file only
 //! declares and re-exports the modules.
 
+pub mod about_page;
 pub mod accounts_page;
 pub mod action;
 pub mod appearance_page;

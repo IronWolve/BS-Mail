@@ -19,6 +19,7 @@ rust-version = "1.95"
 display_name = "BS-Mail"
 tagline = "Mail for Power Users"
 copyright = "Copyright (c) 2026 IronWolve. All rights reserved."
+homepage = "https://github.com/IronWolve/BS-Mail"
 
 [profile.release]
 lto = "thin"

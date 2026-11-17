@@ -3,7 +3,7 @@
 use super::rows::{Row, controls_of};
 use super::state::{OptionsState, Page};
 use super::view::OptionsView;
-use super::{accounts_page, appearance_page, data_page};
+use super::{about_page, accounts_page, appearance_page, data_page};
 
 /// The rows of the current page for a page `width` cells wide.
 pub fn page_rows(view: &OptionsView<'_>, state: &OptionsState, width: u16) -> Vec<Row> {
@@ -11,6 +11,7 @@ pub fn page_rows(view: &OptionsView<'_>, state: &OptionsState, width: u16) -> Ve
         Page::Accounts => accounts_page::rows(view, state, width),
         Page::Appearance => appearance_page::rows(view),
         Page::Data => data_page::rows(view.paths, width),
+        Page::About => about_page::rows(view.identity, width),
     }
 }
 

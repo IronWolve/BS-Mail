@@ -1,10 +1,10 @@
-//! The name, tagline and version the screen shows, taken from the values the
-//! build script read out of the manifest.
+//! The name, tagline, version and home page the screen shows, taken from the
+//! values the build script read out of the manifest.
 
 use ui::AppIdentity;
 
 pub fn identity() -> AppIdentity {
-    AppIdentity::new(display_name(), env!("APP_TAGLINE"), env!("CARGO_PKG_VERSION"))
+    AppIdentity::new(display_name(), env!("APP_TAGLINE"), env!("CARGO_PKG_VERSION")).with_homepage(homepage())
 }
 
 pub fn display_name() -> &'static str {
@@ -19,3 +19,11 @@ pub fn slug() -> &'static str {
 pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
+
+/// The address of the home page, from the manifest's `homepage`.
+pub fn homepage() -> &'static str {
+    env!("APP_HOMEPAGE")
+}
+
+#[cfg(test)]
+include!("identity.tests.rs");

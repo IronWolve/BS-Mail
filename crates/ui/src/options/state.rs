@@ -10,16 +10,18 @@ pub enum Page {
     Accounts,
     Appearance,
     Data,
+    About,
 }
 
 impl Page {
-    pub const ALL: [Page; 3] = [Self::Accounts, Self::Appearance, Self::Data];
+    pub const ALL: [Page; 4] = [Self::Accounts, Self::Appearance, Self::Data, Self::About];
 
     pub fn label(self) -> &'static str {
         match self {
             Self::Accounts => "Accounts",
             Self::Appearance => "Appearance",
             Self::Data => "Data",
+            Self::About => "About",
         }
     }
 

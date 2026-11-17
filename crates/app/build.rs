@@ -1,7 +1,8 @@
-//! Carries the display name, its slug and the tagline from the one manifest
-//! field into the program, so no source file spells any of them and a rename
-//! of the project folder changes nothing. It also finds the font folder, the
-//! one place that is named by a build setting rather than by the code.
+//! Carries the display name, its slug, the tagline and the home page from the
+//! manifest's one table into the program, so no source file spells any of
+//! them and a rename of the project folder changes nothing. It also finds the
+//! font folder, the one place that is named by a build setting rather than by
+//! the code.
 
 use std::path::{Path, PathBuf};
 
@@ -30,6 +31,7 @@ fn main() {
     let name = field(app, "display_name");
     println!("cargo::rustc-env=APP_DISPLAY_NAME={name}");
     println!("cargo::rustc-env=APP_TAGLINE={}", field(app, "tagline"));
+    println!("cargo::rustc-env=APP_HOMEPAGE={}", field(app, "homepage"));
     println!("cargo::rustc-env=APP_SLUG={}", slug(&name));
     embed_windows_resources(&name, &slug(&name), &field(app, "copyright"));
 }

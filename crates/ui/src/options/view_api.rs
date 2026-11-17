@@ -77,6 +77,7 @@ impl AppView {
         OptionsView {
             accounts: self.options_host.accounts.as_deref(),
             paths: &self.options_host.paths,
+            identity: &self.identity,
             theme_names: &self.options_host.theme_names,
             config: &self.config,
             selected: self.selection.account.as_ref().map(|id| id.0.as_str()),

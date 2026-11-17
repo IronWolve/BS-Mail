@@ -1,5 +1,5 @@
-//! The application's name, tagline and version, handed to the screen code by
-//! its caller. The screen code never spells any of them.
+//! The application's name, tagline, version and home page, handed to the
+//! screen code by its caller. The screen code never spells any of them.
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppIdentity {
@@ -9,6 +9,8 @@ pub struct AppIdentity {
     pub tagline: String,
     /// Version number without a leading `v`.
     pub version: String,
+    /// The address of the home page; empty when the caller has none.
+    pub homepage: String,
 }
 
 impl AppIdentity {
@@ -21,7 +23,14 @@ impl AppIdentity {
             name: name.into(),
             tagline: tagline.into(),
             version: version.into(),
+            homepage: String::new(),
         }
+    }
+
+    /// The same identity with its home page set.
+    pub fn with_homepage(mut self, homepage: impl Into<String>) -> Self {
+        self.homepage = homepage.into();
+        self
     }
 
     /// The version as the screen writes it: `v1.2.3`.

@@ -1,17 +1,21 @@
 //! The facts a page is built from, borrowed from the view for one frame or
-//! one input: the accounts the program told of, the paths, the settings now
-//! in force and what the mail snapshot knows about connections.
+//! one input: the accounts the program told of, the paths, the program's
+//! identity, the settings now in force and what the mail snapshot knows about
+//! connections.
 
 use model::ConnectionState;
 use model::config::Config;
 
 use super::host::InfoLine;
 use super::summary::{AccountSummary, OptionsPaths};
+use crate::app_identity::AppIdentity;
 
 pub struct OptionsView<'a> {
     /// `None` when the program has not said (mock mail).
     pub accounts: Option<&'a [AccountSummary]>,
     pub paths: &'a OptionsPaths,
+    /// The program's name, tagline, version and home page, for the About page.
+    pub identity: &'a AppIdentity,
     pub theme_names: &'a [String],
     pub config: &'a Config,
     /// The id of the account whose mail is showing.

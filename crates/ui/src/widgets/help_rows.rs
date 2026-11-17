@@ -87,7 +87,7 @@ pub const HELP_ROWS: &[HelpRow] = &[
     row("drag a bar", "resize the sidebar and the list and reader split"),
     row_needing("Ctrl + - 0  Ctrl wheel", "text size, and back to normal", Needs::FontZoom),
     row_needing("F11", "full screen", Needs::FullScreen),
-    row("{options}", "options: accounts, appearance, data"),
+    row("{options}", "options: accounts, appearance, data, about"),
     row("{help}", "this help"),
     row("q  Ctrl+Q", "quit"),
 ];
