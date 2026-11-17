@@ -18,6 +18,8 @@ use crate::move_picker::MovePicker;
 use crate::options::OptionsState;
 use crate::options::draw::draw_options;
 use crate::options::host::OptionsHost;
+use crate::passphrase::PassphraseDialog;
+use crate::passphrase::dialog_draw::draw_dialog;
 use crate::composer::MailtoDraft;
 use crate::reader_tools::ReaderTools;
 use crate::search::ActiveSearch;
@@ -145,6 +147,9 @@ pub struct AppView {
     pub(crate) options: Option<OptionsState>,
     /// What the program told the Options screen, and what it asked for.
     pub(crate) options_host: OptionsHost,
+    /// The dialog that sets, changes or gives up a passphrase, while it is
+    /// open over the Options screen.
+    pub(crate) passphrase_dialog: Option<PassphraseDialog>,
 }
 
 impl AppView {
@@ -202,6 +207,7 @@ impl AppView {
             pending_mailto: None,
             options: None,
             options_host: OptionsHost::default(),
+            passphrase_dialog: None,
         }
     }
 
@@ -337,6 +343,9 @@ impl AppView {
         }
         if let Some(state) = &self.options {
             draw_options(&mut frame, &ctx, area, &self.options_view(), state);
+            if let Some(dialog) = &self.passphrase_dialog {
+                draw_dialog(&mut frame, &ctx, area, dialog);
+            }
             return frame;
         }
         fill_cells(&mut frame, area, ctx.full(roles::BASE));

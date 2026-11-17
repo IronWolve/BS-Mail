@@ -28,6 +28,10 @@ pub enum Control {
     Column(Column),
     Panel(Panel),
     Reload,
+    /// The three ways of protecting passwords on the Data page.
+    UseKeyFile,
+    UsePassphrase,
+    ChangePassphrase,
 }
 
 /// How a control is used.

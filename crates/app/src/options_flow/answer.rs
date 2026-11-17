@@ -6,6 +6,7 @@ use ui::{AppView, OptionsAction};
 use crate::accounts::{Live, MOCK_RUN};
 
 use super::edit::{add_account, edit_account};
+use super::protect::{change_passphrase, use_key_file, use_passphrase};
 use super::remove::remove_account;
 
 /// Which account form, if any, the answers opened. The caller makes the flow
@@ -42,6 +43,9 @@ pub fn answer(
                 }
             }
             OptionsAction::RemoveAccount(id) => remove_account(view, backend, live, &id),
+            OptionsAction::UsePassphrase(secret) => use_passphrase(view, live, &secret),
+            OptionsAction::ChangePassphrase(secret) => change_passphrase(view, live, &secret),
+            OptionsAction::UseKeyFile => use_key_file(view, live),
             OptionsAction::SetTheme(_)
             | OptionsAction::SetIcons(_)
             | OptionsAction::SetFontSize(_)

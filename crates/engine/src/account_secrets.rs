@@ -77,6 +77,10 @@ fn from_vault(vault: &VaultView, name: &str, oauth: bool) -> Result<Option<Secre
 /// The sentence for a vault that could not be opened. An OAuth2 account has no
 /// password to enter again: it signs in again, and the mail is safe.
 fn unavailable(error: &VaultError, oauth: bool) -> String {
+    if *error == VaultError::Locked {
+        // Not lost: the passphrase has simply not been given in this run.
+        return format!("the secrets of this account cannot be read yet: {error}; start the program again and enter it");
+    }
     if oauth {
         return format!(
             "the sign-in details of this account cannot be read: {error}; the mail is on the server and nothing \

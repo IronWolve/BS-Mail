@@ -10,8 +10,9 @@ use super::crypto;
 use super::entries::Entries;
 use super::error::VaultError;
 use super::file_io::{read_limited, replace};
-use super::format::{Header, MAX_VAULT_BYTES};
-use super::key_source::KeySource;
+use super::format::{Header, KdfHeader, MAX_VAULT_BYTES, Mode};
+use super::kdf::derive;
+use super::key_source::{KeySource, MasterKey, Unlocked};
 
 /// The vault's file name inside its folder.
 pub const VAULT_FILE_NAME: &str = "vault";
@@ -48,11 +49,27 @@ impl Vault {
             return Ok(Self { dir: dir.to_path_buf(), source, entries: Entries::default() });
         };
         let header = Header::parse(&bytes)?;
-        let master = source.existing_key()?;
-        let mut plain = crypto::open(&master, &header, &bytes)?;
-        let entries = Entries::from_plaintext(&plain);
-        wipe_bytes(&mut plain);
-        Ok(Self { dir: dir.to_path_buf(), source, entries: entries? })
+        let master = source.key_for(&header)?;
+        // A key held for this very file that fails to open it means the file changed.
+        let entries = read_entries(&master, &header, &bytes, VaultError::Damaged)?;
+        Ok(Self { dir: dir.to_path_buf(), source, entries })
+    }
+
+    /// The passphrase vault in `dir`, opened with `passphrase`: the key is
+    /// made from it under the settings the file names (this takes about a
+    /// second). A passphrase that does not open it is `WrongPassphrase`; a
+    /// folder with no vault or a vault in another mode is an error too, since
+    /// there is nothing a passphrase could unlock.
+    pub(super) fn open_with_passphrase(dir: &Path, passphrase: &Secret) -> Result<Self, VaultError> {
+        let bytes = read_limited(&dir.join(VAULT_FILE_NAME))?.ok_or(VaultError::WrongMode)?;
+        let header = Header::parse(&bytes)?;
+        let Some(kdf) = header.kdf else {
+            return Err(VaultError::WrongMode);
+        };
+        let master = derive(passphrase, &kdf)?;
+        let entries = read_entries(&master, &header, &bytes, VaultError::WrongPassphrase)?;
+        let source = KeySource::Passphrase(Unlocked::new(master, kdf));
+        Ok(Self { dir: dir.to_path_buf(), source, entries })
     }
 
     /// Sets the vault file in `dir` aside as `vault.unreadable` (replacing an
@@ -113,19 +130,63 @@ impl Vault {
         self.dir.join(VAULT_FILE_NAME)
     }
 
-    /// Writes the vault: the key is made first if this is the first save, then
-    /// a new file under a temporary name is flushed and renamed over the old
-    /// one. A save that fails leaves the old vault as it was.
+    /// The key this vault was opened (or is to be saved) with.
+    pub(super) fn source(&self) -> &KeySource {
+        &self.source
+    }
+
+    /// The passphrase key held, when this vault is a passphrase vault.
+    pub(super) fn unlocked(&self) -> Option<Unlocked> {
+        match &self.source {
+            KeySource::Passphrase(unlocked) => Some(unlocked.clone()),
+            KeySource::KeyFile(_) => None,
+        }
+    }
+
+    /// The same entries, to be saved with `source` from now on (nothing is
+    /// written).
+    pub(super) fn moved_to(&self, source: KeySource) -> Self {
+        Self { dir: self.dir.clone(), source, entries: self.entries.clone() }
+    }
+
+    /// Writes the vault: the key is made first if this is the first save of a
+    /// key-file vault, then a new file under a temporary name is flushed and
+    /// renamed over the old one. A save that fails leaves the old vault as it
+    /// was.
     pub fn save(&self) -> Result<(), VaultError> {
         let master = self.source.key_for_saving()?;
+        let file = self.sealed(&master, self.source.kdf())?;
+        replace(&self.path(), &file)
+    }
+
+    /// The whole file these entries make under `master` (and `kdf` for a
+    /// passphrase vault), not yet written.
+    pub(super) fn sealed(&self, master: &MasterKey, kdf: Option<&KdfHeader>) -> Result<Vec<u8>, VaultError> {
         let mut plain = self.entries.to_plaintext()?;
         if plain.len() as u64 > MAX_VAULT_BYTES {
             wipe_bytes(&mut plain);
             return Err(VaultError::TooBig);
         }
-        let file = crypto::seal(&master, self.source.mode(), plain)?;
-        replace(&self.path(), &file)
+        crypto::seal(master, kdf, plain)
     }
+
+    /// Which way the vault is protected.
+    pub fn mode(&self) -> Mode {
+        self.source.mode()
+    }
+}
+
+/// The entries in `bytes`, whose header is `header`, opened with `master`. A
+/// key that does not open a key-file vault is the lost or wrong key; for a
+/// passphrase vault the caller says what that means (`on_mismatch`).
+fn read_entries(master: &MasterKey, header: &Header, bytes: &[u8], on_mismatch: VaultError) -> Result<Entries, VaultError> {
+    let mut plain = match crypto::open(master, header, bytes) {
+        Err(VaultError::KeyMismatch) if header.mode == Mode::Passphrase => return Err(on_mismatch),
+        other => other?,
+    };
+    let entries = Entries::from_plaintext(&plain);
+    wipe_bytes(&mut plain);
+    entries
 }
 
 #[cfg(test)]

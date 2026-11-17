@@ -26,6 +26,9 @@ impl AppView {
         if self.setup.is_some() {
             return PointerShape::Arrow;
         }
+        if let Some(dialog) = &self.passphrase_dialog {
+            return dialog.pointer_shape(col, row, grid);
+        }
         if self.options.is_some() {
             return self.options_pointer_shape(col, row, grid);
         }

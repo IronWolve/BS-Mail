@@ -5,6 +5,7 @@ use model::config::{Config, IconMode};
 
 use super::host::InfoLine;
 use super::layout::{OptionsRects, layout, max_scroll};
+use super::protection::Protection;
 use super::pages::{page_controls, page_rows};
 use super::rows::row_of;
 use super::state::{OptionsState, Stop};
@@ -28,6 +29,18 @@ impl AppView {
     /// The places the Data page names.
     pub fn set_options_paths(&mut self, paths: OptionsPaths) {
         self.options_host.paths = paths;
+    }
+
+    /// How the saved passwords are protected now, for the Data page. Told at
+    /// start and again after the user changes it.
+    pub fn set_protection(&mut self, protection: Protection) {
+        self.options_host.protection = Some(protection);
+        self.settle_open_options();
+    }
+
+    /// How the saved passwords are protected, as the program last said.
+    pub fn protection(&self) -> Option<Protection> {
+        self.options_host.protection
     }
 
     /// The themes the Theme choice goes through.
@@ -84,6 +97,7 @@ impl AppView {
             connections: &self.mail.accounts,
             problem: self.mail.error.as_deref(),
             line: self.options_host.line.as_ref(),
+            protection: self.options_host.protection,
         }
     }
 

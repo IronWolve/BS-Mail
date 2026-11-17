@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 use super::error::VaultError;
 use super::format::MAX_VAULT_BYTES;
+use super::inject::{Step, reach};
 use crate::private_fs;
 
 /// The temporary name a save writes under, beside the vault.
@@ -39,6 +40,24 @@ pub(super) fn read_limited(path: &Path) -> Result<Option<Vec<u8>>, VaultError> {
     Ok(Some(bytes))
 }
 
+/// The first `limit` bytes of the file, or `None` when there is no file; the
+/// same refusals as `read_limited` for a link or something that is not a
+/// plain file. For looking at a header without reading the whole vault.
+pub(super) fn read_prefix(path: &Path, limit: u64) -> Result<Option<Vec<u8>>, VaultError> {
+    let meta = match std::fs::symlink_metadata(path) {
+        Ok(meta) => meta,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(VaultError::Read(error.to_string())),
+    };
+    if !meta.is_file() {
+        return Err(VaultError::NotAFile);
+    }
+    let file = std::fs::File::open(path).map_err(|error| VaultError::Read(error.to_string()))?;
+    let mut bytes = Vec::new();
+    file.take(limit).read_to_end(&mut bytes).map_err(|error| VaultError::Read(error.to_string()))?;
+    Ok(Some(bytes))
+}
+
 /// Puts `bytes` in place of the file at `path`, all or nothing.
 pub(super) fn replace(path: &Path, bytes: &[u8]) -> Result<(), VaultError> {
     let fail = |error: std::io::Error| VaultError::Write(error.to_string());
@@ -53,10 +72,12 @@ pub(super) fn replace(path: &Path, bytes: &[u8]) -> Result<(), VaultError> {
     if std::fs::symlink_metadata(&temp).is_ok_and(|meta| !meta.is_dir()) {
         std::fs::remove_file(&temp).map_err(fail)?;
     }
+    reach(Step::WriteTemp)?;
     private_fs::write_new_or_remove(&temp, bytes).map_err(fail)?;
-    if let Err(error) = std::fs::rename(&temp, path) {
+    let renamed = reach(Step::Rename).and_then(|()| std::fs::rename(&temp, path).map_err(fail));
+    if let Err(error) = renamed {
         let _ = std::fs::remove_file(&temp);
-        return Err(fail(error));
+        return Err(error);
     }
     let _ = private_fs::sync_folder(folder);
     Ok(())

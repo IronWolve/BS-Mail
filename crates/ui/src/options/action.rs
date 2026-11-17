@@ -1,6 +1,7 @@
 //! What the Options screen asks the program to do. The screen never touches a
 //! file or a server: it queues these, and the program takes them once.
 
+use model::Secret;
 use model::config::IconMode;
 
 use super::layout_choices::LayoutChange;
@@ -27,4 +28,11 @@ pub enum OptionsAction {
     SetLayout(LayoutChange),
     /// Read the settings files again.
     ReloadSettings,
+    /// Protect the saved passwords with this new passphrase (it was typed
+    /// twice and passed the rule), in place of a key file.
+    UsePassphrase(Secret),
+    /// Use this new passphrase in place of the one in use.
+    ChangePassphrase(Secret),
+    /// Protect the saved passwords with a key file again (confirmed).
+    UseKeyFile,
 }

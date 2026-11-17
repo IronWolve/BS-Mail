@@ -3,6 +3,7 @@
 //! open, because the program sets it up at start.
 
 use super::action::OptionsAction;
+use super::protection::Protection;
 use super::summary::{AccountSummary, OptionsPaths};
 
 /// The one line at the bottom of the screen.
@@ -24,6 +25,9 @@ pub struct OptionsHost {
     /// What the screen asked for, until the program takes it.
     pub actions: Vec<OptionsAction>,
     pub line: Option<InfoLine>,
+    /// How the saved passwords are protected; `None` when there is no vault
+    /// to say (mock mail), and the Data page then offers nothing about it.
+    pub protection: Option<Protection>,
 }
 
 impl OptionsHost {

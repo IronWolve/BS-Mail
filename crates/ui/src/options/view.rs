@@ -7,6 +7,7 @@ use model::ConnectionState;
 use model::config::Config;
 
 use super::host::InfoLine;
+use super::protection::Protection;
 use super::summary::{AccountSummary, OptionsPaths};
 use crate::app_identity::AppIdentity;
 
@@ -25,6 +26,8 @@ pub struct OptionsView<'a> {
     /// The last problem the mail backend reported.
     pub problem: Option<&'a str>,
     pub line: Option<&'a InfoLine>,
+    /// How the saved passwords are protected, when the program says.
+    pub protection: Option<Protection>,
 }
 
 impl OptionsView<'_> {

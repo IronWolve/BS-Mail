@@ -9,7 +9,7 @@ use ring::hkdf::{HKDF_SHA256, Salt};
 use ring::rand::{SecureRandom, SystemRandom};
 
 use super::error::VaultError;
-use super::format::{HEADER_LEN, Header, Mode, TAG_LEN};
+use super::format::{Header, KdfHeader, Mode, TAG_LEN};
 use super::key_source::MasterKey;
 
 const INFO: &[u8] = b"vault key v1";
@@ -38,9 +38,11 @@ fn subkey(master: &MasterKey, salt: &[u8]) -> Result<LessSafeKey, VaultError> {
 }
 
 /// The whole file for `plaintext`: header, ciphertext, tag. `plaintext` is
-/// overwritten.
-pub(super) fn seal(master: &MasterKey, mode: Mode, mut plaintext: Vec<u8>) -> Result<Vec<u8>, VaultError> {
-    let header = Header { mode, salt: random()?, nonce: random()? };
+/// overwritten. With `kdf` the file is a passphrase vault (version 2) naming
+/// those key-derivation settings; with `None` it is a key-file vault.
+pub(super) fn seal(master: &MasterKey, kdf: Option<&KdfHeader>, mut plaintext: Vec<u8>) -> Result<Vec<u8>, VaultError> {
+    let mode = if kdf.is_some() { Mode::Passphrase } else { Mode::KeyFile };
+    let header = Header { mode, kdf: kdf.copied(), salt: random()?, nonce: random()? };
     let head = header.encode();
     // Room for the tag from the start, so sealing never moves the text.
     let mut body = Vec::with_capacity(plaintext.len() + TAG_LEN);
@@ -54,7 +56,7 @@ pub(super) fn seal(master: &MasterKey, mode: Mode, mut plaintext: Vec<u8>) -> Re
         model::wipe_bytes(&mut body);
         return Err(error);
     }
-    let mut file = Vec::with_capacity(HEADER_LEN + body.len());
+    let mut file = Vec::with_capacity(head.len() + body.len());
     file.extend_from_slice(&head);
     file.extend_from_slice(&body);
     model::wipe_bytes(&mut body);
@@ -65,9 +67,10 @@ pub(super) fn seal(master: &MasterKey, mode: Mode, mut plaintext: Vec<u8>) -> Re
 /// a changed byte anywhere are the same failure.
 pub(super) fn open(master: &MasterKey, header: &Header, file: &[u8]) -> Result<Vec<u8>, VaultError> {
     let key = subkey(master, &header.salt)?;
-    let mut body = file[HEADER_LEN..].to_vec();
+    let head = header.len();
+    let mut body = file[head..].to_vec();
     let opened = key
-        .open_in_place(Nonce::assume_unique_for_key(header.nonce), Aad::from(&file[..HEADER_LEN]), &mut body)
+        .open_in_place(Nonce::assume_unique_for_key(header.nonce), Aad::from(&file[..head]), &mut body)
         .map(|plain| plain.len());
     match opened {
         Ok(length) => {

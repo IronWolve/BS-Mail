@@ -41,6 +41,19 @@ impl Source {
     }
 }
 
+impl Source {
+    /// The folder the vault and its key file are in: `secrets` in the data
+    /// folder, or beside the account file of `--account`. `None` for mock
+    /// mail, which has no vault.
+    pub fn secrets_folder(&self) -> Option<PathBuf> {
+        match self {
+            Self::Mock(_) => None,
+            Self::Account(file) | Self::Setup(file) => Some(Place::File(file.clone()).secrets_folder()),
+            Self::Accounts(root) | Self::Empty(root) => Some(Place::Root(root.clone()).secrets_folder()),
+        }
+    }
+}
+
 /// Whether the accounts folder has to be looked at to choose: not when the
 /// mail is named outright, unless the form was asked for too.
 pub fn needs_scan(options: &Options) -> bool {

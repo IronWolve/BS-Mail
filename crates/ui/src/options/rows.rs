@@ -19,6 +19,8 @@ pub enum Tone {
     Plain,
     Dim,
     Warn,
+    /// The title of a section of a page.
+    Heading,
 }
 
 /// Which end of text that is too long is cut.

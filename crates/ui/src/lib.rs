@@ -16,6 +16,7 @@ pub mod list_order;
 pub mod delete_prompt;
 pub mod move_picker;
 pub mod options;
+pub mod passphrase;
 pub mod path_entry;
 pub mod reader_tools;
 pub mod search;

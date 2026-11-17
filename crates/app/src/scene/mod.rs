@@ -8,6 +8,6 @@ mod build;
 mod sources;
 mod state;
 
-pub use build::build;
+pub use build::{Look, build, build_holding, look};
 pub(crate) use build::{icon_kind, plain_colors};
-pub use state::{SETTLE_LIMIT, Scene};
+pub use state::SETTLE_LIMIT;

@@ -10,20 +10,24 @@ mod entries;
 mod error;
 mod file_io;
 mod format;
+mod inject;
+mod kdf;
 mod key_file;
 mod key_source;
 mod names;
 mod shared;
 mod store;
+mod switch;
 mod view;
 
 pub use error::VaultError;
 pub use format::{MAX_VAULT_BYTES, Mode};
-pub use key_source::{KEY_FILE_NAME, KeySource};
+pub use key_source::{KEY_FILE_NAME, KeySource, Unlocked};
 pub use names::{
     TokenNames, account_prefix, attempt_name, client_secret_name, earlier_token_names, password_name,
     provider_client_secret_name, smtp_password_name, token_names,
 };
-pub use shared::SharedVault;
+pub use shared::{Protection, SharedVault};
 pub use store::{SECRETS_FOLDER_NAME, VAULT_FILE_NAME, Vault};
+pub use switch::Switched;
 pub use view::VaultView;

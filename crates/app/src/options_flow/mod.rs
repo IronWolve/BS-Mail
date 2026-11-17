@@ -6,6 +6,7 @@
 
 mod answer;
 mod edit;
+mod protect;
 mod reload;
 mod remove;
 mod save_note;

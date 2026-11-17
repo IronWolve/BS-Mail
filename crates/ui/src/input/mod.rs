@@ -55,6 +55,7 @@ pub mod options;
 pub mod options_layout_press;
 pub mod options_press;
 pub mod paired_text;
+pub mod passphrase_dialog;
 pub mod pointer_events;
 pub mod pointer_shape;
 pub mod picker;

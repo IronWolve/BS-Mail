@@ -68,6 +68,7 @@ fn draw_text(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, text: &str, t
         Tone::Plain => ctx.fg(roles::BODY_TEXT),
         Tone::Dim => ctx.fg(roles::LIST_HINT_LABEL).add_modifier(Modifier::DIM),
         Tone::Warn => ctx.fg(roles::FOOTER_ERROR),
+        Tone::Heading => ctx.fg(roles::SECTION_TITLE).add_modifier(Modifier::BOLD),
     };
     let shown = match cut {
         Cut::Right => truncate(text, usize::from(rect.width), ELLIPSIS_CHAR),

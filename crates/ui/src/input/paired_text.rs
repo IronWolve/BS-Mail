@@ -57,6 +57,7 @@ impl AppView {
     fn ignores_text(&self) -> bool {
         self.setup.is_none()
             && self.options.is_none()
+            && self.passphrase_dialog.is_none()
             && self.composer.is_none()
             && self.picker.is_none()
             && self.ask.is_none()

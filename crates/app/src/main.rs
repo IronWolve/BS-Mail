@@ -36,6 +36,7 @@ mod stats;
 mod theme_list;
 mod ticker;
 mod tty_run;
+mod unlock;
 mod unused_settings;
 mod window_run;
 

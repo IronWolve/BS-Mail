@@ -2,17 +2,19 @@
 
 use std::path::Path;
 
+use model::config::WindowConfig;
 use surface::Capabilities;
-use ui::icons::IconSet;
+use ui::icons::{IconKind, IconSet};
 use ui::theme::Theme;
 use ui::theme::roles;
+use ui::options::Protection;
 use ui::{AppView, OptionsPaths};
 
 use crate::accounts::{Migration, Place, Scan, move_secrets_into_vault, recover, scan};
 use crate::address_file;
 use crate::cli::Options;
 use crate::config_io::{self, CONFIG_NAME};
-use crate::data_lock::{self, DataLock, Refused};
+use crate::data_lock::{self, DataLock};
 use crate::errors::AppError;
 use crate::identity::identity;
 use crate::options_flow::Settings;
@@ -22,8 +24,45 @@ use crate::source::{Source, choose, needs_scan};
 use super::sources::{self, Base};
 use super::state::Scene;
 
+/// What a window and the start-up prompt need before any account is read:
+/// everything that comes from the settings and nothing from the vault.
+pub struct Look {
+    pub icons: IconKind,
+    /// Text size in points and row height, from the command line or the settings.
+    pub font: (u8, f32),
+    /// What the settings say about the window's size and start state.
+    pub window: WindowConfig,
+    /// What the theme means by plain text on the plain background.
+    pub base: Base,
+}
+
+/// The look of this run, from the settings.
+pub fn look(options: &Options) -> Result<Look, AppError> {
+    let data = data_dir(options.data_dir.as_ref());
+    let loaded = config_io::load(data.as_deref())?;
+    Ok(look_of(options, &loaded))
+}
+
+fn look_of(options: &Options, loaded: &config_io::Loaded) -> Look {
+    Look {
+        icons: options.icons.unwrap_or_else(|| icon_kind(loaded.config.appearance.icons)),
+        font: (
+            options.points.unwrap_or(loaded.config.font.size),
+            options.line_spacing.unwrap_or(loaded.config.font.line_spacing),
+        ),
+        window: loaded.config.window.clone(),
+        base: base_colors(&loaded.theme),
+    }
+}
+
 /// Builds the screen and its mail source.
 pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, AppError> {
+    build_holding(options, capabilities, None)
+}
+
+/// As `build`, for a run that already holds the lock on the data folder
+/// (the start-up prompt takes it before it asks for anything).
+pub fn build_holding(options: &Options, capabilities: Capabilities, held: Option<DataLock>) -> Result<Scene, AppError> {
     let data = data_dir(options.data_dir.as_ref());
     let root = data.as_deref().map(accounts_dir);
     let mut scanned = match (&root, needs_scan(options)) {
@@ -33,7 +72,10 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
     let source = choose(options, root, scanned.found.len())?;
     // Listing the accounts above only reads; from here on the run may start
     // sign-ins and write, so only one copy at a time gets to.
-    let lock = hold_data_folder(&source)?;
+    let lock = match held {
+        Some(lock) => Some(lock),
+        None => hold_data_folder(&source)?,
+    };
     let recovered = put_right_after_a_hard_stop(&source);
     let moved = move_secrets(&source);
     if moved.moved > 0
@@ -44,13 +86,7 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
     }
     scanned.problems.extend(recovered);
     let loaded = config_io::load(data.as_deref())?;
-    let base = base_colors(&loaded.theme);
-    let font = (
-        options.points.unwrap_or(loaded.config.font.size),
-        options.line_spacing.unwrap_or(loaded.config.font.line_spacing),
-    );
-    let window = loaded.config.window.clone();
-    let icons = options.icons.unwrap_or_else(|| icon_kind(loaded.config.appearance.icons));
+    let Look { icons, font, window, base, .. } = look_of(options, &loaded);
     engine::set_body_preference(loaded.config.reader.prefer);
     let mut view = AppView::new(identity(), loaded.theme, loaded.config, IconSet::new(icons));
     if let Some(link) = &options.mailto {
@@ -64,6 +100,9 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
     view.set_config_problem(config_io::footer_note(&problems));
     view.set_capabilities(capabilities);
     view.set_options_paths(options_paths(data.as_deref(), &source));
+    if let Some(protection) = protection_of(&source) {
+        view.set_protection(protection);
+    }
     let mut scene = scene_for(&source, view, base, &scanned)?;
     scene.lock = lock;
     scene.font = font;
@@ -98,9 +137,16 @@ fn hold_data_folder(source: &Source) -> Result<Option<DataLock>, AppError> {
     let Some(folder) = source.data_folder() else {
         return Ok(None);
     };
-    data_lock::take(&folder).map_err(|refused| match refused {
-        Refused::Busy { holder } => AppError::Locked(folder, holder),
-        Refused::Unlockable { reason } => AppError::Unlockable(folder, reason),
+    data_lock::hold(&folder)
+}
+
+/// How the vault of this run is protected, for the Data page; `None` for mock
+/// mail, which has no vault.
+fn protection_of(source: &Source) -> Option<Protection> {
+    let folder = source.secrets_folder()?;
+    Some(match engine::vault::SharedVault::for_dir(&folder).protection().mode {
+        engine::vault::Mode::Passphrase => Protection::Passphrase,
+        engine::vault::Mode::KeyFile => Protection::KeyFile,
     })
 }
 

@@ -33,7 +33,12 @@ impl Settings {
                 }
                 OptionsAction::ReloadSettings => self.reload(view, host),
                 // The accounts' requests are answered next door.
-                OptionsAction::AddAccount | OptionsAction::EditAccount(_) | OptionsAction::RemoveAccount(_) => None,
+                OptionsAction::AddAccount
+                | OptionsAction::EditAccount(_)
+                | OptionsAction::RemoveAccount(_)
+                | OptionsAction::UsePassphrase(_)
+                | OptionsAction::ChangePassphrase(_)
+                | OptionsAction::UseKeyFile => None,
             };
             grid = changed.or(grid);
         }

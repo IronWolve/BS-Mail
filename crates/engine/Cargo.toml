@@ -15,6 +15,7 @@ rustls = { workspace = true }
 tokio-rustls = { workspace = true }
 webpki-roots = { workspace = true }
 ring = { workspace = true }
+argon2.workspace = true
 mail-parser = { workspace = true }
 html2text = { workspace = true }
 html5ever = { workspace = true }

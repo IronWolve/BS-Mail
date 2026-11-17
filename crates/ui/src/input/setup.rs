@@ -66,6 +66,7 @@ impl AppView {
     pub fn takes_text(&self) -> bool {
         self.composer.is_some()
             || self.setup.is_some()
+            || self.passphrase_dialog.is_some()
             || self.search_bar.is_some()
             || self.picker.is_some()
             || self.find_is_editing()

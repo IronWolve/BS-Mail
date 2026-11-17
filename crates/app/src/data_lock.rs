@@ -8,6 +8,7 @@ use std::path::Path;
 
 use chrono::{Local, TimeZone};
 
+use crate::errors::AppError;
 use crate::paths::LOCK_FILE;
 use crate::private_dirs;
 
@@ -27,6 +28,15 @@ pub enum Refused {
     /// cannot be opened, or the file system has no locks), so nothing would
     /// keep two copies from writing the same files at once.
     Unlockable { reason: String },
+}
+
+/// The lock on `folder` for a run, or the error that turns the run away: a
+/// second copy is told who has the folder.
+pub fn hold(folder: &Path) -> Result<Option<DataLock>, AppError> {
+    take(folder).map_err(|refused| match refused {
+        Refused::Busy { holder } => AppError::Locked(folder.to_path_buf(), holder),
+        Refused::Unlockable { reason } => AppError::Unlockable(folder.to_path_buf(), reason),
+    })
 }
 
 /// Takes the lock on `folder`, making the folder if it is not there yet.

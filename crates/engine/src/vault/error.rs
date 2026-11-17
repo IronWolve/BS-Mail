@@ -34,6 +34,20 @@ pub enum VaultError {
     Random,
     /// The encryption library refused the key.
     Crypto,
+    /// The vault is protected by a passphrase and none has been given in this
+    /// run (or the one held is not for this file).
+    Locked,
+    /// The passphrase given does not open the vault. A passphrase that is
+    /// wrong and a ciphertext that was changed fail the same way, so this
+    /// cannot tell them apart.
+    WrongPassphrase,
+    /// The file asks the key derivation for settings out of range (zero, or
+    /// more than a vault ever needs), so nothing was computed.
+    KdfRefused,
+    /// The vault is protected in another way than the key given is for.
+    WrongMode,
+    /// A new passphrase that is shorter than the rule allows.
+    PassphraseTooShort,
 }
 
 impl VaultError {
@@ -69,6 +83,15 @@ impl fmt::Display for VaultError {
             Self::Write(why) => write!(f, "the secrets vault could not be saved: {why}"),
             Self::Random => write!(f, "the secrets vault could not be saved: the system gave no random numbers"),
             Self::Crypto => write!(f, "the secrets vault could not be used: the encryption library refused the key"),
+            Self::Locked => write!(f, "the secrets vault is locked: its passphrase has not been entered"),
+            Self::WrongPassphrase => write!(f, "that passphrase does not open the vault"),
+            Self::KdfRefused => write!(f, "{OPEN}: the key settings in the file are out of range"),
+            Self::WrongMode => write!(f, "{OPEN}: it is protected in another way than the key given"),
+            Self::PassphraseTooShort => write!(
+                f,
+                "that passphrase is too short: it needs at least {} characters",
+                model::MIN_PASSPHRASE_CHARS
+            ),
         }
     }
 }
