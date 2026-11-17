@@ -100,7 +100,9 @@ it needs a client ID that you make once with the provider.
   folder. You choose how it is protected in Options: a key file in the folder (the default:
   nothing to type and the folder stays portable, but anyone who gets the whole folder can
   read it), a passphrase you type at start, or the system keychain on Windows and Linux
-  (nothing to type, and a copy of the folder is useless on another computer).
+  (nothing to type, and a copy of the folder is useless on another computer). Windows does not
+  keep other people who use the same PC out of that folder by itself, so on a shared Windows PC
+  choose the system keychain (Options moves your saved secrets over for you).
 - To remove everything, delete the program and that folder. If you used the system keychain,
   switch to another way in Options first, so its key is removed too.
 
