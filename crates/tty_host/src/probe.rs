@@ -7,6 +7,13 @@ use surface::ColorDepth;
 /// direct-color name (such as `xterm-direct`) is true color, a `256color` name
 /// is 256 colors, and a terminal that says nothing is taken to have sixteen.
 pub fn color_depth(env: &dyn Fn(&str) -> Option<String>) -> ColorDepth {
+    color_depth_on(env, cfg!(windows))
+}
+
+/// The same, for a system given: a Windows console (Windows 10 and later, and
+/// Windows Terminal) shows true color and says nothing about it in the
+/// environment, so with no terminal name set it is taken to have it.
+fn color_depth_on(env: &dyn Fn(&str) -> Option<String>, windows: bool) -> ColorDepth {
     if env("NO_COLOR").is_some_and(|value| !value.is_empty()) {
         return ColorDepth::None;
     }
@@ -14,6 +21,7 @@ pub fn color_depth(env: &dyn Fn(&str) -> Option<String>) -> ColorDepth {
         return ColorDepth::TrueColor;
     }
     match env("TERM").as_deref() {
+        None if windows => ColorDepth::TrueColor,
         Some("dumb") | Some("") => ColorDepth::None,
         Some(term) if term.contains("direct") => ColorDepth::TrueColor,
         Some(term) if term.contains("256color") => ColorDepth::Indexed256,

@@ -61,9 +61,8 @@ pub fn help_text() -> String {
          \n\
          Usage: {name} [options] [mailto:address]\n\
          \n\
-         Where it draws (default: a window when started on its own, this\n\
-         terminal when started from one):\n  \
-         --window           open a window and draw there\n  \
+         Where it draws (default: this terminal, on every system):\n  \
+         --window           open a window and draw there instead\n  \
          --tty              run in this terminal (with --print: draw once and exit)\n  \
          --print            draw once into the terminal or a pipe and exit (never a window)\n  \
          --color-depth <d>  truecolor, 256, 16 or none (default: from the environment)\n  \

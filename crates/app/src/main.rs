@@ -1,8 +1,6 @@
 //! Program entry: reads the arguments, shows the screen the way this run
 //! asks for, and reports what went wrong when it cannot.
 
-// On Windows the program is a window program: starting it never shows a console.
-#![cfg_attr(windows, windows_subsystem = "windows")]
 mod account_writer;
 mod address_file;
 mod accounts;

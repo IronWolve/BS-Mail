@@ -34,7 +34,7 @@ pub enum SizeChoice {
 /// Where the screen is shown.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Mode {
-    /// The console it was started from, or a window when there is none.
+    /// The terminal it was started from; a window only when asked for.
     Auto,
     Terminal,
     Window,
