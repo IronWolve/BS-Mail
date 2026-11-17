@@ -17,6 +17,7 @@ pub mod gauge;
 pub mod help_overlay;
 pub mod help_rows;
 pub mod key_bar;
+pub mod link_hint;
 pub mod list_header;
 pub mod list_rows;
 pub mod list_title;
@@ -43,16 +44,17 @@ pub use focus_mark::mark_focused;
 pub use folder_tree::{
     FolderRowInfo, FolderTreeView, content_rows, draw_folder_tree, row_offsets, visible_rows,
 };
-pub use footer::{FooterData, FooterItem, FooterSpan, draw_footer, footer_item_at};
+pub use footer::{FooterData, FooterItem, FooterSpan, draw_footer, draw_footer_with_hint, footer_item_at};
 pub use gauge::draw_gauge;
 pub use help_overlay::{draw_help, help_capacity, help_max_scroll};
 pub use key_bar::{button_at, button_span_at, draw_key_bar};
+pub use link_hint::{LinkHint, is_web_address};
 pub use list_header::{column_align, column_label, draw_list_header};
 pub use list_rows::{ListRowsView, column_label_for, draw_list_rows};
 pub use list_title::draw_list_title;
 pub use reader_body::{
-    BodyPos, BodyText, BodyView, Highlights, Match, body_link_at, body_pos_at, body_text, draw_highlights, draw_reader_body,
-    visual_len,
+    BodyPos, BodyText, BodyView, Highlights, LinkHit, LinkState, Match, body_link_at, body_link_hit, body_pos_at, body_text,
+    draw_highlights, draw_link_light, draw_reader_body, visual_len,
 };
 pub use reader_headers::draw_reader_headers;
 pub use reader_title::{ReaderTitleData, draw_reader_title};

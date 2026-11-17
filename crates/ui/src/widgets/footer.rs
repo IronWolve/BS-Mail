@@ -7,6 +7,7 @@ use surface::{Frame, Rect};
 use super::account_strip::MailboxSummary;
 use super::cell_text::{Run, put_text, runs_width};
 use super::draw_context::DrawContext;
+use super::link_hint::LinkHint;
 use super::segment_row::{MIN_GAP, draw_segments, segments_fit};
 use crate::app_identity::AppIdentity;
 use crate::format::{ELLIPSIS_CHAR, group_thousands, truncate};
@@ -120,9 +121,32 @@ fn error_segments(
     vec![first, (item, vec![Run::new(text, ctx.fg(role))])]
 }
 
+/// The connection state and where the link under the pointer goes (`Open
+/// <address>`, `Write to <address>`), cut at the tail by display width to the
+/// cells left, so the scheme and the host are what stays. The verb is the
+/// footer's text and the target its key colour. When nothing is left, only the
+/// connection segment remains.
+fn hint_segments(ctx: &DrawContext<'_>, data: &FooterData<'_>, hint: &LinkHint, width: u16) -> Vec<Segment> {
+    let connection = connection_segment(ctx, data.connection);
+    let room = width.saturating_sub(runs_width(&connection)).saturating_sub(MIN_GAP);
+    let first = (Some(FooterItem::Connection), connection);
+    if room == 0 {
+        return vec![first];
+    }
+    let shown = truncate(&format!("{}{}", hint.verb, hint.target), usize::from(room), ELLIPSIS_CHAR);
+    // The verb is ASCII; a cut that falls inside it leaves its start and the ellipsis.
+    let verb_len: usize = shown.chars().zip(hint.verb.chars()).take_while(|(a, b)| a == b).map(|(ch, _)| ch.len_utf8()).sum();
+    let (verb, target) = shown.split_at(verb_len);
+    let mut runs = vec![text_run(ctx, verb)];
+    if !target.is_empty() {
+        runs.push(Run::new(target, ctx.fg(roles::FOOTER_KEY)));
+    }
+    vec![first, (None, runs)]
+}
+
 /// Where the footer's segments go: the cells between the slashes, and the
 /// segments that fit, each with what a click on it does.
-fn footer_row(ctx: &DrawContext<'_>, rect: Rect, data: &FooterData<'_>) -> (Rect, Vec<Segment>) {
+fn footer_row(ctx: &DrawContext<'_>, rect: Rect, data: &FooterData<'_>, hint: Option<&LinkHint>) -> (Rect, Vec<Segment>) {
     let footer = &ctx.config.footer;
     let content = inset_h(rect, 1);
     let mut area = content;
@@ -135,9 +159,10 @@ fn footer_row(ctx: &DrawContext<'_>, rect: Rect, data: &FooterData<'_>) -> (Rect
         .error
         .map(|error| (error, roles::FOOTER_ERROR))
         .or(data.notice.map(|notice| (notice, roles::FOOTER_UNREAD)));
-    let mut segments: Vec<Segment> = match shown {
-        Some(text) => error_segments(ctx, data, text, area.width),
-        None => footer.segments.iter().filter_map(|name| segment(ctx, name, data)).collect(),
+    let mut segments: Vec<Segment> = match (hint, shown) {
+        (Some(hint), _) => hint_segments(ctx, data, hint, area.width),
+        (None, Some(text)) => error_segments(ctx, data, text, area.width),
+        (None, None) => footer.segments.iter().filter_map(|name| segment(ctx, name, data)).collect(),
     };
     let fits = |segments: &[Segment]| {
         let runs: Vec<Vec<Run>> = segments.iter().map(|(_, runs)| runs.clone()).collect();
@@ -152,6 +177,12 @@ fn footer_row(ctx: &DrawContext<'_>, rect: Rect, data: &FooterData<'_>) -> (Rect
 /// Draws the footer into the one-row `rect` (inside the frame). Segments
 /// that do not fit are dropped from the right.
 pub fn draw_footer(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, data: &FooterData<'_>) {
+    draw_footer_with_hint(frame, ctx, rect, data, None);
+}
+
+/// The same, and while `hint` is given the footer says where the link under
+/// the pointer goes in place of the usual segments, a failure or a notice.
+pub fn draw_footer_with_hint(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, data: &FooterData<'_>, hint: Option<&LinkHint>) {
     if rect.is_empty() {
         return;
     }
@@ -162,7 +193,7 @@ pub fn draw_footer(frame: &mut Frame, ctx: &DrawContext<'_>, rect: Rect, data: &
         let right_x = content.right().saturating_sub(RIGHT_SLASHES);
         put_text(frame, content, right_x, rect.y, &"/".repeat(usize::from(RIGHT_SLASHES)), style);
     }
-    let (area, segments) = footer_row(ctx, rect, data);
+    let (area, segments) = footer_row(ctx, rect, data, hint);
     let runs: Vec<Vec<Run>> = segments.into_iter().map(|(_, runs)| runs).collect();
     draw_segments(frame, ctx, area, rect.y, &runs);
 }
@@ -180,7 +211,7 @@ pub fn footer_item_at(ctx: &DrawContext<'_>, rect: Rect, data: &FooterData<'_>, 
     if rect.is_empty() {
         return None;
     }
-    let (area, segments) = footer_row(ctx, rect, data);
+    let (area, segments) = footer_row(ctx, rect, data, None);
     let widths: Vec<u16> = segments.iter().map(|(_, runs)| runs_width(runs)).collect();
     let spread = spread_items(&widths, area.width, MIN_GAP)?;
     segments.iter().enumerate().find_map(|(index, (item, _))| {

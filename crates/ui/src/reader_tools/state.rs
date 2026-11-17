@@ -5,6 +5,7 @@ use model::{MessageId, RawPart};
 
 use super::attachment_state::AttachmentState;
 use super::find::FindState;
+use super::link_answers::LinkAnswers;
 use super::raw_view::RawView;
 use super::selection::TextSelection;
 
@@ -32,6 +33,8 @@ pub struct ReaderTools {
     /// The attachments of the open message: the cursor, the downloads asked
     /// for and the files that arrived.
     pub attachments: AttachmentState,
+    /// Which link the pointer is over, kept between its moves.
+    pub link_answers: LinkAnswers,
 }
 
 impl ReaderTools {

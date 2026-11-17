@@ -31,6 +31,9 @@ magenta    = "#00ffff"
 on_accent  = "#000000"
 
 [roles]
+# `ice` and `cyan` are the same here, so the pressed link takes a white block
+# (black text on white, 21:1) to differ from the hovered one (black on cyan).
+"body.link.pressed"      = { fg = "on_accent", bg = "text" }
 "footer.error"           = { underline = true }
 "reader.found.current"   = { underline = true }
 "strip.offline"          = { underline = true }

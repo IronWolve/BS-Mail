@@ -44,6 +44,16 @@ impl Highlights<'_> {
         let to = if row == end.row { end.col.saturating_add(1).min(width) } else { width };
         (from < to).then_some((from, to))
     }
+
+    /// The cells of `row` the marks cover, as `from` up to `to` (not included):
+    /// what is drawn under the marks leaves those cells to them.
+    pub(super) fn covered(&self, text: &BodyText, row: usize) -> Vec<(u16, u16)> {
+        let first = self.found.partition_point(|found| found.row < row);
+        let mut cells: Vec<(u16, u16)> =
+            self.found[first..].iter().take_while(|found| found.row == row).map(|found| (found.from, found.to)).collect();
+        cells.extend(self.selected_cells(text, row));
+        cells
+    }
 }
 
 /// Restyles the marked cells of the body drawn in `rect` with `view`.

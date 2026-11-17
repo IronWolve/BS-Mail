@@ -37,4 +37,8 @@ pub struct InputMemory {
     pub go_pending: bool,
     /// `F` was pressed and the letter of a folder action is awaited.
     pub folder_pending: bool,
+    /// The note the footer was showing when the pointer came onto the link it
+    /// is on: a note different from this one came after, and the footer keeps
+    /// it over the hint about the link.
+    pub hint_note: Option<String>,
 }

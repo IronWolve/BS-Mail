@@ -4,7 +4,10 @@
 //! everything else, so no widget has to know about it. Nothing is lit while a
 //! screen or a question is open over the mail, while something is being
 //! dragged, or after the window lost focus. While rows are being dragged the
-//! folder a drop would move them to is lit instead.
+//! folder a drop would move them to is lit instead. A link in the reader is
+//! lit too, but by the reader's own drawing (`link_light`), under the marks:
+//! here it is only a thing the pointer can be over, so that moving between
+//! links, or off one, asks for a new drawing.
 
 use surface::{Color, Frame, InputEvent, Modifier, Rect};
 
@@ -26,6 +29,9 @@ pub enum HoverTarget {
     KeyBar(&'static str, u16, u16),
     Footer(FooterSpan),
     Divider(Drag),
+    /// A link of the message in the reader, by its place among the message's
+    /// links: two links with one address are two targets.
+    Link(usize),
 }
 
 /// Gives every cell of `rect` the background `color`, keeping its text.
@@ -44,10 +50,18 @@ fn tint(frame: &mut Frame, rect: Rect, color: Option<Color>) {
 }
 
 impl AppView {
+    /// Whether nothing holds the pointer: no screen or question is open over
+    /// the mail and no bar, thumb, rows or text are being dragged. The press on
+    /// a link that has not yet become a selection holds nothing.
+    pub(crate) fn pointer_is_free(&self) -> bool {
+        let selecting = self.reading.selection.as_ref().is_some_and(|held| held.dragging && held.spread);
+        self.mail_is_free() && self.drag.is_none() && self.bar_drag.is_none() && !self.dragging_rows() && !selecting
+    }
+
     /// What the pointer is over, when something there is lit by it.
     pub(crate) fn hover_target(&self, grid: (u16, u16)) -> Option<HoverTarget> {
         let (col, row) = self.memory.hover?;
-        if !self.mail_is_free() || self.drag.is_some() || self.bar_drag.is_some() || self.dragging_rows() {
+        if !self.pointer_is_free() {
             return None;
         }
         let layout = self.layout(grid.0, grid.1);
@@ -66,6 +80,8 @@ impl AppView {
                 Some(HoverTarget::KeyBar(action, x, width))
             }
             Hit::Nothing => self.footer_span_at(&layout, col, row).map(HoverTarget::Footer),
+            // The link is looked for only when the pointer is on the reader.
+            Hit::Reader if self.link_light_allowed() => self.link_index_at(&layout, col, row).map(HoverTarget::Link),
             Hit::Sidebar | Hit::ListChrome | Hit::Reader => None,
         }
     }
@@ -84,7 +100,12 @@ impl AppView {
         };
         let before = self.hover_target(grid);
         self.memory.hover = at;
-        before != self.hover_target(grid)
+        let after = self.hover_target(grid);
+        if matches!(after, Some(HoverTarget::Link(_))) && before != after {
+            // The pointer came onto a link: the notes now showing are older.
+            self.memory.hint_note = self.footer_note().map(str::to_string);
+        }
+        before != after
     }
 
     /// Lights what the pointer is over, or the folder a drag would drop on.

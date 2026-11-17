@@ -1,7 +1,7 @@
 //! Role names as constants, so a widget never types a role as a bare string.
 //!
 //! `ALL` lists every role a widget may ask for; a theme must define each one.
-//! Three are reserved: no widget asks for them yet (marked `not drawn yet`
+//! Four are reserved: no widget asks for them yet (marked `not drawn yet`
 //! below), so a theme that changes them changes no frame.
 //! A role is named for its place and meaning (`list.selected`), never for its
 //! color. A child name (`list.date.recent`) starts from its parent's style.
@@ -119,6 +119,9 @@ roles! {
     BODY_TOKEN = "body.token";
     BODY_PATH = "body.path";
     BODY_LINK = "body.link";
+    BODY_LINK_HOVER = "body.link.hover"; // a link under the pointer
+    BODY_LINK_PRESSED = "body.link.pressed"; // a link the button is down on
+    BODY_LINK_FOCUS = "body.link.focus"; // not drawn yet: a link the keys are on
     BODY_SIGNATURE = "body.signature";
     READER_SELECTION = "reader.selection"; // the text selected with the pointer or Shift and the arrows
     READER_FOUND = "reader.found"; // a match of the find box

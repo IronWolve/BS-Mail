@@ -9,33 +9,17 @@ use surface::Modifiers;
 use crate::app_view::AppView;
 use crate::layout::Layout;
 use crate::view_state::Focus;
-use crate::widgets::{BodyView, DrawContext, HighlightRules, body_link_at};
+use crate::widgets::is_web_address;
 
 /// The start of the note shown while an address is being opened.
 const OPENING: &str = "Opening ";
 
-/// Whether an address in a message is a web address, which the browser opens;
-/// anything else that is marked as an address is a mail address.
-fn is_web_address(address: &str) -> bool {
-    let start = address.get(..8).unwrap_or(address).to_ascii_lowercase();
-    start.starts_with("http://") || start.starts_with("https://")
-}
-
 impl AppView {
     /// The web address under a cell of the reader's body, when there is one,
-    /// whole even where the address is cut over lines.
+    /// whole even where the address is cut over lines. The same answer the
+    /// light on a link gets (`link_hit_at`).
     pub(crate) fn link_under(&self, layout: &Layout, col: u16, row: u16) -> Option<String> {
-        let reader = layout.reader.as_ref()?;
-        let content = self.reader_content()?;
-        let ctx = DrawContext::new(&self.theme, &self.icons, &self.config, self.now);
-        let view = BodyView {
-            lead: &content.lead,
-            lines: content.body,
-            first: self.scroll.reader,
-            app_name: &self.identity.name,
-            rules: HighlightRules::default(),
-        };
-        body_link_at(&ctx, reader.body, &view, col, row)
+        self.link_hit_at(layout, col, row).map(|hit| hit.address)
     }
 
     /// A press in the reader: it takes focus. On the find box it is the box's;

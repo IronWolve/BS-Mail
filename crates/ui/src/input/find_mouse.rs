@@ -27,6 +27,11 @@ impl AppView {
         })
     }
 
+    /// Whether the cell is on the open find box, which takes a press there.
+    pub(crate) fn over_find_bar(&self, layout: &Layout, col: u16, row: u16) -> bool {
+        self.find_parts_now(layout).is_some_and(|parts| holds(parts.bar, col, row))
+    }
+
     /// A press on the find box. Returns whether it was on the box.
     pub(crate) fn click_find_bar(&mut self, layout: &Layout, col: u16, row: u16, shift: bool, grid: (u16, u16)) -> bool {
         let Some(parts) = self.find_parts_now(layout) else {

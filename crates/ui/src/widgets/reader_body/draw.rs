@@ -111,9 +111,24 @@ pub fn visual_len(ctx: &DrawContext<'_>, rect: Rect, view: &BodyView<'_>) -> usi
     wrapped(ctx, rect, view).len()
 }
 
+/// A link of the body: its place among the links of this body (the number its
+/// pieces carry, so two links with one address are told apart) and its address.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkHit {
+    pub index: usize,
+    pub address: String,
+}
+
 /// The web address under the cell `col`, `row` of the body drawn in `rect`
 /// with `view`, whole even when it is cut over several lines.
 pub fn body_link_at(ctx: &DrawContext<'_>, rect: Rect, view: &BodyView<'_>, col: u16, row: u16) -> Option<String> {
+    body_link_hit(ctx, rect, view, col, row).map(|hit| hit.address)
+}
+
+/// The link under the cell `col`, `row` of the body drawn in `rect` with
+/// `view`. The click, the hand pointer and the light on a link all ask this,
+/// so they cannot disagree about which cells are a link.
+pub fn body_link_hit(ctx: &DrawContext<'_>, rect: Rect, view: &BodyView<'_>, col: u16, row: u16) -> Option<LinkHit> {
     if rect.is_empty() || row < rect.y || row >= rect.bottom() {
         return None;
     }
@@ -126,7 +141,8 @@ pub fn body_link_at(ctx: &DrawContext<'_>, rect: Rect, view: &BodyView<'_>, col:
     for piece in pieces {
         let end = x.saturating_add(cells(&piece.text));
         if col >= x && col < end.min(clip_right) {
-            return piece.link.and_then(|index| body.links.get(index)).cloned();
+            let index = piece.link?;
+            return body.links.get(index).map(|address| LinkHit { index, address: address.clone() });
         }
         x = end;
     }

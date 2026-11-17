@@ -9,6 +9,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use super::cache::Wrapped;
 use super::draw::{BodyView, TEXT_AT, wrap_width, wrapped};
+use super::wrap::Piece;
 use crate::widgets::DrawContext;
 use crate::widgets::cell_text::cells;
 
@@ -73,6 +74,11 @@ impl BodyText {
     /// How many rows the body has room for on screen.
     pub fn visible(&self) -> usize {
         self.visible
+    }
+
+    /// The pieces of one row, each with the link it is a part of, if any.
+    pub(super) fn pieces(&self, row: usize) -> &[Piece] {
+        self.body.rows.get(row).map_or(&[], Vec::as_slice)
     }
 
     /// The text of one row.

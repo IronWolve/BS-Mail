@@ -83,8 +83,10 @@ impl AppView {
         match self.hit(layout, col, row) {
             Hit::Message(_) | Hit::Folder(_) | Hit::KeyBar(_) => true,
             Hit::Account(_) => self.account_row_switches(layout, col, row),
+            // The answer for the cell is the one the light on a link asks for, kept
+            // between the pointer's moves, so the hand costs nothing more.
             Hit::Reader => {
-                self.link_under(layout, col, row).is_some() || self.over_find_word(layout, col, row) || self.attachment_at(layout, col, row).is_some()
+                self.link_index_at(layout, col, row).is_some() || self.over_find_word(layout, col, row) || self.attachment_at(layout, col, row).is_some()
             }
             Hit::Nothing => self.footer_span_at(layout, col, row).is_some(),
             Hit::ListChrome => self.header_column_at(layout, col, row).is_some(),

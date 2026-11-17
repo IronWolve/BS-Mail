@@ -36,7 +36,7 @@ on_accent  = "#04121c"   # dark text on cyan and keycap blocks
 "base"                   = { fg = "text", bg = "bg" }
 "border"                 = { fg = "border" }
 "border.focused"         = { fg = "green" }
-"border.hover"           = { fg = "yellow", bold = true }   # not drawn yet
+"border.hover"           = { fg = "yellow", bold = true }   # a bar under the pointer
 "border.drag"            = { fg = "yellow", bold = true }   # not drawn yet
 "border.rule"            = {}
 "separator"              = { fg = "text" }
@@ -98,7 +98,7 @@ on_accent  = "#04121c"   # dark text on cyan and keycap blocks
 "list.header.bar"        = { fg = "cyan" }
 "list.row"               = { fg = "text" }
 "list.row.unread"        = { fg = "text" }                  # not drawn yet
-"list.row.hover"         = { bg = "bg_raised" }             # not drawn yet
+"list.row.hover"         = { bg = "bg_raised" }             # a message row under the pointer
 "list.selected"          = { fg = "text", bg = "blue_sel", bold = true }
 "list.marked"            = { bg = "bg_raised", bold = true } # not drawn yet; a marked row reverses its number cell
 "list.flag.unread"       = { fg = "green" }
@@ -135,6 +135,9 @@ on_accent  = "#04121c"   # dark text on cyan and keycap blocks
 "body.token"             = { fg = "cyan" }
 "body.path"              = { fg = "magenta" }
 "body.link"              = { fg = "cyan", underline = true }
+"body.link.hover"        = { fg = "on_accent", bg = "cyan", bold = true, underline = true }   # a link under the pointer: a cyan block, every piece of it
+"body.link.pressed"      = { fg = "on_accent", bg = "ice", bold = true, underline = true }    # the button is down on it, no selection yet
+"body.link.focus"        = { fg = "on_accent", bg = "cyan", bold = true, underline = true }   # not drawn yet: the link the keys are on
 "body.signature"         = { fg = "green" }
 "reader.selection"       = { fg = "text", bg = "blue_sel" }
 "reader.found"           = { fg = "on_accent", bg = "yellow" }
@@ -143,7 +146,7 @@ on_accent  = "#04121c"   # dark text on cyan and keycap blocks
 # Key bar and footer.
 "keybar.cap"             = { fg = "on_accent", bg = "keycap", bold = true }
 "keybar.label"           = { fg = "text" }
-"keybar.hover"           = { bg = "bg_raised" }             # not drawn yet
+"keybar.hover"           = { bg = "bg_raised" }             # a key bar button or footer item under the pointer
 "footer.slashes"         = { fg = "lime", italic = true }
 "footer.text"            = { fg = "text" }
 "footer.ok"              = { fg = "green" }
