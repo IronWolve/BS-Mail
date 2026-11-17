@@ -46,7 +46,8 @@ it needs a client ID that you make once with the provider.
 - **Several accounts** at once, each with its own folders, switched with a click or the keyboard.
 - **Read and write:** reply, reply to everyone, forward, with attachments. Pick which account
   sends, keep a signature, and complete addresses from the people you wrote to.
-- **Attachments:** save them or open them. Programs and scripts are saved but never opened.
+- **Attachments:** save them or open them. Programs and scripts are saved but never opened, and
+  PDF, older Office and RTF files ask before they open.
 - **HTML mail** opens as a safe copy in your browser: scripts, frames, forms and everything that
   would load from the internet are left out, and it tells you how many items were removed.
 - **Find and arrange:** search, sort by any column, group into threads, tag, star and mark alerts.

@@ -1,9 +1,11 @@
-//! A yes or no before a folder goes for good: which folder, what is said
-//! and what the two buttons read. Focus starts on the safe button.
+//! A yes or no before a folder goes for good, or before an attachment that can
+//! carry active content is opened: what is asked, what is said under it and what
+//! the two buttons read. Focus starts on the safe button.
 
-use model::{Folder, FolderId, FolderRole};
+use model::{AttachmentInfo, Folder, FolderId, FolderRole, MessageId};
 
 use crate::delete_prompt::Choice;
+use crate::format::truncate;
 
 /// What a yes does.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -12,6 +14,8 @@ pub enum ConfirmAction {
     DeleteFolder(FolderId),
     /// Remove every message of the Trash or Spam folder.
     EmptyFolder(FolderId),
+    /// Save the attachment and open it with the system.
+    OpenAttachment { message: MessageId, attachment: AttachmentInfo },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,6 +34,9 @@ pub struct ConfirmPrompt {
 }
 
 const WARNING: &str = "This cannot be undone.";
+const ACTIVE_CONTENT_WARNING: &str = "PDF, Office and RTF files can carry active content.";
+/// The most of an attachment's name that the question shows, so that the line fits the box.
+const NAME_CELLS: usize = 34;
 
 fn messages(count: u32) -> String {
     if count == 1 { "1 message".to_owned() } else { format!("{count} messages") }
@@ -72,6 +79,23 @@ impl ConfirmPrompt {
             no: " Keep them ",
             focus: Choice::Keep,
             done: format!("Emptied {place}"),
+        }
+    }
+
+    /// The question before the system opens `attachment` of `message`: a kind of
+    /// file that can carry active content (see `active_content`). A no, the
+    /// default, leaves it unopened (it can still be saved).
+    pub fn open_attachment(message: MessageId, attachment: &AttachmentInfo) -> Self {
+        let name = truncate(&attachment.name, NAME_CELLS, "...");
+        Self {
+            action: ConfirmAction::OpenAttachment { message, attachment: attachment.clone() },
+            title: " Open attachment ",
+            question: format!("Open {name} with the system viewer?"),
+            warning: ACTIVE_CONTENT_WARNING,
+            yes: " Open it ",
+            no: " Do not open ",
+            focus: Choice::Keep,
+            done: String::new(),
         }
     }
 

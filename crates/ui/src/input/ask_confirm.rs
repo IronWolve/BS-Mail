@@ -1,4 +1,5 @@
-//! The yes or no before a folder goes for good (see `ask::confirm`): `y`
+//! The yes or no before a folder goes for good or an attachment that can carry
+//! active content is opened (see `ask::confirm`): `y`
 //! does it, `n` or Escape keeps things as they are, the arrows and Tab move
 //! between the two buttons, Enter does what the focused button says, and a
 //! click on a button does the same. A yes sends the command and says what was
@@ -12,6 +13,7 @@ use super::question::{Step, question_step};
 use crate::app_view::AppView;
 use crate::ask::{Ask, ConfirmAction};
 use crate::delete_prompt::Choice;
+use crate::reader_tools::{Owner, Want};
 
 impl AppView {
     /// Input while the question is open. Returns whether the screen changed.
@@ -42,6 +44,11 @@ impl AppView {
         let command = match prompt.action {
             ConfirmAction::DeleteFolder(folder) => Command::DeleteFolder { folder },
             ConfirmAction::EmptyFolder(folder) => Command::EmptyFolder { folder },
+            ConfirmAction::OpenAttachment { message, attachment } => {
+                // Asked for as `o` asks for it, once the question is answered: the program saves it and opens it.
+                self.fetch_attachment(message, attachment, Owner::Reader(Want::Open));
+                return;
+            }
         };
         self.queue.push(command);
         self.promise_note(prompt.done, Settles::Folders);

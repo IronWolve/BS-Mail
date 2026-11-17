@@ -2,7 +2,8 @@
 //! attachment (the next one, and `X` the one before), and the reader then
 //! reads a few keys as its own: `Enter` saves the attachment in the
 //! attachments folder of the data folder, `o` saves it and opens it with the
-//! system, `a` asks where to save it (a path box, with the folders and files
+//! system (after a question for a PDF, an older Office file or an RTF, see
+//! `ask::active_content`), `a` asks where to save it (a path box, with the folders and files
 //! that match listed), `x` and `X` step on and `Esc` leaves. The mouse does the
 //! same through the menu a click opens (see `attachment_mouse`). The screen
 //! only asks the engine for the attachment and hands the file that arrives to
@@ -12,6 +13,7 @@ use model::{AttachmentInfo, Command, MessageId};
 use surface::{KeyEvent, LogicalKey, NamedKey};
 
 use crate::app_view::AppView;
+use crate::ask::{Ask, ConfirmPrompt, may_carry_active_content};
 use crate::format::format_size;
 use crate::reader_tools::{Fetch, Owner, Want};
 use crate::view_state::Focus;
@@ -105,6 +107,11 @@ impl AppView {
             return;
         };
         self.reading.attachments.cursor = Some((message, at));
+        // A PDF, an older Office file or an RTF can carry active content: opening it asks first.
+        if want == Want::Open && may_carry_active_content(&attachment.name, &attachment.content_type) {
+            self.ask = Some(Ask::Confirm(ConfirmPrompt::open_attachment(message, &attachment)));
+            return;
+        }
         self.fetch_attachment(message, attachment, Owner::Reader(want));
     }
 
