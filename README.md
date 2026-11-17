@@ -2,9 +2,8 @@
 
 *Mail for Power Users*
 
-A fast, keyboard-first mail client for any IMAP and SMTP account. It opens in a
-window of its own, and on Linux it can also run inside a terminal. Everything
-works with the mouse too.
+A fast, keyboard-first mail client for any IMAP and SMTP account that runs in your
+terminal. Everything works with the mouse too.
 
 ![BS Mail: folders, message list and the open message](screenshots/main.png)
 
@@ -19,11 +18,15 @@ Get the latest release from the [Releases page](../../releases).
 
 Each file has a `.sha256` file beside it so you can check the download.
 
-- **Linux:** make the file executable (`chmod +x BSMail_linux-x64_v0.9.1.AppImage`) and run it.
-  If it does not start, your system may need FUSE: install `libfuse2` (`libfuse2t64` on Ubuntu 24.04).
-  Started from a terminal it runs in that terminal; add `--window` to get the window.
-- **Windows:** unzip, then run `bs-mail.exe`. The program is not signed, so Windows may say
-  "Windows protected your PC": choose *More info*, then *Run anyway*.
+- **Linux:** make the file executable (`chmod +x BSMail_linux-x64_v0.9.1.AppImage`) and run it
+  in your terminal. If it does not start, your system may need FUSE: install `libfuse2`
+  (`libfuse2t64` on Ubuntu 24.04).
+- **Windows:** unzip, then run `bs-mail.exe` in Windows Terminal, PowerShell or the Command
+  Prompt. The program is not signed, so Windows may say "Windows protected your PC": choose
+  *More info*, then *Run anyway*.
+
+It runs in the terminal you start it from. Add `--window` to open it in a window of its own
+instead, on Linux or Windows.
 
 ## First steps
 
