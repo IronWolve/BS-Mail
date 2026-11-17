@@ -10,4 +10,4 @@ mod state;
 
 pub use build::build;
 pub(crate) use build::{icon_kind, plain_colors};
-pub use state::SETTLE_LIMIT;
+pub use state::{SETTLE_LIMIT, Scene};

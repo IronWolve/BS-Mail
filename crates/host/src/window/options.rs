@@ -24,6 +24,13 @@ pub struct WindowOptions {
     pub line_spacing: f32,
     /// The colors a cell means by "reset".
     pub palette: Palette,
+    /// The window's icon, as the bytes of a PNG picture (shown in the title
+    /// bar and the task bar by systems that take one from the program).
+    pub icon_png: Option<&'static [u8]>,
+    /// The name a desktop knows the program's windows by (the window class
+    /// on X11, the application id on Wayland), so a launcher entry of the
+    /// same name finds its icon and groups the windows. Empty leaves it unset.
+    pub app_id: String,
 }
 
 /// Points, the smallest and largest the font-size keys go.
@@ -50,6 +57,8 @@ impl Default for WindowOptions {
             points: 12,
             line_spacing: 1.0,
             palette: Palette::default(),
+            icon_png: None,
+            app_id: String::new(),
         }
     }
 }

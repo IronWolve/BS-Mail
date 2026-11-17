@@ -14,6 +14,7 @@ use winit::window::{Window, WindowAttributes};
 use crate::font::CellMetrics;
 
 use super::geometry::{MonitorArea, minimum_pixels, window_pixels};
+use super::icon;
 use super::options::WindowOptions;
 
 /// Opens the window for `options`, measured with `metrics` at scale factor 1.
@@ -42,8 +43,9 @@ fn attributes(
     let limit = monitor.map(|area| area.usable());
     let (width, height) = window_pixels(metrics, options.cols, options.rows, limit);
     let (least_width, least_height) = minimum_pixels(metrics, options.min_cols, options.min_rows, limit);
-    let attributes = Window::default_attributes()
+    let attributes = named(Window::default_attributes(), &options.app_id)
         .with_title(options.title.clone())
+        .with_window_icon(options.icon_png.and_then(icon::from_png))
         .with_inner_size(LogicalSize::new(width, height))
         .with_min_inner_size(LogicalSize::new(least_width, least_height))
         .with_maximized(options.maximized);
@@ -54,6 +56,23 @@ fn attributes(
         }
         _ => attributes,
     }
+}
+
+/// The window class and application id the desktop knows the windows by.
+#[cfg(target_os = "linux")]
+fn named(attributes: WindowAttributes, app_id: &str) -> WindowAttributes {
+    use winit::platform::wayland::WindowAttributesExtWayland;
+    use winit::platform::x11::WindowAttributesExtX11;
+    if app_id.is_empty() {
+        return attributes;
+    }
+    WindowAttributesExtX11::with_name(WindowAttributesExtWayland::with_name(attributes, app_id, app_id), app_id, app_id)
+}
+
+/// Other systems name windows by their program, not by a setting.
+#[cfg(not(target_os = "linux"))]
+fn named(attributes: WindowAttributes, _app_id: &str) -> WindowAttributes {
+    attributes
 }
 
 /// The monitor the window opens on, when one is known.

@@ -31,6 +31,58 @@ fn main() {
     println!("cargo::rustc-env=APP_DISPLAY_NAME={name}");
     println!("cargo::rustc-env=APP_TAGLINE={}", field(app, "tagline"));
     println!("cargo::rustc-env=APP_SLUG={}", slug(&name));
+    embed_windows_resources(&name, &slug(&name), &field(app, "copyright"));
+}
+
+/// On Windows the program carries its icon and its version information as
+/// resources, which Explorer and the task bar read. The resource script is
+/// written here from the manifest and compiled with the target's resource
+/// compiler: the one `WINDRES` names, or the cross compiler's own. Other
+/// systems take their icon from elsewhere and do nothing here.
+fn embed_windows_resources(name: &str, slug: &str, copyright: &str) {
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
+        return;
+    }
+    println!("cargo::rerun-if-env-changed=WINDRES");
+    if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() != Ok("gnu") {
+        println!("cargo::warning=the icon and version resources are only embedded by the gnu target");
+        return;
+    }
+    let icon = crate_dir().join("..").join("..").join("assets").join("icon").join("icon.ico");
+    assert!(icon.is_file(), "the build needs the program icon");
+    println!("cargo::rerun-if-changed={}", icon.display());
+    let version = std::env::var("CARGO_PKG_VERSION").expect("cargo sets the version");
+    let mut parts = version.split(|c: char| !c.is_ascii_digit()).filter_map(|part| part.parse::<u16>().ok());
+    let numbers = format!("{},{},{},0", parts.next().unwrap_or(0), parts.next().unwrap_or(0), parts.next().unwrap_or(0));
+    let script = format!(
+        "1 ICON \"{icon}\"\n\
+         1 VERSIONINFO\nFILEVERSION {numbers}\nPRODUCTVERSION {numbers}\nFILEOS 0x40004\nFILETYPE 0x1\n\
+         BEGIN\n BLOCK \"StringFileInfo\"\n BEGIN\n  BLOCK \"040904B0\"\n  BEGIN\n\
+         \x20  VALUE \"FileDescription\", \"{name}\"\n   VALUE \"FileVersion\", \"{version}\"\n\
+         \x20  VALUE \"InternalName\", \"{slug}\"\n   VALUE \"LegalCopyright\", \"{copyright}\"\n\
+         \x20  VALUE \"OriginalFilename\", \"{slug}.exe\"\n   VALUE \"ProductName\", \"{name}\"\n\
+         \x20  VALUE \"ProductVersion\", \"{version}\"\n  END\n END\n\
+         \x20BLOCK \"VarFileInfo\"\n BEGIN\n  VALUE \"Translation\", 0x409, 1200\n END\nEND\n",
+        icon = icon.display().to_string().replace('\\', "/"),
+    );
+    let out = PathBuf::from(std::env::var("OUT_DIR").expect("cargo sets the output folder"));
+    let (rc, object) = (out.join("app.rc"), out.join("app_resources.o"));
+    std::fs::write(&rc, script).expect("the resource script is written");
+    let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+    let program = std::env::var("WINDRES").unwrap_or_else(|_| match arch.as_str() {
+        "x86" => "i686-w64-mingw32-windres".to_string(),
+        _ => "x86_64-w64-mingw32-windres".to_string(),
+    });
+    let status = std::process::Command::new(&program)
+        .arg("--input")
+        .arg(&rc)
+        .arg("--output")
+        .arg(&object)
+        .arg("--output-format=coff")
+        .status()
+        .unwrap_or_else(|error| panic!("the resource compiler {program} did not start: {error}"));
+    assert!(status.success(), "the resource compiler {program} failed");
+    println!("cargo::rustc-link-arg-bins={}", object.display());
 }
 
 fn workspace_manifest() -> PathBuf {

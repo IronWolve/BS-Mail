@@ -11,7 +11,8 @@ use ui::layout::{MIN_COLS, MIN_ROWS};
 use crate::cli::{Options, SizeChoice, window_grid};
 use crate::errors::AppError;
 use crate::link_opener::opener_for;
-use crate::identity::display_name;
+use crate::identity::{display_name, slug};
+use crate::scene::Scene;
 use crate::screen::Screen;
 use crate::paths::data_dir;
 use crate::stats::{Shown, Stats};
@@ -32,17 +33,7 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
     scene.prime();
     let remember_size = scene.window.remember_geometry;
     let (cols, rows) = starting_grid(options.size, remembered.as_ref(), remember_size);
-    let window = WindowOptions {
-        title: display_name().to_string(),
-        cols,
-        rows,
-        min_cols: MIN_COLS,
-        min_rows: MIN_ROWS,
-        maximized: opens_maximized(&scene.window, options.size),
-        points: scene.font.0,
-        line_spacing: scene.font.1,
-        palette: Palette::new(scene.base.0, scene.base.1),
-    };
+    let window = window_options(&scene, options, (cols, rows));
     if let Some(state) = &remembered {
         scene.view.set_prefs(state.layout.clone());
     }
@@ -77,6 +68,27 @@ pub fn run(options: &Options) -> Result<Stats, AppError> {
             font_bytes: fonts::embedded_bytes(),
         },
     })
+}
+
+/// The program's icon, as the bytes of its picture: what the title bar and the
+/// task bar show where the system takes an icon from the program.
+const ICON: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/icon/icon-256.png"));
+
+/// What the window is told before it opens.
+fn window_options(scene: &Scene, options: &Options, (cols, rows): (u16, u16)) -> WindowOptions {
+    WindowOptions {
+        title: display_name().to_string(),
+        cols,
+        rows,
+        min_cols: MIN_COLS,
+        min_rows: MIN_ROWS,
+        maximized: opens_maximized(&scene.window, options.size),
+        points: scene.font.0,
+        line_spacing: scene.font.1,
+        palette: Palette::new(scene.base.0, scene.base.1),
+        icon_png: Some(ICON),
+        app_id: slug().to_string(),
+    }
 }
 
 /// The grid the window opens at: one asked for on the command line, else the

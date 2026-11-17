@@ -18,6 +18,7 @@ rust-version = "1.95"
 [workspace.metadata.app]
 display_name = "BS Mail"
 tagline = "Mail for Power Users"
+copyright = "Copyright (c) 2026 IronWolve. All rights reserved."
 
 [profile.release]
 lto = "thin"

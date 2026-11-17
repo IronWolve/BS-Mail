@@ -4,6 +4,7 @@
 pub mod create;
 pub mod event_loop;
 pub mod geometry;
+pub mod icon;
 pub mod options;
 pub mod shortcuts;
 pub mod state;
