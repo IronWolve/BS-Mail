@@ -36,6 +36,19 @@ pub(crate) fn write_new(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     file.sync_all()
 }
 
+/// As `write_new`, and a file this call made but could not finish writing is
+/// removed again, so a failed write leaves no half file behind. A file that
+/// was there already is an error and is left as it is.
+pub(crate) fn write_new_or_remove(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let mut file = open_new(path)?;
+    let written = file.write_all(bytes).and_then(|()| file.sync_all());
+    if written.is_err() {
+        drop(file);
+        let _ = std::fs::remove_file(path);
+    }
+    written
+}
+
 /// Flushes the folder's own entry list, so a file renamed into it a moment
 /// ago is still there after a power loss. Folders cannot be opened for this on
 /// every system; where they cannot, there is nothing to do.

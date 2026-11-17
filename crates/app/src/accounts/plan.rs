@@ -9,6 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use engine::AccountConfig;
+use engine::vault::VaultView;
 
 use super::id::{is_valid_id, unique_id};
 use super::merge::carry_over;
@@ -29,6 +30,9 @@ pub struct Plan {
     pub file: PathBuf,
     /// The folder the account lives in, which is also where its tokens go.
     pub folder: PathBuf,
+    /// The folder the vault and its key file are in; the account's passwords
+    /// go there when it is saved.
+    pub secrets: PathBuf,
     /// An existing account is being changed.
     pub edit: bool,
     /// The folder is not there yet, so this attempt is the one that makes it.
@@ -77,7 +81,7 @@ fn in_file(place: &Place, edit: Option<&str>, config: AccountConfig, text: &str)
         return Err("there is no place to save this account".to_string());
     };
     let (config, text, old_text) = if edit.is_some() {
-        with_old_keys(&file, config, text.to_string())?
+        with_old_keys(place, &file, config, text.to_string())?
     } else {
         (config, text.to_string(), None)
     };
@@ -87,6 +91,7 @@ fn in_file(place: &Place, edit: Option<&str>, config: AccountConfig, text: &str)
         config,
         file,
         folder,
+        secrets: place.secrets_folder(),
         edit: edit.is_some(),
         new_folder: false,
         exclusive: false,
@@ -123,9 +128,9 @@ fn finish(place: &Place, id: String, config: AccountConfig, text: &str, edit: bo
         return Err(format!("\"{id}\" cannot be the name of an account folder"));
     };
     let (config, text) = if config.id == id { (config, text.to_string()) } else { with_id(&id, text)? };
-    let (config, text, old_text) = if edit { with_old_keys(&file, config, text)? } else { (config, text, None) };
+    let (config, text, old_text) = if edit { with_old_keys(place, &file, config, text)? } else { (config, text, None) };
     let new_folder = !folder.exists();
-    Ok(Plan { id, text, config, file, folder, edit, new_folder, exclusive: !edit, old_text })
+    Ok(Plan { id, text, config, file, folder, secrets: place.secrets_folder(), edit, new_folder, exclusive: !edit, old_text })
 }
 
 /// For a change to an account that is already saved: the form's text with the
@@ -135,8 +140,15 @@ fn finish(place: &Place, id: String, config: AccountConfig, text: &str, edit: bo
 /// saved, not a plainer one that only the next start would correct.
 ///
 /// The old file's text is returned too, so that saving can tell whether the
-/// file changed since.
-fn with_old_keys(file: &Path, config: AccountConfig, text: String) -> Result<(AccountConfig, String, Option<String>), String> {
+/// file changed since. A carried `secrets = "vault"` lets the account tried
+/// read what the form does not give (a separate sending password) from the
+/// vault, as it will be read once saved.
+fn with_old_keys(
+    place: &Place,
+    file: &Path,
+    config: AccountConfig,
+    text: String,
+) -> Result<(AccountConfig, String, Option<String>), String> {
     let Ok(old) = fs::read_to_string(file) else {
         return Ok((config, text, None));
     };
@@ -144,7 +156,8 @@ fn with_old_keys(file: &Path, config: AccountConfig, text: String) -> Result<(Ac
     if merged == text {
         return Ok((config, text, Some(old)));
     }
-    let config = AccountConfig::from_toml_str(&merged).map_err(|error| reason_of(&error))?;
+    let vault = VaultView::open(&place.secrets_folder());
+    let config = AccountConfig::from_toml_str_with_vault(&merged, &vault).map_err(|error| reason_of(&error))?;
     Ok((config, merged, Some(old)))
 }
 

@@ -54,6 +54,12 @@ pub fn wipe_text(text: &mut String) {
     text.zeroize();
 }
 
+/// Overwrites `bytes` with zeros in a way the compiler may not drop. For a key
+/// or a buffer of decrypted text that is not a `Secret`.
+pub fn wipe_bytes(bytes: &mut [u8]) {
+    bytes.zeroize();
+}
+
 /// A message ready to send.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OutgoingMessage {

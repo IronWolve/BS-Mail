@@ -8,7 +8,9 @@
 //! every entry whose key names a password or a secret is removed at any depth,
 //! however it is written (quoted key, value over several lines); a file that
 //! is not TOML cannot be redacted with certainty, so no backup is kept of it.
-//! Each save replaces the backup of the one before. Only then does the new
+//! The one entry that names a secret and is kept is `secrets = "vault"`, the
+//! marker that the account's password is in the vault, which holds no secret
+//! itself. Each save replaces the backup of the one before. Only then does the new
 //! file take the target's place, in one rename, so a crash leaves the old file
 //! or the new one and never half of either.
 
@@ -99,12 +101,27 @@ fn keep_old(target: &Path, dir: &Path, name: &str) -> Result<Option<PathBuf>, St
 fn without_secrets(text: &str) -> Option<String> {
     let mut document: DocumentMut = text.parse().ok()?;
     strip_secrets(document.as_table_mut());
-    let redacted: String = without_secret_trailing_comments(&document.to_string())
-        .split_inclusive('\n')
-        .filter(|line| !(line.trim_start().starts_with('#') && mentions_a_secret(line)))
-        .collect();
+    let redacted = without_comments_that_mention(&document.to_string(), mentions_a_secret);
     redacted.parse::<DocumentMut>().ok()?;
     Some(redacted)
+}
+
+/// `text` without the comments `mentions` picks out, whether on a line of
+/// their own or after a setting.
+fn without_comments_that_mention(text: &str, mentions: fn(&str) -> bool) -> String {
+    without_secret_trailing_comments(text, mentions)
+        .split_inclusive('\n')
+        .filter(|line| !(line.trim_start().starts_with('#') && mentions(line)))
+        .collect()
+}
+
+/// The text of an account file without any comment that mentions a password,
+/// for a file whose password has just moved into the vault: a comment that
+/// quotes the old one must not stay behind. The text is unchanged when
+/// dropping them would leave something that is not TOML.
+pub(crate) fn without_password_comments(text: &str) -> String {
+    let cleaned = without_comments_that_mention(text, mentions_a_password);
+    if cleaned.parse::<DocumentMut>().is_ok() { cleaned } else { text.to_owned() }
 }
 
 /// Where the scan of a TOML text is: in plain text, or inside one of the four
@@ -123,7 +140,7 @@ enum Scan {
 /// the setting and the rest of the file stay. A comment on a line of its own
 /// is left for the caller, and a `#` inside a string is never a comment. `text`
 /// is TOML that already parsed.
-fn without_secret_trailing_comments(text: &str) -> String {
+fn without_secret_trailing_comments(text: &str, mentions: fn(&str) -> bool) -> String {
     let chars: Vec<char> = text.chars().collect();
     let mut out = String::with_capacity(text.len());
     let (mut state, mut at, mut content) = (Scan::Plain, 0, false);
@@ -134,7 +151,7 @@ fn without_secret_trailing_comments(text: &str) -> String {
             (Scan::Plain, '#') => {
                 let end = chars[at..].iter().position(|c| *c == '\n' || *c == '\r').map_or(chars.len(), |n| at + n);
                 let comment: String = chars[at..end].iter().collect();
-                if content && mentions_a_secret(&comment) {
+                if content && mentions(&comment) {
                     out.truncate(out.trim_end_matches([' ', '\t']).len());
                 } else {
                     out.push_str(&comment);
@@ -187,7 +204,7 @@ fn without_secret_trailing_comments(text: &str) -> String {
 fn strip_secrets(table: &mut dyn TableLike) {
     let keys: Vec<String> = table.iter().map(|(key, _)| key.to_owned()).collect();
     for key in keys {
-        if mentions_a_secret(&key) {
+        if mentions_a_secret(&key) && !is_vault_marker(table.get(&key), &key) {
             table.remove(&key);
             continue;
         }
@@ -198,6 +215,17 @@ fn strip_secrets(table: &mut dyn TableLike) {
             _ => {}
         }
     }
+}
+
+/// Whether the entry is `secrets = "vault"`: it says where the password is
+/// kept and holds none.
+fn is_vault_marker(item: Option<&Item>, key: &str) -> bool {
+    key == engine::MARKER_KEY && item.and_then(Item::as_str) == Some(engine::MARKER_VALUE)
+}
+
+/// Whether `text` names a password, in any letter case.
+fn mentions_a_password(text: &str) -> bool {
+    text.to_ascii_lowercase().contains("password")
 }
 
 /// Whether `text` names a password or a secret, in any letter case.

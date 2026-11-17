@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
+use engine::vault::VaultView;
 use engine::{AccountConfig, Member, MockBackend, MultiBackend, RealBackend};
 use model::AccountId;
 use model::config::WindowConfig;
@@ -42,7 +43,9 @@ pub(super) fn mock(mut view: AppView, base: Base, path: &Path) -> Result<Scene, 
 /// `--account <file>`: that one account, as the only member. A file that
 /// cannot be used stops the run, as it always has.
 pub(super) fn single(view: AppView, base: Base, file: &Path) -> Result<Scene, AppError> {
-    let config = AccountConfig::from_file(file)
+    // The vault of `--account` is the `secrets` folder beside the file.
+    let vault = VaultView::open(&Place::File(file.to_path_buf()).secrets_folder());
+    let config = AccountConfig::from_file_with_vault(file, &vault)
         .map_err(|error| AppError::Account(file.to_path_buf(), reason_of(&error)))?;
     let id = AccountId(config.id.clone());
     let member = Member::new(id, config.name.clone(), config.address.clone(), Box::new(RealBackend::start(config)));

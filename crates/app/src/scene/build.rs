@@ -8,7 +8,7 @@ use ui::theme::Theme;
 use ui::theme::roles;
 use ui::{AppView, OptionsPaths};
 
-use crate::accounts::{Place, Scan, recover, scan};
+use crate::accounts::{Migration, Place, Scan, move_passwords_into_vault, recover, scan};
 use crate::address_file;
 use crate::cli::Options;
 use crate::config_io::{self, CONFIG_NAME};
@@ -34,7 +34,15 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
     // Listing the accounts above only reads; from here on the run may start
     // sign-ins and write, so only one copy at a time gets to.
     let lock = hold_data_folder(&source)?;
-    scanned.problems.extend(put_right_after_a_hard_stop(&source));
+    let recovered = put_right_after_a_hard_stop(&source);
+    let moved = move_passwords(&source);
+    if moved.moved > 0
+        && let Source::Accounts(root) = &source
+    {
+        // The files changed: what the first look found is out of date.
+        scanned = scan(root);
+    }
+    scanned.problems.extend(recovered);
     let loaded = config_io::load(data.as_deref())?;
     let base = base_colors(&loaded.theme);
     let font = (
@@ -50,7 +58,9 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
     }
     // What is wrong with an account comes before what is wrong with a setting.
     let note_is_about_settings = scanned.problems.is_empty() && !loaded.problems.is_empty();
-    let problems: Vec<String> = scanned.problems.iter().cloned().chain(loaded.problems).collect();
+    // What the move into the vault did comes last: it is said once, and what
+    // needs the user's attention comes before it.
+    let problems: Vec<String> = scanned.problems.iter().cloned().chain(loaded.problems).chain(moved.notes).collect();
     view.set_config_problem(config_io::footer_note(&problems));
     view.set_capabilities(capabilities);
     view.set_options_paths(options_paths(data.as_deref(), &source));
@@ -102,6 +112,16 @@ fn put_right_after_a_hard_stop(source: &Source) -> Vec<String> {
     match source {
         Source::Accounts(root) | Source::Empty(root) => recover(root),
         Source::Mock(_) | Source::Account(_) | Source::Setup(_) => Vec::new(),
+    }
+}
+
+/// Moves the plain-text passwords of the data folder's account files into the
+/// encrypted vault, now that this run holds the data folder. Only a data folder
+/// of its own is touched, as with `put_right_after_a_hard_stop`.
+fn move_passwords(source: &Source) -> Migration {
+    match source {
+        Source::Accounts(root) => move_passwords_into_vault(root, &Place::Root(root.clone()).secrets_folder()),
+        Source::Empty(_) | Source::Mock(_) | Source::Account(_) | Source::Setup(_) => Migration::default(),
     }
 }
 

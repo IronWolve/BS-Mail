@@ -9,10 +9,12 @@ pub const UNKNOWN: &str = "not known";
 const NOTE: &str = "Reload settings reads the settings file and the theme again.";
 
 /// What is kept and where, said where the folder is shown.
-pub const KEPT: &str = "Kept in the data folder and nowhere else: each account's file with its password or sign-in \
-    token (plain text, limited to your user where the system allows it), your settings and window sizes, the \
-    addresses your mail was from, to or copied to (to complete recipients as you type), and sent messages not \
-    yet saved on the server. Mail itself is not kept on disk.";
+pub const KEPT: &str = "Kept in the data folder and nowhere else: each account's file, with its password kept \
+    encrypted in the secrets vault (the key to it is a file in the same folder, so it keeps passwords out of \
+    casual view, such as a file shown on screen or pasted, but not from someone who holds the whole folder: keep \
+    the folder private), a browser sign-in's token (plain text, limited to your user where the system allows it), \
+    your settings and window sizes, the addresses your mail was from, to or copied to (to complete recipients \
+    as you type), and sent messages not yet saved on the server. Mail itself is not kept on disk.";
 
 /// Who the program talks to.
 pub const CONTACTED: &str = "Contacted: your mail servers and, for a browser sign-in, the provider's sign-in service. \

@@ -9,8 +9,8 @@
 //!   account was saved (`engine::previous_token`): the earlier tokens come
 //!   back, or, for an account that was never saved, the new tokens go.
 //! - `account.toml.new` and `account.toml.bak.new`, the temporary names a save
-//!   writes under before the rename: they hold the new account text, a
-//!   password included, and nothing lists them.
+//!   writes under before the rename: they hold account text (the password is
+//!   in the vault, but the text may be an older file's), and nothing lists them.
 //!
 //! Nothing else is removed. A folder with a saved sign-in and no account file
 //! that no try of this program left a trace of is only reported.

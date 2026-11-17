@@ -3,8 +3,10 @@
 //! rest of the module map.
 
 pub mod account_config;
+mod account_error;
 mod account_folders;
 mod account_oauth;
+mod account_secrets;
 mod account_security;
 mod account_signature;
 mod account_smtp;
@@ -26,10 +28,12 @@ mod send;
 mod session_state;
 mod sign_in_advice;
 mod text_clean;
+pub mod vault;
 
 pub use account_config::{AccountConfig, ConfigError, Security, SmtpAuth, SmtpSettings, Trust, clean_signature};
 pub use account_folders::FolderPaths;
 pub use account_oauth::{AuthKind, OAuthSettings, token_file_in};
+pub use account_secrets::{MARKER_KEY, MARKER_VALUE, NOT_IN_VAULT};
 pub use mime_render::{body_preference, set_body_preference};
 pub use mock::{Fixture, FixtureError};
 pub use mock_backend::MockBackend;

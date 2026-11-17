@@ -49,7 +49,12 @@ pub(super) fn remove_account(view: &mut AppView, backend: &mut Box<dyn MailBacke
     let outcome = accounts::remove(root, id);
     view.set_accounts(live.summaries());
     match outcome {
-        Ok(()) => view.options_info(&format!("Removed {address}.")),
+        Ok(()) => match accounts::forget_secrets(&live.place.secrets_folder(), id) {
+            Ok(()) => view.options_info(&format!("Removed {address}.")),
+            Err(reason) => view.options_problem(&format!(
+                "Removed {address}, but its password could not be taken out of the vault: {reason}"
+            )),
+        },
         Err(reason) => view.options_problem(&format!(
             "{reason}; the account is stopped for now and comes back the next time the program starts"
         )),

@@ -58,8 +58,10 @@ pub fn summaries_in_order(found: &[Found], order: &[AccountId]) -> Vec<AccountSu
     sorted.into_iter().map(summary_of).collect()
 }
 
-/// The form's starting point for an account. The password and the client
-/// secret are part of it; they travel only into the form's hidden fields.
+/// The form's starting point for an account. The password (from the account
+/// file, or from the vault when the file says it is there) and the client
+/// secret are part of it; they travel only into the form's hidden fields, so
+/// an account whose password is saved shows it as dots, as it always did.
 pub fn prefill_of(found: &Found) -> Result<AccountPrefill, String> {
     let table = found.table.as_ref().ok_or(UNREADABLE)?;
     let get = |key: &str| text_of(table, key);
@@ -72,7 +74,9 @@ pub fn prefill_of(found: &Found) -> Result<AccountPrefill, String> {
         username: get("username").unwrap_or_else(|| address.clone()),
         address,
         name: get("name").unwrap_or_else(|| found.name.clone()),
-        password: get("password").unwrap_or_default(),
+        password: get("password")
+            .or_else(|| found.vault_password.as_ref().map(|secret| secret.expose().to_string()))
+            .unwrap_or_default(),
         imap_host: get("imap_host").unwrap_or_default(),
         imap_port: port_of(Some(table), "imap_port", default_imap_port(&security)),
         smtp_host: get("smtp_host").unwrap_or_default(),

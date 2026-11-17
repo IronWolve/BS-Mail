@@ -8,11 +8,14 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use engine::AccountConfig;
+use engine::vault::{VaultView, password_name};
+use engine::{AccountConfig, MARKER_KEY, MARKER_VALUE};
+use model::Secret;
 
 use crate::paths::ACCOUNT_FILE;
 
 use super::id::is_valid_id;
+use super::place::Place;
 use super::reason::reason_of;
 
 /// One account folder, read.
@@ -26,6 +29,10 @@ pub struct Found {
     /// The file as a TOML table, when it could be read as one. It can hold a
     /// password, so it is never printed.
     pub table: Option<toml::Table>,
+    /// The password the vault holds for an account whose file says so and has
+    /// none of its own; it is what the form starts with when the account is
+    /// edited.
+    pub vault_password: Option<Secret>,
     /// For the account list: from the file when it could be read, else the id.
     pub name: String,
     pub address: String,
@@ -63,6 +70,7 @@ impl Scan {
 
 /// The accounts under `root`. A root that is not there has none.
 pub fn scan(root: &Path) -> Scan {
+    let vault = VaultView::open(&Place::Root(root.to_path_buf()).secrets_folder());
     let mut scan = Scan::default();
     let entries = match fs::read_dir(root) {
         Ok(entries) => entries,
@@ -90,7 +98,7 @@ pub fn scan(root: &Path) -> Scan {
         if !file.is_file() {
             continue;
         }
-        let found = read_account(&file, &folder, Some(&name));
+        let found = read_account(&file, &folder, Some(&name), &vault);
         if let Err(reason) = &found.config {
             scan.problems.push(format!("account {name}: {reason}"));
         }
@@ -106,7 +114,8 @@ pub fn scan_file(file: &Path) -> Scan {
         return scan;
     }
     let folder = file.parent().filter(|dir| !dir.as_os_str().is_empty()).map_or_else(|| PathBuf::from("."), Path::to_path_buf);
-    let found = read_account(file, &folder, None);
+    let vault = VaultView::open(&Place::File(file.to_path_buf()).secrets_folder());
+    let found = read_account(file, &folder, None, &vault);
     if let Err(reason) = &found.config {
         scan.problems.push(format!("account {}: {reason}", found.id));
     }
@@ -116,9 +125,9 @@ pub fn scan_file(file: &Path) -> Scan {
 
 /// Reads one account file. `folder_id` is the folder's name where the id must
 /// be it; `None` takes the id from the file.
-fn read_account(file: &Path, folder: &Path, folder_id: Option<&str>) -> Found {
+fn read_account(file: &Path, folder: &Path, folder_id: Option<&str>, vault: &VaultView) -> Found {
     let table = fs::read_to_string(file).ok().and_then(|text| toml::from_str::<toml::Table>(&text).ok());
-    let mut config = AccountConfig::from_file(file).map_err(|error| reason_of(&error));
+    let mut config = AccountConfig::from_file_with_vault(file, vault).map_err(|error| reason_of(&error));
     if let (Ok(checked), Some(id)) = (&config, folder_id)
         && checked.id != id
     {
@@ -140,7 +149,19 @@ fn read_account(file: &Path, folder: &Path, folder_id: Option<&str>) -> Found {
             table.as_ref().and_then(|table| text_of(table, "address")).unwrap_or_else(|| id.clone()),
         ),
     };
-    Found { id, folder: folder.to_path_buf(), file: file.to_path_buf(), config, table, name, address }
+    let vault_password = vault_password_of(table.as_ref(), &id, vault);
+    Found { id, folder: folder.to_path_buf(), file: file.to_path_buf(), config, table, vault_password, name, address }
+}
+
+/// The vault's password for account `id` when its file says the password is
+/// there and holds none itself.
+fn vault_password_of(table: Option<&toml::Table>, id: &str, vault: &VaultView) -> Option<Secret> {
+    let table = table?;
+    let in_vault = table.get(MARKER_KEY).and_then(toml::Value::as_str) == Some(MARKER_VALUE);
+    if !in_vault || text_of(table, "password").is_some() {
+        return None;
+    }
+    vault.get(&password_name(id)).ok().flatten()
 }
 
 /// A non-empty text value of a table.

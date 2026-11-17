@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::paths::ACCOUNT_FILE;
+use crate::paths::{ACCOUNT_FILE, SECRETS_DIR_NAME};
 
 use super::id::is_valid_id;
 use super::scan::{Scan, scan, scan_file};
@@ -65,6 +65,12 @@ impl Place {
             Self::Root(root) => folder_of_file(root),
             Self::File(file) => folder_of_file(file),
         }
+    }
+
+    /// The folder the vault and its key file are in: `secrets` inside the data
+    /// folder, which for `--account <file>` is the file's own folder.
+    pub fn secrets_folder(&self) -> PathBuf {
+        self.data_folder().join(SECRETS_DIR_NAME)
     }
 
     /// The folder to show as the accounts folder.

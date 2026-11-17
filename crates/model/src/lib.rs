@@ -25,7 +25,7 @@ pub use address::Address;
 pub use attachments::{MAX_FETCH_BYTES, MAX_SEND_BYTES, OutgoingAttachment, TEXT_RESERVE, max_raw_len, sendable_name, wire_size};
 pub use backend::MailBackend;
 pub use body::{AttachmentInfo, Body, BodyRole, StyledLine, StyledSpan};
-pub use command::{Command, OutgoingMessage, RawPart, Secret, wipe_text};
+pub use command::{Command, OutgoingMessage, RawPart, Secret, wipe_bytes, wipe_text};
 pub use envelope::{Envelope, MailDate};
 pub use event::Event;
 pub use file_bytes::FileBytes;

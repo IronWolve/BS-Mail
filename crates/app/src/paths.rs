@@ -10,6 +10,10 @@ pub const DATA_DIR_NAME: &str = "data";
 /// The folder inside the data folder that holds one folder per account.
 pub const ACCOUNTS_DIR_NAME: &str = "accounts";
 
+/// The folder inside the data folder that holds the encrypted vault and its
+/// key file.
+pub const SECRETS_DIR_NAME: &str = "secrets";
+
 /// The account file inside an account's own folder.
 pub const ACCOUNT_FILE: &str = "account.toml";
 

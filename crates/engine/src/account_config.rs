@@ -1,9 +1,13 @@
 //! The account file the real backend reads: where the mail server is and how
 //! to sign in.
 //!
-//! INTERIM, DEV-ONLY: the password sits in this file as plain text. That is a
-//! stand-in until the encrypted vault exists; the file is refused on Unix when
-//! other users can read it, and nothing here is meant for a shipped build.
+//! The password is not kept in this file by the program any more: it lives in
+//! the encrypted vault (`vault/`), and the file says `secrets = "vault"`. A
+//! file written by an older version, or by hand, may still hold `password` (and
+//! `smtp_password`) in plain text, which keeps working until the program moves
+//! it into the vault at its next start (see `account_secrets.rs`). A file that
+//! holds a password or client secret is refused on Unix when other users can
+//! read it.
 //!
 //! The file is flat TOML:
 //!
@@ -15,7 +19,8 @@
 //! imap_port = 993            # optional: 993 for implicit TLS, else 143
 //! security = "implicit"      # implicit | starttls | none  (default implicit)
 //! username = "alex"
-//! password = "app-password"
+//! password = "app-password"  # older files only; the program writes
+//!                            # secrets = "vault" instead
 //! trust = "verify"           # verify | any                (default verify)
 //! read_only = true           # true | false                (default true)
 //! poll_seconds = 60          # seconds between checks for new mail
@@ -62,19 +67,21 @@
 //! Sync. It only ever reads. `0` turns the automatic check off; a value from
 //! 1 to 14 is raised to 15, the shortest wait allowed, without an error.
 
-use std::fmt;
 use std::path::{Path, PathBuf};
 
 use model::{Secret, wipe_text};
 use serde::Deserialize;
 
+pub use crate::account_error::ConfigError;
 use crate::account_folders::FolderPaths;
 use crate::account_oauth::{AuthKind, OAuthSettings, RawOAuth, token_file_in};
+use crate::account_secrets::{self, Given};
 pub use crate::account_signature::clean_signature;
 use crate::account_smtp::RawSmtp;
 pub use crate::account_security::{Security, Trust};
 pub use crate::account_smtp::{SmtpAuth, SmtpSettings};
 pub use crate::loopback_host::is_loopback_host;
+use crate::vault::VaultView;
 
 pub use model::{DEFAULT_POLL_SECONDS, MIN_POLL_SECONDS};
 
@@ -113,36 +120,6 @@ pub struct AccountConfig {
     pub state_dir: Option<PathBuf>,
 }
 
-/// Why an account file was refused.
-#[derive(Debug)]
-pub enum ConfigError {
-    /// The file could not be read.
-    Read(String),
-    /// The text is not valid TOML or has a wrong or missing field.
-    Parse(String),
-    /// A value is present but not allowed.
-    Invalid(String),
-    /// Other users can read the file (Unix mode bits).
-    Permissions { path: String, mode: u32 },
-}
-
-impl fmt::Display for ConfigError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Read(text) => write!(f, "cannot read the account file: {text}"),
-            Self::Parse(text) => write!(f, "the account file is not valid: {text}"),
-            Self::Invalid(text) => write!(f, "the account file is not allowed: {text}"),
-            Self::Permissions { path, mode } => write!(
-                f,
-                "the account file {path} holds a password or client secret and is readable by \
-                 other users (mode {mode:o}); run: chmod 600 {path}"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for ConfigError {}
-
 #[derive(Deserialize)]
 struct RawAccount {
     id: String,
@@ -155,6 +132,8 @@ struct RawAccount {
     username: String,
     #[serde(default, deserialize_with = "secret_field")]
     password: Option<Secret>,
+    /// `"vault"`: the passwords the file does not hold are in the vault.
+    secrets: Option<String>,
     #[serde(default)]
     auth: AuthKind,
     oauth_provider: Option<String>,
@@ -222,8 +201,8 @@ fn resolve_oauth(raw: &mut RawAccount) -> Result<Option<OAuthSettings>, ConfigEr
     OAuthSettings::resolve(asked, raw.imap_host.trim()).map(Some)
 }
 
-/// The mailbox password: whatever the file says for a password account
-/// (which must say something), nothing for an OAuth2 account.
+/// The mailbox password: whatever the file or the vault says for a password
+/// account (which must say something), nothing for an OAuth2 account.
 fn mailbox_password(given: Option<Secret>, oauth: bool) -> Result<Secret, ConfigError> {
     if oauth {
         return Ok(Secret::new(""));
@@ -234,13 +213,21 @@ fn mailbox_password(given: Option<Secret>, oauth: bool) -> Result<Secret, Config
 }
 
 impl AccountConfig {
-    /// Reads and checks the account file at `path`. An OAuth2 account keeps
-    /// its tokens in `oauth/<id>.token` in the same folder.
+    /// Reads and checks the account file at `path`, with no vault: a file
+    /// that says its password is in the vault is refused with the sentence for
+    /// a password that is not there. An OAuth2 account keeps its tokens in
+    /// `oauth/<id>.token` in the same folder.
     pub fn from_file(path: &Path) -> Result<Self, ConfigError> {
+        Self::from_file_with_vault(path, &VaultView::none())
+    }
+
+    /// As `from_file`, with the vault a `secrets = "vault"` file's passwords
+    /// are read from.
+    pub fn from_file_with_vault(path: &Path, vault: &VaultView) -> Result<Self, ConfigError> {
         check_private(path)?;
         let mut text = std::fs::read_to_string(path).map_err(|e| ConfigError::Read(e.to_string()))?;
         let folder = path.parent().unwrap_or_else(|| Path::new(""));
-        let parsed = Self::from_toml_str(&text);
+        let parsed = Self::from_toml_str_with_vault(&text, vault);
         // The file text holds the password and the client secret.
         wipe_text(&mut text);
         parsed.map(|config| config.with_state_dir(folder))
@@ -259,15 +246,24 @@ impl AccountConfig {
         self
     }
 
-    /// Parses and checks account file text.
+    /// Parses and checks account file text, with no vault.
     pub fn from_toml_str(text: &str) -> Result<Self, ConfigError> {
+        Self::from_toml_str_with_vault(text, &VaultView::none())
+    }
+
+    /// Parses and checks account file text; a password the text does not hold
+    /// is read from `vault` when the text says `secrets = "vault"`.
+    pub fn from_toml_str_with_vault(text: &str, vault: &VaultView) -> Result<Self, ConfigError> {
         let mut raw: RawAccount = toml::from_str(text).map_err(|e| ConfigError::Parse(e.to_string()))?;
         let default_port = match raw.security {
             Security::Implicit => 993,
             Security::Starttls | Security::None => 143,
         };
         let oauth = resolve_oauth(&mut raw)?;
-        let password = mailbox_password(raw.password.take(), oauth.is_some())?;
+        let given = Given { password: raw.password.take(), smtp_password: raw.smtp_password.take() };
+        let given = account_secrets::resolve(&raw.id, raw.secrets.as_deref(), oauth.is_some(), given, vault)?;
+        raw.smtp_password = given.smtp_password;
+        let password = mailbox_password(given.password, oauth.is_some())?;
         let smtp = SmtpSettings::resolve(
             RawSmtp {
                 host: raw.smtp_host,
