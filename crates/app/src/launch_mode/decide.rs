@@ -21,7 +21,14 @@ pub enum Launch {
 
 /// The way to show the screen, for a mode and what the run looks like.
 pub fn decide(mode: &Mode) -> Launch {
+    decide_for(mode, cfg!(windows))
+}
+
+/// The same, with the system given: Windows has no terminal mode, so a request
+/// for one opens the window.
+fn decide_for(mode: &Mode, windows: bool) -> Launch {
     match mode {
+        Mode::Terminal if windows => Launch::Window,
         Mode::Terminal => Launch::Terminal,
         Mode::Window => Launch::Window,
         Mode::Picture(path) => Launch::Picture(path.clone()),

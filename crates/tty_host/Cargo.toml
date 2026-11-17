@@ -10,3 +10,8 @@ surface = { path = "../surface" }
 unicode-width.workspace = true
 crossterm.workspace = true
 signal-hook.workspace = true
+
+# Terminal mode is not offered on Windows, but the drawing code is shared with
+# the one-frame print mode, so the library has to build there too.
+[target.'cfg(windows)'.dependencies]
+crossterm = { workspace = true, features = ["windows"] }

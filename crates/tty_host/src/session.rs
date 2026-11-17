@@ -182,11 +182,17 @@ const STOPPED_EXIT_CODE: i32 = 129;
 /// loop looks at it and leaves in the ordinary way.
 fn stop_flag() -> Arc<AtomicBool> {
     let flag = Arc::new(AtomicBool::new(false));
-    for signal in [signal_hook::consts::SIGTERM, signal_hook::consts::SIGHUP] {
+    for signal in STOP_SIGNALS.iter().copied() {
         let _ = signal_hook::flag::register(signal, flag.clone());
     }
     flag
 }
+
+/// The signals that end the run: a hang-up exists only on Unix systems.
+#[cfg(unix)]
+const STOP_SIGNALS: &[i32] = &[signal_hook::consts::SIGTERM, signal_hook::consts::SIGHUP];
+#[cfg(not(unix))]
+const STOP_SIGNALS: &[i32] = &[signal_hook::consts::SIGTERM];
 
 #[cfg(test)]
 include!("session.tests.rs");
