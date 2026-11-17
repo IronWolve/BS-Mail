@@ -12,13 +12,19 @@
 //! `update` are short and do no waiting.
 //!
 //! The one thing the handle does keep is the key of a passphrase vault, once
-//! the passphrase has been given (`unlock`): the key made from it, in memory
-//! only, so the background refreshes of sign-in tokens keep working without
-//! asking again. It is wiped by `lock`, which the program calls for its vault folder when it ends. Which way a
-//! vault is protected is what its file says (`state`), so a vault that is
-//! switched, restored or set aside is read the way it now is. Switching
-//! (`switch_to_passphrase`, `switch_to_key_file`, `change_passphrase`) is one
-//! more change under the same lock.
+//! the passphrase has been given (`unlock`), and the key of a keychain vault,
+//! once it has been read from the system keychain (`unlock_keychain`, at
+//! start): in memory only, so the background refreshes of sign-in tokens keep
+//! working without asking again. They are wiped by `lock`, which the program
+//! calls for its vault folder when it ends. A keychain that failed is
+//! remembered too, until `lock` (the program tries again at its next start),
+//! so a keychain that is missing or hung costs one wait, not one for every
+//! save. Which way a vault is protected is what its file says (`peek`), so a
+//! vault that is switched, restored or set aside is read the way it now is.
+//! Switching (`switch_to_passphrase`, `switch_to_key_file`,
+//! `change_passphrase`, `switch_to_keychain`) is one more change under the
+//! same lock. The lock covers file work: the calls to the keychain, which can
+//! wait, are made before it is taken and after it is let go (`shared_keychain.rs`).
 //!
 //! Only one copy of the program holds a data folder at a time (the data lock),
 //! so no other process changes the file in between.
@@ -31,7 +37,8 @@ use model::Secret;
 use super::error::VaultError;
 use super::file_io::read_prefix;
 use super::format::{HEADER_LEN_V2, Header, Mode, TAG_LEN};
-use super::key_source::{KeySource, Unlocked};
+use super::keychain::{Keychain, KeyId};
+use super::key_source::{KeySource, KeychainKey, Unlocked};
 use super::store::{VAULT_FILE_NAME, Vault};
 use super::switch::{self, Switched};
 
@@ -43,17 +50,33 @@ pub struct Protection {
     pub locked: bool,
 }
 
+/// What the handle knows about the key of a keychain vault.
+#[derive(Debug, Default)]
+pub(super) enum KeychainHold {
+    #[default]
+    Nothing,
+    /// The key read from the keychain, for this key id.
+    Key(KeychainKey),
+    /// Reading the key of this key id failed; the failure stands until `lock`.
+    Failed(KeyId, VaultError),
+}
+
 /// What the handle keeps between calls.
 #[derive(Debug, Default)]
-struct Held {
-    unlocked: Option<Unlocked>,
+pub(super) struct Held {
+    pub(super) unlocked: Option<Unlocked>,
+    pub(super) keychain: KeychainHold,
 }
 
 /// One vault folder's gate.
 #[derive(Debug)]
 pub struct SharedVault {
-    dir: PathBuf,
-    gate: Mutex<Held>,
+    pub(super) dir: PathBuf,
+    pub(super) gate: Mutex<Held>,
+    /// The keychain this folder's vault uses, when it was given one (tests);
+    /// else the program's own (`keychain::default_store`). Its own lock, so a
+    /// call that waits never holds the gate.
+    pub(super) keychain: Mutex<Option<Keychain>>,
 }
 
 /// The handles made so far, by the folder they are for.
@@ -80,7 +103,8 @@ impl SharedVault {
         if let Some((_, found)) = all.iter().find(|(known, _)| *known == key) {
             return Arc::clone(found);
         }
-        let made = Arc::new(Self { dir: dir.to_path_buf(), gate: Mutex::new(Held::default()) });
+        let made =
+            Arc::new(Self { dir: dir.to_path_buf(), gate: Mutex::new(Held::default()), keychain: Mutex::new(None) });
         all.push((key, Arc::clone(&made)));
         made
     }
@@ -90,25 +114,27 @@ impl SharedVault {
         &self.dir
     }
 
-    fn hold(&self) -> MutexGuard<'_, Held> {
+    pub(super) fn hold(&self) -> MutexGuard<'_, Held> {
         self.gate.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
     /// The header of the vault file as it is now; `None` when there is no
     /// file or it cannot be read as a vault (opening it then says why).
-    fn peek(&self) -> Option<Header> {
+    pub(super) fn peek(&self) -> Option<Header> {
         let bytes = read_prefix(&self.dir.join(VAULT_FILE_NAME), (HEADER_LEN_V2 + TAG_LEN) as u64).ok()??;
         Header::parse(&bytes).ok()
     }
 
     /// The key for the vault as the file says it is protected now: the key
-    /// file, or the passphrase key held, or `Locked`.
-    fn source(&self, held: &Held) -> Result<KeySource, VaultError> {
+    /// file, or the passphrase key held, or the keychain key held (read now
+    /// if nothing read it yet, or its failure), or `Locked`.
+    pub(super) fn source(&self, held: &mut Held) -> Result<KeySource, VaultError> {
         match self.peek() {
             Some(Header { kdf: Some(kdf), .. }) => match &held.unlocked {
                 Some(unlocked) if *unlocked.kdf() == kdf => Ok(KeySource::Passphrase(unlocked.clone())),
                 _ => Err(VaultError::Locked),
             },
+            Some(Header { key_id: Some(id), .. }) => self.keychain_source(held, id),
             _ => Ok(KeySource::key_file_in(&self.dir)),
         }
     }
@@ -123,6 +149,10 @@ impl SharedVault {
                 let open = matches!((&held.unlocked, &kdf), (Some(unlocked), Some(kdf)) if unlocked.kdf() == kdf);
                 Protection { mode: Mode::Passphrase, locked: !open }
             }
+            Some(Header { mode: Mode::Keychain, key_id, .. }) => {
+                let open = matches!((&held.keychain, key_id), (KeychainHold::Key(key), Some(id)) if key.id() == id);
+                Protection { mode: Mode::Keychain, locked: !open }
+            }
             _ => Protection { mode: Mode::KeyFile, locked: false },
         }
     }
@@ -131,8 +161,9 @@ impl SharedVault {
     /// middle of another change). A folder with no vault is an empty vault; a
     /// locked one is `Locked`.
     pub fn load(&self) -> Result<Vault, VaultError> {
-        let held = self.hold();
-        Vault::open_or_create(&self.dir, self.source(&held)?)
+        let mut held = self.hold();
+        let source = self.source(&mut held)?;
+        Vault::open_or_create(&self.dir, source)
     }
 
     /// Looks at the vault as it is on disk now; changes nothing.
@@ -146,8 +177,9 @@ impl SharedVault {
     /// is an error and is never replaced; a save that fails leaves the old
     /// vault as it was.
     pub fn update<T>(&self, change: impl FnOnce(&mut Vault) -> (T, bool)) -> Result<T, VaultError> {
-        let held = self.hold();
-        let mut vault = Vault::open_or_create(&self.dir, self.source(&held)?)?;
+        let mut held = self.hold();
+        let source = self.source(&mut held)?;
+        let mut vault = Vault::open_or_create(&self.dir, source)?;
         let (result, changed) = change(&mut vault);
         if changed {
             vault.save()?;
@@ -161,18 +193,29 @@ impl SharedVault {
     /// then runs on an empty vault; when it is false the lost vault is left
     /// where it is and the error is returned. A locked vault or a wrong
     /// passphrase is never started over: only the prompt's own "forgot the
-    /// passphrase" does that (`forget_passphrase`).
+    /// passphrase" does that (`forget_passphrase`). A keychain vault whose key
+    /// is not in the keychain (`KeychainKeyMissing`) is lost the way a missing
+    /// key file is, and is set aside; one whose keychain is not there at all
+    /// (`KeychainUnavailable`) is only out of reach and is never touched. A
+    /// vault that is started over is an empty key-file vault from then on.
     pub fn update_or_start_over<T>(
         &self,
         start: bool,
         change: impl FnOnce(&mut Vault) -> (T, bool),
     ) -> Result<T, VaultError> {
-        let held = self.hold();
-        let source = self.source(&held)?;
-        let mut vault = match Vault::open_or_create(&self.dir, source.clone()) {
-            Ok(vault) => vault,
-            Err(error) if start && error.can_start_over() && source.mode() == Mode::KeyFile => {
-                Vault::start_over(&self.dir, source)?
+        let mut held = self.hold();
+        let mut vault = match self.source(&mut held) {
+            Ok(source) => match Vault::open_or_create(&self.dir, source.clone()) {
+                Ok(vault) => vault,
+                Err(error) if start && error.can_start_over() && source.mode() != Mode::Passphrase => {
+                    held.keychain = KeychainHold::Nothing;
+                    Vault::start_over(&self.dir, KeySource::key_file_in(&self.dir))?
+                }
+                Err(error) => return Err(error),
+            },
+            Err(VaultError::KeychainKeyMissing) if start => {
+                held.keychain = KeychainHold::Nothing;
+                Vault::start_over(&self.dir, KeySource::key_file_in(&self.dir))?
             }
             Err(error) => return Err(error),
         };
@@ -202,10 +245,13 @@ impl SharedVault {
         }
     }
 
-    /// Wipes the passphrase key held, if there is one. The vault is locked
-    /// again; secrets are unavailable until `unlock`.
+    /// Wipes the passphrase key and the keychain key held, if there are any,
+    /// and forgets a keychain failure. The vault is locked again; secrets are
+    /// unavailable until `unlock` (a keychain vault reads its key again).
     pub fn lock(&self) {
-        self.hold().unlocked = None;
+        let mut held = self.hold();
+        held.unlocked = None;
+        held.keychain = KeychainHold::Nothing;
     }
 
     /// For a passphrase that is forgotten: sets the vault file aside as
@@ -227,10 +273,18 @@ impl SharedVault {
     /// gets a new passphrase and a new key-derivation salt. Atomic: see
     /// `switch.rs`. On an error the old vault and key are as they were.
     pub fn switch_to_passphrase(&self, passphrase: &Secret) -> Result<Switched, VaultError> {
-        let mut held = self.hold();
-        let vault = Vault::open_or_create(&self.dir, self.source(&held)?)?;
-        let (unlocked, switched) = switch::to_passphrase(&vault, passphrase)?;
-        held.unlocked = Some(unlocked);
+        let (mut switched, old_key) = {
+            let mut held = self.hold();
+            let source = self.source(&mut held)?;
+            let vault = Vault::open_or_create(&self.dir, source)?;
+            let old_key = vault.keychain_id();
+            let (unlocked, switched) = switch::to_passphrase(&vault, passphrase)?;
+            held.unlocked = Some(unlocked);
+            held.keychain = KeychainHold::Nothing;
+            (switched, old_key)
+        };
+        // The new vault is in place; only now does the old keychain key go, and with the lock let go.
+        self.remove_old_keychain_key(old_key, &mut switched);
         Ok(switched)
     }
 
@@ -243,18 +297,27 @@ impl SharedVault {
         self.switch_to_passphrase(passphrase)
     }
 
-    /// Protects the vault with a new random key file instead of a passphrase;
-    /// the vault must be open (`Locked` otherwise). A vault that is a key-file
-    /// vault already is left as it is. The passphrase key is dropped.
-    pub fn switch_to_key_file(&self) -> Result<(), VaultError> {
-        let mut held = self.hold();
-        if self.peek().is_none_or(|header| header.mode != Mode::Passphrase) {
-            return Ok(());
-        }
-        let vault = Vault::open_or_create(&self.dir, self.source(&held)?)?;
-        switch::to_key_file(&vault)?;
-        held.unlocked = None;
-        Ok(())
+    /// Protects the vault with a new random key file instead of a passphrase
+    /// or the system keychain; the vault must be open (`Locked`, or the
+    /// keychain's own failure, otherwise). A vault that is a key-file vault
+    /// already is left as it is. The key held is dropped, and a keychain key
+    /// is removed from the keychain once the new vault is in place.
+    pub fn switch_to_key_file(&self) -> Result<Switched, VaultError> {
+        let (mut switched, old_key) = {
+            let mut held = self.hold();
+            if self.peek().is_none_or(|header| header.mode == Mode::KeyFile) {
+                return Ok(Switched::default());
+            }
+            let source = self.source(&mut held)?;
+            let vault = Vault::open_or_create(&self.dir, source)?;
+            let old_key = vault.keychain_id();
+            switch::to_key_file(&vault)?;
+            held.unlocked = None;
+            held.keychain = KeychainHold::Nothing;
+            (Switched::default(), old_key)
+        };
+        self.remove_old_keychain_key(old_key, &mut switched);
+        Ok(switched)
     }
 }
 

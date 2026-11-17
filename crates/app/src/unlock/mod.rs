@@ -11,9 +11,11 @@
 mod gate;
 mod gated;
 mod guard;
+mod keychain;
 mod target;
 
 pub use gate::Gate;
 pub use gated::{Built, Facts, Gated};
 pub use guard::LockOnExit;
+pub use keychain::open_keychain_vault;
 pub use target::vault_folder;

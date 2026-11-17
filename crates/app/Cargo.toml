@@ -17,6 +17,10 @@ serde = { workspace = true }
 toml = { workspace = true }
 toml_edit = { workspace = true }
 
+# The unit tests give the vault a keychain of their own in memory, so none of them can reach the real one.
+[dev-dependencies]
+engine = { path = "../engine", features = ["test-support"] }
+
 # The build script carries the display name out of the workspace manifest.
 [build-dependencies]
 toml.workspace = true

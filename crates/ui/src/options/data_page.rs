@@ -2,7 +2,7 @@
 //! settings again. The paths come from the program and are never stored here.
 
 use super::control::Control;
-use super::protection::{Protection, rows as protection_rows};
+use super::protection::{KeychainState, Protection, rows as protection_rows};
 use super::rows::{Cut, Item, Row, Tone, button_rows, paragraph};
 use super::summary::OptionsPaths;
 
@@ -26,10 +26,20 @@ pub const KEPT_PASSPHRASE: &str = "Kept in the data folder and nowhere else: eac
     was from, to or copied to (to complete recipients as you type), and sent messages not yet saved on the server. \
     Mail itself is not kept on disk.";
 
+/// What is kept, said for the system keychain: the key is not in the folder,
+/// and a copy of the folder opens only on this computer.
+pub const KEPT_KEYCHAIN: &str = "Kept in the data folder and nowhere else: each account's file, with its passwords, its \
+    browser sign-in tokens and any client secret kept encrypted in the secrets vault (the key to it is in this \
+    computer's system keychain, not in the folder: a copy of the folder alone reveals nothing, and it will not open \
+    on another computer or user account, where the passwords are entered again), your settings and window sizes, \
+    the addresses your mail was from, to or copied to (to complete recipients as you type), and sent messages not yet \
+    saved on the server. Mail itself is not kept on disk.";
+
 /// The text about what is kept, for the way the passwords are protected.
 pub fn kept_text(protection: Option<Protection>) -> &'static str {
     match protection {
         Some(Protection::Passphrase) => KEPT_PASSPHRASE,
+        Some(Protection::Keychain) => KEPT_KEYCHAIN,
         Some(Protection::KeyFile) | None => KEPT,
     }
 }
@@ -44,12 +54,13 @@ pub const REMOVE: &str = "To remove everything, close the program and delete the
     their secrets) and the address list.";
 
 pub fn rows(paths: &OptionsPaths, width: u16) -> Vec<Row> {
-    rows_for(paths, None, width)
+    rows_for(paths, None, KeychainState::default(), width)
 }
 
 /// The page with the section on how the passwords are protected, when the
-/// program says (`Some`), and the text about what is kept for that way.
-pub fn rows_for(paths: &OptionsPaths, protection: Option<Protection>, width: u16) -> Vec<Row> {
+/// program says (`Some`), the keychain as the program found it, and the text
+/// about what is kept for that way.
+pub fn rows_for(paths: &OptionsPaths, protection: Option<Protection>, keychain: KeychainState, width: u16) -> Vec<Row> {
     let path = |text: &str| {
         let text = if text.is_empty() { UNKNOWN } else { text };
         Item::Text { text: text.to_string(), tone: Tone::Plain, cut: Cut::Left }
@@ -65,7 +76,7 @@ pub fn rows_for(paths: &OptionsPaths, protection: Option<Protection>, width: u16
     rows.extend(paragraph(NOTE, width, Tone::Dim));
     if let Some(now) = protection {
         rows.push(Row::blank());
-        rows.extend(protection_rows(now, width));
+        rows.extend(protection_rows(now, keychain, width));
     }
     for text in [kept_text(protection), CONTACTED, REMOVE] {
         rows.push(Row::blank());

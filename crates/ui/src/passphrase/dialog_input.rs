@@ -46,7 +46,7 @@ impl PassphraseDialog {
     }
 
     fn ring(&self) -> &'static [Stop] {
-        if self.kind == DialogKind::KeyFile { &KEY_RING } else { &SET_RING }
+        if self.kind.is_question() { &KEY_RING } else { &SET_RING }
     }
 
     fn stop(&self) -> Stop {
@@ -69,7 +69,7 @@ impl PassphraseDialog {
         if held.alt || held.meta || (held.ctrl && key.key != LogicalKey::Char('u')) {
             return DialogStep::Nothing;
         }
-        if self.kind == DialogKind::KeyFile {
+        if self.kind.is_question() {
             return self.question_key(key);
         }
         match key.key {
@@ -99,7 +99,7 @@ impl PassphraseDialog {
             }
             LogicalKey::Char('y' | 'Y') => {
                 self.paired = Some('y');
-                DialogStep::UseKeyFile
+                self.confirmed()
             }
             LogicalKey::Named(NamedKey::Enter) => self.activate(),
             LogicalKey::Named(NamedKey::Tab | NamedKey::Left | NamedKey::Right | NamedKey::Up | NamedKey::Down) => self.step(true),
@@ -167,9 +167,14 @@ impl PassphraseDialog {
         match button {
             ButtonId::Save => self.save(),
             ButtonId::Cancel | ButtonId::Keep => DialogStep::Cancel,
-            ButtonId::Switch => DialogStep::UseKeyFile,
+            ButtonId::Switch => self.confirmed(),
             _ => DialogStep::Nothing,
         }
+    }
+
+    /// What a yes to the question means.
+    fn confirmed(&self) -> DialogStep {
+        if self.kind == DialogKind::Keychain { DialogStep::UseKeychain } else { DialogStep::UseKeyFile }
     }
 
     /// Checks the two boxes against the rule and, when they pass, hands the

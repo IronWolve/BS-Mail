@@ -7,7 +7,7 @@ use crate::app_view::AppView;
 use crate::options::appearance_values::{
     cycle_icons, cycle_theme, spacing_differs, step_font_size, step_line_spacing,
 };
-use crate::options::{Control, OptionsAction, OptionsState, Part};
+use crate::options::{Control, OptionsAction, OptionsState, Part, Protection};
 use crate::passphrase::DialogKind;
 
 const NOT_READY: &str = "That account is not ready yet; try again in a moment.";
@@ -50,7 +50,11 @@ impl AppView {
             Control::Reload => self.queue_options_action(OptionsAction::ReloadSettings),
             Control::UsePassphrase => self.open_passphrase_dialog(DialogKind::Set),
             Control::ChangePassphrase => self.open_passphrase_dialog(DialogKind::Change),
-            Control::UseKeyFile => self.open_passphrase_dialog(DialogKind::KeyFile),
+            Control::UseKeyFile => {
+                let from_keychain = self.options_host.protection == Some(Protection::Keychain);
+                self.open_passphrase_dialog(if from_keychain { DialogKind::KeyFileFromKeychain } else { DialogKind::KeyFile });
+            }
+            Control::UseKeychain => self.open_passphrase_dialog(DialogKind::Keychain),
             Control::AccountList => {}
         }
     }

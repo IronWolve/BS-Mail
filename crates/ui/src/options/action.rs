@@ -35,4 +35,9 @@ pub enum OptionsAction {
     ChangePassphrase(Secret),
     /// Protect the saved passwords with a key file again (confirmed).
     UseKeyFile,
+    /// Keep the key of the saved passwords in the system keychain (confirmed).
+    UseKeychain,
+    /// Look whether this computer has a keychain the program can use, and say
+    /// so with `set_keychain`.
+    CheckKeychain,
 }

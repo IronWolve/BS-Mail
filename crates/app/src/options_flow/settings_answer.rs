@@ -38,7 +38,9 @@ impl Settings {
                 | OptionsAction::RemoveAccount(_)
                 | OptionsAction::UsePassphrase(_)
                 | OptionsAction::ChangePassphrase(_)
-                | OptionsAction::UseKeyFile => None,
+                | OptionsAction::UseKeyFile
+                | OptionsAction::UseKeychain
+                | OptionsAction::CheckKeychain => None,
             };
             grid = changed.or(grid);
         }

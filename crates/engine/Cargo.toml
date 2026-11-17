@@ -25,3 +25,9 @@ futures-util = { workspace = true }
 # Hooks for the integration tests (short reconnect delays). Never enabled by
 # the app.
 test-support = []
+
+[target.'cfg(windows)'.dependencies]
+keyring = { workspace = true, features = ["windows-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { workspace = true, features = ["async-secret-service", "tokio", "crypto-rust"] }

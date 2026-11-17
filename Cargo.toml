@@ -67,6 +67,8 @@ webpki-roots = "1"
 ring = { version = "0.17.14", default-features = false }
 # The vault's passphrase mode: Argon2id, a memory-hard way to make a key from a typed passphrase (pure Rust, no system library).
 argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
+# The vault's system keychain mode: the Windows credential store and the Linux Secret Service (pure Rust, no system library); chosen per system in the engine manifest.
+keyring = { version = "3", default-features = false }
 # Stage 5: MIME parsing and charset decoding; 1.x needs a newer compiler than the pinned one (engine).
 mail-parser = "0.11"
 # Stage 5: HTML bodies to wrapped text with numbered link references (engine).

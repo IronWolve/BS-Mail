@@ -10,8 +10,9 @@ use super::crypto;
 use super::entries::Entries;
 use super::error::VaultError;
 use super::file_io::{read_limited, replace};
-use super::format::{Header, KdfHeader, MAX_VAULT_BYTES, Mode};
+use super::format::{Binding, Header, MAX_VAULT_BYTES, Mode};
 use super::kdf::derive;
+use super::keychain::KeyId;
 use super::key_source::{KeySource, MasterKey, Unlocked};
 
 /// The vault's file name inside its folder.
@@ -139,7 +140,16 @@ impl Vault {
     pub(super) fn unlocked(&self) -> Option<Unlocked> {
         match &self.source {
             KeySource::Passphrase(unlocked) => Some(unlocked.clone()),
-            KeySource::KeyFile(_) => None,
+            KeySource::KeyFile(_) | KeySource::Keychain(_) => None,
+        }
+    }
+
+    /// The key id of the keychain key this vault is held open with, when it
+    /// is a keychain vault.
+    pub(super) fn keychain_id(&self) -> Option<KeyId> {
+        match &self.source {
+            KeySource::Keychain(held) => Some(held.id()),
+            KeySource::KeyFile(_) | KeySource::Passphrase(_) => None,
         }
     }
 
@@ -155,19 +165,19 @@ impl Vault {
     /// was.
     pub fn save(&self) -> Result<(), VaultError> {
         let master = self.source.key_for_saving()?;
-        let file = self.sealed(&master, self.source.kdf())?;
+        let file = self.sealed(&master, &self.source.binding())?;
         replace(&self.path(), &file)
     }
 
-    /// The whole file these entries make under `master` (and `kdf` for a
-    /// passphrase vault), not yet written.
-    pub(super) fn sealed(&self, master: &MasterKey, kdf: Option<&KdfHeader>) -> Result<Vec<u8>, VaultError> {
+    /// The whole file these entries make under `master`, whose header says
+    /// what `binding` does, not yet written.
+    pub(super) fn sealed(&self, master: &MasterKey, binding: &Binding) -> Result<Vec<u8>, VaultError> {
         let mut plain = self.entries.to_plaintext()?;
         if plain.len() as u64 > MAX_VAULT_BYTES {
             wipe_bytes(&mut plain);
             return Err(VaultError::TooBig);
         }
-        crypto::seal(master, kdf, plain)
+        crypto::seal(master, binding, plain)
     }
 
     /// Which way the vault is protected.

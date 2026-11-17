@@ -9,8 +9,7 @@
 use surface::{ButtonState, InputEvent, LogicalKey, NamedKey, PointerButton, PointerShape};
 
 use crate::app_view::AppView;
-use crate::options::OptionsAction;
-use crate::options::OptionsState;
+use crate::options::{KeychainState, OptionsAction, OptionsState, Page, Protection};
 use crate::options::input::{Nav, Outcome, handle_key, handle_text};
 use crate::options::layout::OptionsRects;
 use crate::options::mouse::{click, is_clickable, wheel};
@@ -55,6 +54,7 @@ impl AppView {
             return false;
         };
         let typed = is_user_input(event);
+        let page = state.page;
         let had_line = typed && self.options_host.line.take().is_some();
         // The mail may have changed since the last input (an account list
         // from the backend): start from something that exists.
@@ -68,8 +68,23 @@ impl AppView {
         }
         let reveal = !matches!(event, InputEvent::Wheel { .. });
         self.settle_options(&mut state, rects.as_ref(), reveal);
+        if state.page == Page::Data && page != Page::Data {
+            self.ask_for_the_keychain();
+        }
         self.options = Some(state);
         had_line || outcome != Outcome::Ignored
+    }
+
+    /// The Data page has just been opened: when the program has not found
+    /// out yet whether this computer has a keychain (or found none the last
+    /// time), asks it to look, once. The page says "checking..." meanwhile.
+    fn ask_for_the_keychain(&mut self) {
+        let host = &mut self.options_host;
+        let worth_asking = host.protection.is_some_and(|now| now != Protection::Keychain);
+        if worth_asking && matches!(host.keychain, KeychainState::Unknown | KeychainState::Unavailable) {
+            host.keychain = KeychainState::Checking;
+            host.actions.push(OptionsAction::CheckKeychain);
+        }
     }
 
     fn options_outcome(&self, state: &mut OptionsState, event: &InputEvent, rects: Option<&OptionsRects>) -> Outcome {

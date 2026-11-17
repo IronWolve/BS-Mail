@@ -33,6 +33,7 @@ impl AppView {
             DialogStep::UsePassphrase(secret) => Some(OptionsAction::UsePassphrase(secret)),
             DialogStep::ChangePassphrase(secret) => Some(OptionsAction::ChangePassphrase(secret)),
             DialogStep::UseKeyFile => Some(OptionsAction::UseKeyFile),
+            DialogStep::UseKeychain => Some(OptionsAction::UseKeychain),
         };
         // It has decided: the typed text goes now, not when the view next changes.
         self.passphrase_dialog = None;

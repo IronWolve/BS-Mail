@@ -9,7 +9,7 @@ use ring::hkdf::{HKDF_SHA256, Salt};
 use ring::rand::{SecureRandom, SystemRandom};
 
 use super::error::VaultError;
-use super::format::{Header, KdfHeader, Mode, TAG_LEN};
+use super::format::{Binding, Header, TAG_LEN};
 use super::key_source::MasterKey;
 
 const INFO: &[u8] = b"vault key v1";
@@ -38,11 +38,11 @@ fn subkey(master: &MasterKey, salt: &[u8]) -> Result<LessSafeKey, VaultError> {
 }
 
 /// The whole file for `plaintext`: header, ciphertext, tag. `plaintext` is
-/// overwritten. With `kdf` the file is a passphrase vault (version 2) naming
-/// those key-derivation settings; with `None` it is a key-file vault.
-pub(super) fn seal(master: &MasterKey, kdf: Option<&KdfHeader>, mut plaintext: Vec<u8>) -> Result<Vec<u8>, VaultError> {
-    let mode = if kdf.is_some() { Mode::Passphrase } else { Mode::KeyFile };
-    let header = Header { mode, kdf: kdf.copied(), salt: random()?, nonce: random()? };
+/// overwritten. The binding says what the header names: nothing (a key-file
+/// vault, version 1), the key-derivation settings (a passphrase vault) or the
+/// key id (a keychain vault), both version 2.
+pub(super) fn seal(master: &MasterKey, binding: &Binding, mut plaintext: Vec<u8>) -> Result<Vec<u8>, VaultError> {
+    let header = binding.header(random()?, random()?);
     let head = header.encode();
     // Room for the tag from the start, so sealing never moves the text.
     let mut body = Vec::with_capacity(plaintext.len() + TAG_LEN);

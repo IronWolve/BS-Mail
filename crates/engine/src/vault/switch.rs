@@ -1,5 +1,6 @@
 //! Changing how the vault is protected: from a key file to a passphrase, from
-//! a passphrase to a key file, and to another passphrase.
+//! a passphrase to a key file, and to another passphrase. Moves to the system
+//! keychain are in `switch_keychain.rs`.
 //!
 //! Every switch writes the whole new vault under a temporary name, flushes it
 //! and renames it over the old one before anything else changes, and only
@@ -16,7 +17,7 @@ use model::{MIN_PASSPHRASE_CHARS, Secret, wipe_bytes};
 use super::crypto::random;
 use super::error::VaultError;
 use super::file_io::replace;
-use super::format::KdfHeader;
+use super::format::{Binding, KdfHeader};
 use super::inject::{Step, reach};
 use super::kdf::derive;
 use super::key_file::KEY_LEN;
@@ -31,6 +32,10 @@ pub struct Switched {
     /// be removed (the system's words). It opens nothing any more; the person
     /// is told to delete it.
     pub key_file_left: Option<String>,
+    /// The new vault is in place, but the key the old keychain vault used
+    /// could not be removed from the system keychain (the keychain's words).
+    /// It opens nothing any more; the person is told to delete it there.
+    pub keychain_left: Option<String>,
 }
 
 /// The name a new key file is written under before it is put in place.
@@ -52,13 +57,13 @@ pub(super) fn to_passphrase(vault: &Vault, passphrase: &Secret) -> Result<(Unloc
     // The new vault is in place: only now does the old key file go.
     let key_file_left = match vault.source() {
         KeySource::KeyFile(path) => remove_old_key(path),
-        KeySource::Passphrase(_) => None,
+        KeySource::Passphrase(_) | KeySource::Keychain(_) => None,
     };
-    Ok((unlocked, Switched { key_file_left }))
+    Ok((unlocked, Switched { key_file_left, keychain_left: None }))
 }
 
 /// Takes the old key file out; the system's words when it could not be.
-fn remove_old_key(path: &Path) -> Option<String> {
+pub(super) fn remove_old_key(path: &Path) -> Option<String> {
     if let Err(error) = reach(Step::RemoveKey) {
         return Some(error.to_string());
     }
@@ -90,7 +95,7 @@ pub(super) fn to_key_file(vault: &Vault) -> Result<(), VaultError> {
         std::fs::remove_file(&temp).map_err(fail)?;
     }
     let master = write_new_key(&temp)?;
-    let file = vault.sealed(&master, None).inspect_err(|_| {
+    let file = vault.sealed(&master, &Binding::KeyFile).inspect_err(|_| {
         let _ = std::fs::remove_file(&temp);
     })?;
     let placed = reach(Step::RenameKey).and_then(|()| std::fs::rename(&temp, &key_path).map_err(fail));

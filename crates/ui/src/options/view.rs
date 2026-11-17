@@ -7,7 +7,7 @@ use model::ConnectionState;
 use model::config::Config;
 
 use super::host::InfoLine;
-use super::protection::Protection;
+use super::protection::{KeychainState, Protection};
 use super::summary::{AccountSummary, OptionsPaths};
 use crate::app_identity::AppIdentity;
 
@@ -28,6 +28,8 @@ pub struct OptionsView<'a> {
     pub line: Option<&'a InfoLine>,
     /// How the saved passwords are protected, when the program says.
     pub protection: Option<Protection>,
+    /// What the program found out about the system keychain.
+    pub keychain: KeychainState,
 }
 
 impl OptionsView<'_> {

@@ -32,6 +32,6 @@ pub mod view_api;
 pub use action::OptionsAction;
 pub use control::{Control, Part};
 pub use layout_choices::{Column, LayoutChange, Panel};
-pub use protection::Protection;
+pub use protection::{KeychainState, Protection};
 pub use state::{OptionsState, Page, Stop};
 pub use summary::{AccountSummary, OptionsPaths};

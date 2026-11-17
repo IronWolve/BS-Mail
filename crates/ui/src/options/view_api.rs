@@ -5,7 +5,7 @@ use model::config::{Config, IconMode};
 
 use super::host::InfoLine;
 use super::layout::{OptionsRects, layout, max_scroll};
-use super::protection::Protection;
+use super::protection::{KeychainState, Protection};
 use super::pages::{page_controls, page_rows};
 use super::rows::row_of;
 use super::state::{OptionsState, Stop};
@@ -41,6 +41,18 @@ impl AppView {
     /// How the saved passwords are protected, as the program last said.
     pub fn protection(&self) -> Option<Protection> {
         self.options_host.protection
+    }
+
+    /// What the program found out about the system keychain: the Data page
+    /// offers it only when it is `Available`.
+    pub fn set_keychain(&mut self, state: KeychainState) {
+        self.options_host.keychain = state;
+        self.settle_open_options();
+    }
+
+    /// What the program last said about the system keychain.
+    pub fn keychain(&self) -> KeychainState {
+        self.options_host.keychain
     }
 
     /// The themes the Theme choice goes through.
@@ -98,6 +110,7 @@ impl AppView {
             problem: self.mail.error.as_deref(),
             line: self.options_host.line.as_ref(),
             protection: self.options_host.protection,
+            keychain: self.options_host.keychain,
         }
     }
 

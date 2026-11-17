@@ -6,7 +6,8 @@ use ui::{AppView, OptionsAction};
 use crate::accounts::{Live, MOCK_RUN};
 
 use super::edit::{add_account, edit_account};
-use super::protect::{change_passphrase, use_key_file, use_passphrase};
+use super::background::Background;
+use super::protect::{change_passphrase, check_keychain, use_key_file, use_keychain, use_passphrase};
 use super::remove::remove_account;
 
 /// Which account form, if any, the answers opened. The caller makes the flow
@@ -22,11 +23,14 @@ pub enum Opened {
 }
 
 /// Answers the accounts' requests in `actions` in order. Requests about
-/// settings are `Settings::answer`'s and are passed over here.
+/// settings are `Settings::answer`'s and are passed over here. `jobs` is where
+/// the requests that can wait on the system keychain are done, apart from the
+/// screen.
 pub fn answer(
     view: &mut AppView,
     backend: &mut Box<dyn MailBackend>,
     live: Option<&Live>,
+    jobs: &mut Background,
     actions: Vec<OptionsAction>,
 ) -> Opened {
     let mut opened = Opened::Nothing;
@@ -43,9 +47,11 @@ pub fn answer(
                 }
             }
             OptionsAction::RemoveAccount(id) => remove_account(view, backend, live, &id),
-            OptionsAction::UsePassphrase(secret) => use_passphrase(view, live, &secret),
+            OptionsAction::UsePassphrase(secret) => use_passphrase(view, live, jobs, &secret),
             OptionsAction::ChangePassphrase(secret) => change_passphrase(view, live, &secret),
-            OptionsAction::UseKeyFile => use_key_file(view, live),
+            OptionsAction::UseKeyFile => use_key_file(view, live, jobs),
+            OptionsAction::UseKeychain => use_keychain(view, live, jobs),
+            OptionsAction::CheckKeychain => check_keychain(view, live, jobs),
             OptionsAction::SetTheme(_)
             | OptionsAction::SetIcons(_)
             | OptionsAction::SetFontSize(_)

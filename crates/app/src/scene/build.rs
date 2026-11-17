@@ -7,7 +7,7 @@ use surface::Capabilities;
 use ui::icons::{IconKind, IconSet};
 use ui::theme::Theme;
 use ui::theme::roles;
-use ui::options::Protection;
+use ui::options::{KeychainState, Protection};
 use ui::{AppView, OptionsPaths};
 
 use crate::accounts::{Migration, Place, Scan, move_secrets_into_vault, recover, scan};
@@ -20,6 +20,7 @@ use crate::identity::identity;
 use crate::options_flow::Settings;
 use crate::paths::{accounts_dir, data_dir};
 use crate::source::{Source, choose, needs_scan};
+use crate::unlock::open_keychain_vault;
 
 use super::sources::{self, Base};
 use super::state::Scene;
@@ -63,6 +64,9 @@ pub fn build(options: &Options, capabilities: Capabilities) -> Result<Scene, App
 /// As `build`, for a run that already holds the lock on the data folder
 /// (the start-up prompt takes it before it asks for anything).
 pub fn build_holding(options: &Options, capabilities: Capabilities, held: Option<DataLock>) -> Result<Scene, AppError> {
+    // A vault whose key is in the system keychain is opened first of all, with no prompt: what
+    // comes below reads the accounts, and an account that needs a secret says why when it cannot.
+    let _ = open_keychain_vault(options);
     let data = data_dir(options.data_dir.as_ref());
     let root = data.as_deref().map(accounts_dir);
     let mut scanned = match (&root, needs_scan(options)) {
@@ -100,9 +104,7 @@ pub fn build_holding(options: &Options, capabilities: Capabilities, held: Option
     view.set_config_problem(config_io::footer_note(&problems));
     view.set_capabilities(capabilities);
     view.set_options_paths(options_paths(data.as_deref(), &source));
-    if let Some(protection) = protection_of(&source) {
-        view.set_protection(protection);
-    }
+    tell_how_the_vault_is_kept(&mut view, &source);
     let mut scene = scene_for(&source, view, base, &scanned)?;
     scene.lock = lock;
     scene.font = font;
@@ -140,12 +142,25 @@ fn hold_data_folder(source: &Source) -> Result<Option<DataLock>, AppError> {
     data_lock::hold(&folder)
 }
 
+/// What the Data page is told at start about the vault: the way it is
+/// protected (nothing for mock mail, which has no vault) and, on a system this
+/// version has no code for a keychain on, that a keychain is not available.
+fn tell_how_the_vault_is_kept(view: &mut AppView, source: &Source) {
+    if let Some(protection) = protection_of(source) {
+        view.set_protection(protection);
+    }
+    if !engine::vault::keychain_built() {
+        view.set_keychain(KeychainState::NotBuilt);
+    }
+}
+
 /// How the vault of this run is protected, for the Data page; `None` for mock
 /// mail, which has no vault.
 fn protection_of(source: &Source) -> Option<Protection> {
     let folder = source.secrets_folder()?;
     Some(match engine::vault::SharedVault::for_dir(&folder).protection().mode {
         engine::vault::Mode::Passphrase => Protection::Passphrase,
+        engine::vault::Mode::Keychain => Protection::Keychain,
         engine::vault::Mode::KeyFile => Protection::KeyFile,
     })
 }

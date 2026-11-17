@@ -45,6 +45,8 @@ use std::process::ExitCode;
 use launch_mode::{Launch, decide};
 
 fn main() -> ExitCode {
+    // The service name the keychain entries of the vault's key are kept under: the program's own.
+    engine::vault::set_keychain_service(identity::slug());
     let args: Vec<String> = std::env::args().skip(1).collect();
     let options = match cli::parse(&args) {
         Ok(options) => options,

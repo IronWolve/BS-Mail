@@ -6,26 +6,34 @@
 //! offset  size  what
 //!      0     8  magic "BSMVAULT"
 //!      8     1  version, 1
-//!      9     1  mode: 1 key file (2 is the reserved system keychain)
+//!      9     1  mode, 1 key file
 //!     10     2  reserved, zero
 //!     12    32  salt, new at every save
 //!     44    12  nonce, new at every save
 //!     56     n  ciphertext, then the 16-byte tag
 //! ```
 //!
-//! Version 2 (passphrase mode, 84 header bytes): the same, with the key
-//! derivation's salt and parameters put before the per-save salt and nonce.
+//! Version 2 (passphrase mode and keychain mode, 84 header bytes): the same,
+//! with 28 bytes about where the key comes from put before the per-save salt
+//! and nonce. In passphrase mode (3) they are the key derivation's salt and
+//! parameters; in keychain mode (2) the first 16 are the key id and the other
+//! 12 are reserved and zero, so one parser reads both and the rest of the
+//! header sits at the same offsets.
 //!
 //! ```text
 //! offset  size  what
 //!      0     8  magic "BSMVAULT"
 //!      8     1  version, 2
-//!      9     1  mode, 3 passphrase
+//!      9     1  mode, 3 passphrase, 2 system keychain
 //!     10     2  reserved, zero
-//!     12    16  key-derivation salt, new when the passphrase is set
-//!     28     4  memory cost in KiB, little-endian
-//!     32     4  passes (time cost), little-endian
-//!     36     4  lanes (parallelism), little-endian
+//!     12    16  passphrase: key-derivation salt, new when the passphrase is set
+//!               keychain: the key id, random, new when the keychain is chosen
+//!     28     4  passphrase: memory cost in KiB, little-endian
+//!               keychain: zero
+//!     32     4  passphrase: passes (time cost), little-endian
+//!               keychain: zero
+//!     36     4  passphrase: lanes (parallelism), little-endian
+//!               keychain: zero
 //!     40    32  salt, new at every save
 //!     72    12  nonce, new at every save
 //!     84     n  ciphertext, then the 16-byte tag
@@ -33,12 +41,16 @@
 //!
 //! Everything before the ciphertext is the associated data of the encryption,
 //! so a changed byte anywhere in the file makes it fail to open. The master
-//! key of a version-2 file is Argon2id over the passphrase with that salt and
+//! key of a passphrase file is Argon2id over the passphrase with that salt and
 //! those parameters (`kdf.rs`); the parameters are in the file so they can
 //! change later, and an absurd value is refused before anything is computed
-//! (`KdfParams::check`). A key-file vault is always written as version 1.
+//! (`KdfParams::check`). The master key of a keychain file is 32 random bytes
+//! kept in the system keychain under the key id (`keychain/`); an all-zero key
+//! id and a non-zero reserved byte are refused as damage. A key-file vault is
+//! always written as version 1.
 
 use super::error::VaultError;
+use super::keychain::{KEY_ID_LEN, KeyId};
 
 pub(super) const MAGIC: &[u8; 8] = b"BSMVAULT";
 pub(super) const VERSION_1: u8 = 1;
@@ -67,6 +79,8 @@ pub(super) const MAX_P: u32 = 8;
 pub enum Mode {
     /// A random key in a file beside the vault.
     KeyFile,
+    /// A random key kept in the system keychain, found by a key id in the file.
+    Keychain,
     /// A key made from a passphrase typed at start.
     Passphrase,
 }
@@ -75,8 +89,30 @@ impl Mode {
     pub(super) fn byte(self) -> u8 {
         match self {
             Self::KeyFile => 1,
+            Self::Keychain => 2,
             Self::Passphrase => 3,
         }
+    }
+}
+
+/// What a vault being written says about where its key comes from; the header
+/// is made from it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Binding {
+    KeyFile,
+    Passphrase(KdfHeader),
+    Keychain(KeyId),
+}
+
+impl Binding {
+    /// The header of a vault written with this binding.
+    pub fn header(self, salt: [u8; SALT_LEN], nonce: [u8; NONCE_LEN]) -> Header {
+        let (mode, kdf, key_id) = match self {
+            Self::KeyFile => (Mode::KeyFile, None, None),
+            Self::Passphrase(kdf) => (Mode::Passphrase, Some(kdf), None),
+            Self::Keychain(id) => (Mode::Keychain, None, Some(id)),
+        };
+        Header { mode, kdf, key_id, salt, nonce }
     }
 }
 
@@ -119,6 +155,8 @@ pub(super) struct Header {
     pub mode: Mode,
     /// `Some` exactly for a passphrase vault (version 2).
     pub kdf: Option<KdfHeader>,
+    /// `Some` exactly for a keychain vault (version 2).
+    pub key_id: Option<KeyId>,
     pub salt: [u8; SALT_LEN],
     pub nonce: [u8; NONCE_LEN],
 }
@@ -132,7 +170,7 @@ fn le_u32(bytes: &[u8]) -> u32 {
 impl Header {
     /// How many bytes the header takes in the file.
     pub fn len(&self) -> usize {
-        if self.kdf.is_some() { HEADER_LEN_V2 } else { HEADER_LEN }
+        if self.kdf.is_some() || self.key_id.is_some() { HEADER_LEN_V2 } else { HEADER_LEN }
     }
 
     pub fn encode(&self) -> Vec<u8> {
@@ -149,6 +187,11 @@ impl Header {
                 bytes[at..at + 4].copy_from_slice(&value.to_le_bytes());
                 at += 4;
             }
+        } else if let Some(id) = &self.key_id {
+            // The 12 bytes the passphrase layout uses for its parameters stay zero.
+            bytes[8] = VERSION_2;
+            bytes[at..at + KEY_ID_LEN].copy_from_slice(id.bytes());
+            at += KDF_SALT_LEN + 12;
         }
         bytes[at..at + SALT_LEN].copy_from_slice(&self.salt);
         bytes[at + SALT_LEN..at + SALT_LEN + NONCE_LEN].copy_from_slice(&self.nonce);
@@ -165,36 +208,45 @@ impl Header {
         }
         let mode = match (file[8], file[9]) {
             (VERSION_1, 1) => Mode::KeyFile,
+            (VERSION_2, 2) => Mode::Keychain,
             (VERSION_2, 3) => Mode::Passphrase,
-            (VERSION_1 | VERSION_2, 2) => return Err(VaultError::ModeUnavailable),
             (VERSION_1 | VERSION_2, _) => return Err(VaultError::UnknownMode),
             _ => return Err(VaultError::UnknownVersion),
         };
         if file[10..12] != [0, 0] {
             return Err(VaultError::Damaged);
         }
+        if mode != Mode::KeyFile && file.len() < HEADER_LEN_V2 + TAG_LEN {
+            return Err(VaultError::Damaged);
+        }
         match mode {
-            Mode::KeyFile => Ok(Self::rest(mode, None, file, HEADER_LEN - SALT_LEN - NONCE_LEN)),
+            Mode::KeyFile => Ok(Self::rest(mode, (None, None), file, HEADER_LEN - SALT_LEN - NONCE_LEN)),
             Mode::Passphrase => {
-                if file.len() < HEADER_LEN_V2 + TAG_LEN {
-                    return Err(VaultError::Damaged);
-                }
                 let mut salt = [0u8; KDF_SALT_LEN];
                 salt.copy_from_slice(&file[12..12 + KDF_SALT_LEN]);
                 let params = KdfParams { m_kib: le_u32(&file[28..]), t: le_u32(&file[32..]), p: le_u32(&file[36..]) };
                 params.check()?;
-                Ok(Self::rest(mode, Some(KdfHeader { salt, params }), file, 12 + KDF_SALT_LEN + 12))
+                Ok(Self::rest(mode, (Some(KdfHeader { salt, params }), None), file, 12 + KDF_SALT_LEN + 12))
+            }
+            Mode::Keychain => {
+                let mut id = [0u8; KEY_ID_LEN];
+                id.copy_from_slice(&file[12..12 + KEY_ID_LEN]);
+                let id = KeyId::from_bytes(id);
+                if id.is_zero() || file[28..40].iter().any(|byte| *byte != 0) {
+                    return Err(VaultError::Damaged);
+                }
+                Ok(Self::rest(mode, (None, Some(id)), file, 12 + KDF_SALT_LEN + 12))
             }
         }
     }
 
     /// The per-save salt and nonce, which start at `at`.
-    fn rest(mode: Mode, kdf: Option<KdfHeader>, file: &[u8], at: usize) -> Self {
+    fn rest(mode: Mode, bound: (Option<KdfHeader>, Option<KeyId>), file: &[u8], at: usize) -> Self {
         let mut salt = [0u8; SALT_LEN];
         salt.copy_from_slice(&file[at..at + SALT_LEN]);
         let mut nonce = [0u8; NONCE_LEN];
         nonce.copy_from_slice(&file[at + SALT_LEN..at + SALT_LEN + NONCE_LEN]);
-        Self { mode, kdf, salt, nonce }
+        Self { mode, kdf: bound.0, key_id: bound.1, salt, nonce }
     }
 }
 

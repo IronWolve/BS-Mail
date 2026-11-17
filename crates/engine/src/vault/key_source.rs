@@ -1,15 +1,16 @@
 //! Where the key that opens the vault comes from: a random key in a file
-//! beside the vault, or the key made from a typed passphrase and held in
-//! memory. The system keychain is the mode the file format reserves for a
-//! later version, and is one more variant here when it is built.
+//! beside the vault, the key made from a typed passphrase and held in memory,
+//! or a random key read from the system keychain (by the key id the vault's
+//! header names) and held in memory.
 
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::error::VaultError;
-use super::format::{Header, KdfHeader, Mode};
+use super::format::{Binding, Header, KdfHeader, Mode};
 use super::key_file::{self, KEY_LEN};
+use super::keychain::KeyId;
 
 /// The key file's name inside the vault's folder.
 pub const KEY_FILE_NAME: &str = "key";
@@ -75,6 +76,39 @@ impl PartialEq for Unlocked {
 
 impl Eq for Unlocked {}
 
+/// The random key read from the system keychain for a vault, with the key id
+/// it was kept under. Held in memory for as long as the vault stays open and
+/// wiped when the last copy goes. A copy shares the one key.
+#[derive(Clone)]
+pub struct KeychainKey {
+    key: Arc<MasterKey>,
+    id: KeyId,
+}
+
+impl KeychainKey {
+    pub(super) fn new(key: MasterKey, id: KeyId) -> Self {
+        Self { key: Arc::new(key), id }
+    }
+
+    pub(super) fn id(&self) -> KeyId {
+        self.id
+    }
+}
+
+impl fmt::Debug for KeychainKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("KeychainKey(<redacted>)")
+    }
+}
+
+impl PartialEq for KeychainKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id && self.key.bytes() == other.key.bytes()
+    }
+}
+
+impl Eq for KeychainKey {}
+
 /// How the key is obtained.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeySource {
@@ -82,6 +116,8 @@ pub enum KeySource {
     KeyFile(PathBuf),
     /// The key made from the passphrase, already computed.
     Passphrase(Unlocked),
+    /// The random key the system keychain gave, already read.
+    Keychain(KeychainKey),
 }
 
 impl KeySource {
@@ -95,15 +131,16 @@ impl KeySource {
         match self {
             Self::KeyFile(_) => Mode::KeyFile,
             Self::Passphrase(_) => Mode::Passphrase,
+            Self::Keychain(_) => Mode::Keychain,
         }
     }
 
-    /// The key-derivation settings a vault saved with this key names; `None`
-    /// for a key file.
-    pub(super) fn kdf(&self) -> Option<&KdfHeader> {
+    /// What the header of a vault saved with this key says.
+    pub(super) fn binding(&self) -> Binding {
         match self {
-            Self::KeyFile(_) => None,
-            Self::Passphrase(unlocked) => Some(unlocked.kdf()),
+            Self::KeyFile(_) => Binding::KeyFile,
+            Self::Passphrase(unlocked) => Binding::Passphrase(*unlocked.kdf()),
+            Self::Keychain(held) => Binding::Keychain(held.id),
         }
     }
 
@@ -119,7 +156,11 @@ impl KeySource {
                 Ok(Arc::clone(&unlocked.key))
             }
             (Self::Passphrase(_), Mode::Passphrase) => Err(VaultError::Locked),
-            (Self::Passphrase(_), Mode::KeyFile) => Err(VaultError::WrongMode),
+            (Self::Keychain(held), Mode::Keychain) if header.key_id == Some(held.id) => Ok(Arc::clone(&held.key)),
+            // The key held is for another vault's id: this vault's key is not what was read.
+            (Self::Keychain(_), Mode::Keychain) => Err(VaultError::KeychainKeyMissing),
+            // A key for one way of protecting meeting a vault protected another way.
+            (Self::Passphrase(_) | Self::Keychain(_), _) | (Self::KeyFile(_), Mode::Keychain) => Err(VaultError::WrongMode),
         }
     }
 
@@ -129,6 +170,7 @@ impl KeySource {
         match self {
             Self::KeyFile(path) => key_file::read_or_create(path).map(Arc::new),
             Self::Passphrase(unlocked) => Ok(Arc::clone(&unlocked.key)),
+            Self::Keychain(held) => Ok(Arc::clone(&held.key)),
         }
     }
 }

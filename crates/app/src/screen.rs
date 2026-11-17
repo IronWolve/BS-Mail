@@ -16,7 +16,7 @@ use crate::accounts::Live;
 use crate::clock::system_now;
 use crate::html_store::HtmlStore;
 use crate::link_opener::{LinkOpener, NoOpener};
-use crate::options_flow::{self, Opened, Settings, is_setting};
+use crate::options_flow::{self, Background, Opened, Settings, is_setting};
 use crate::pump::pump;
 use crate::setup_flow::SetupFlow;
 use crate::state_file::State;
@@ -60,6 +60,9 @@ pub struct Screen {
     live: Option<Live>,
     /// What answers the Options screen's requests about settings.
     settings: Settings,
+    /// Work for the Options screen that can wait on the system keychain, done
+    /// apart so the screen stays alive.
+    jobs: Background,
     /// What opens a web address the user clicked in a message.
     links: Box<dyn LinkOpener>,
     /// Where the address book is kept, when this run keeps one.
@@ -96,6 +99,7 @@ impl Screen {
             setup: None,
             live: None,
             settings: Settings::default(),
+            jobs: Background::default(),
             links: Box::new(NoOpener),
             addresses: None,
             pages: None,
@@ -165,6 +169,7 @@ impl Screen {
         if changed {
             self.answer_options(actions, host);
         }
+        changed |= self.jobs.poll(&mut self.view);
         changed |= self.setup_step();
         changed |= self.link_steps();
         changed
@@ -186,7 +191,7 @@ impl Screen {
     }
 
     fn answer_accounts(&mut self, actions: Vec<ui::OptionsAction>) {
-        let edit = match options_flow::answer(&mut self.view, &mut self.backend, self.live.as_ref(), actions) {
+        let edit = match options_flow::answer(&mut self.view, &mut self.backend, self.live.as_ref(), &mut self.jobs, actions) {
             Opened::Nothing => return,
             Opened::New => None,
             Opened::Editing(id) => Some(id),

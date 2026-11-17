@@ -5,6 +5,7 @@
 //! declares and re-exports the modules.
 
 mod answer;
+mod background;
 mod edit;
 mod protect;
 mod reload;
@@ -18,4 +19,5 @@ mod settings;
 mod settings_answer;
 
 pub use answer::{Opened, answer};
+pub use background::Background;
 pub use settings::{Settings, is_setting};

@@ -20,6 +20,13 @@ const CHANGE: &str = "Choose a new passphrase for the saved passwords. The old o
 const KEY_FILE: &str = "The saved passwords will be protected by a key file kept in this folder instead. Nothing is \
     typed at start, and the folder can be copied to another computer, but anyone who holds the whole folder can read \
     them. The passphrase is no longer needed.";
+const KEY_FILE_FROM_KEYCHAIN: &str = "The saved passwords will be protected by a key file kept in this folder instead, and \
+    the key is removed from the system keychain. Nothing is typed at start, and the folder can be copied to another \
+    computer and opened there, but anyone who holds the whole folder can read them.";
+const KEYCHAIN: &str = "The key to the saved passwords will be kept in this computer's own keychain instead of in this \
+    folder or a passphrase. Nothing is typed at start, and a copy of the folder alone reveals nothing. A copy will \
+    not open on another computer or user account: the passwords are entered again there. Mail is not lost; it \
+    stays on the server.";
 
 /// What the dialog is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,6 +37,17 @@ pub enum DialogKind {
     Change,
     /// Give the passphrase up for a key file: only a question.
     KeyFile,
+    /// Give the system keychain up for a key file: only a question.
+    KeyFileFromKeychain,
+    /// Keep the key in the system keychain: only a question.
+    Keychain,
+}
+
+impl DialogKind {
+    /// A question with two buttons, no text to type.
+    pub(super) fn is_question(self) -> bool {
+        matches!(self, Self::KeyFile | Self::KeyFileFromKeychain | Self::Keychain)
+    }
 }
 
 /// What the program is to do after an input.
@@ -46,6 +64,8 @@ pub enum DialogStep {
     ChangePassphrase(Secret),
     /// Switch to a key file.
     UseKeyFile,
+    /// Switch to the system keychain.
+    UseKeychain,
 }
 
 pub struct PassphraseDialog {
@@ -67,8 +87,10 @@ impl fmt::Debug for PassphraseDialog {
 impl PassphraseDialog {
     pub fn new(kind: DialogKind) -> Self {
         let focus = match kind {
-            DialogKind::KeyFile => Focus { field: None, button: Some(ButtonId::Keep) },
             DialogKind::Set | DialogKind::Change => Focus { field: Some(FieldId::First), button: None },
+            DialogKind::KeyFile | DialogKind::KeyFileFromKeychain | DialogKind::Keychain => {
+                Focus { field: None, button: Some(ButtonId::Keep) }
+            }
         };
         Self { kind, first: SecretLine::new(), second: SecretLine::new(), focus, problem: None, paired: None }
     }
@@ -106,17 +128,39 @@ impl PassphraseDialog {
                     Block::Buttons(vec![(ButtonId::Save, "Save"), (ButtonId::Cancel, "Cancel")]),
                 ],
             },
-            DialogKind::KeyFile => Prompt {
-                title: " Use a key file instead ",
-                hint: " y switch   Esc keep the passphrase ",
-                blocks: vec![
-                    Block::Blank,
-                    Block::Text(KEY_FILE.to_string(), Tone::Plain),
-                    Block::Blank,
-                    Block::Buttons(vec![(ButtonId::Switch, "Switch to a key file"), (ButtonId::Keep, "Keep the passphrase")]),
-                ],
-            },
+            DialogKind::KeyFile => question(
+                " Use a key file instead ",
+                " y switch   Esc keep the passphrase ",
+                KEY_FILE,
+                ("Switch to a key file", "Keep the passphrase"),
+            ),
+            DialogKind::KeyFileFromKeychain => question(
+                " Use a key file instead ",
+                " y switch   Esc keep the keychain ",
+                KEY_FILE_FROM_KEYCHAIN,
+                ("Switch to a key file", "Keep the keychain"),
+            ),
+            DialogKind::Keychain => question(
+                " Use the system keychain ",
+                " y switch   Esc keep it as it is ",
+                KEYCHAIN,
+                ("Use the system keychain", "Keep it as it is"),
+            ),
         }
+    }
+}
+
+/// A question with a text and two buttons, the first of which does it.
+fn question(title: &'static str, hint: &'static str, text: &str, buttons: (&'static str, &'static str)) -> Prompt {
+    Prompt {
+        title,
+        hint,
+        blocks: vec![
+            Block::Blank,
+            Block::Text(text.to_string(), Tone::Plain),
+            Block::Blank,
+            Block::Buttons(vec![(ButtonId::Switch, buttons.0), (ButtonId::Keep, buttons.1)]),
+        ],
     }
 }
 

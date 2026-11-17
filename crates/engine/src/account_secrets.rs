@@ -81,6 +81,12 @@ fn unavailable(error: &VaultError, oauth: bool) -> String {
         // Not lost: the passphrase has simply not been given in this run.
         return format!("the secrets of this account cannot be read yet: {error}; start the program again and enter it");
     }
+    if *error == VaultError::KeychainUnavailable {
+        // Not lost either, and nothing is offered to be thrown away: the key is in a keychain that
+        // is out of reach for now, and the program asks it again the next time it starts.
+        // The reason comes first: the footer clips a long sentence at its end.
+        return format!("{error}, so the secrets of this account cannot be read now; the program asks again the next time it starts");
+    }
     if oauth {
         return format!(
             "the sign-in details of this account cannot be read: {error}; the mail is on the server and nothing \

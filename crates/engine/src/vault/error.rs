@@ -18,8 +18,6 @@ pub enum VaultError {
     UnknownVersion,
     /// A mode byte this program does not know.
     UnknownMode,
-    /// A mode the format has but this version cannot open yet.
-    ModeUnavailable,
     /// The vault is there and its key is not.
     KeyMissing,
     /// The key does not open the vault, or the vault was changed.
@@ -48,6 +46,19 @@ pub enum VaultError {
     WrongMode,
     /// A new passphrase that is shorter than the rule allows.
     PassphraseTooShort,
+    /// The vault is a keychain vault and the system keychain works, but has no
+    /// key for it: this computer or user never had it (the folder was moved),
+    /// or it was deleted.
+    KeychainKeyMissing,
+    /// The vault needs the system keychain and there is none here, or it is
+    /// locked, refused or did not answer in time. Nothing is lost: the vault
+    /// is as it was, and the next start asks again.
+    KeychainUnavailable,
+    /// The system keychain failed in some other way, in fixed words.
+    KeychainOther(&'static str),
+    /// A key was stored in the system keychain and what it gave back was not
+    /// that key, so it was not used and no vault was written for it.
+    KeychainReadBack,
 }
 
 impl VaultError {
@@ -55,7 +66,7 @@ impl VaultError {
     /// its key is lost, not merely out of reach (an unreadable folder, a key
     /// file of the wrong length or a newer format are never overwritten).
     pub fn can_start_over(&self) -> bool {
-        matches!(self, Self::Damaged | Self::KeyMissing | Self::KeyMismatch | Self::Contents)
+        matches!(self, Self::Damaged | Self::KeyMissing | Self::KeyMismatch | Self::Contents | Self::KeychainKeyMissing)
     }
 
     /// Whether the error is one of writing the vault (as against opening it),
@@ -76,7 +87,6 @@ impl fmt::Display for VaultError {
             Self::Damaged => write!(f, "{OPEN}: the file is damaged or is not a vault"),
             Self::UnknownVersion => write!(f, "{OPEN}: it was made by a newer version of this program"),
             Self::UnknownMode => write!(f, "{OPEN}: it is protected in a way this program does not know"),
-            Self::ModeUnavailable => write!(f, "{OPEN}: that way of protecting it is not available in this version"),
             Self::KeyMissing | Self::KeyMismatch => write!(f, "{OPEN}: the key is missing or does not match"),
             Self::BadKeyFile(why) => write!(f, "{OPEN}: the key file {why}"),
             Self::Contents => write!(f, "{OPEN}: its contents are not in the form this program expects"),
@@ -92,6 +102,14 @@ impl fmt::Display for VaultError {
                 "that passphrase is too short: it needs at least {} characters",
                 model::MIN_PASSPHRASE_CHARS
             ),
+            Self::KeychainKeyMissing => write!(
+                f,
+                "{OPEN}: the system keychain does not have this vault's key (the folder was moved to another \
+                 computer or user, or the key was deleted)"
+            ),
+            Self::KeychainUnavailable => write!(f, "there is no system keychain here (or it is locked)"),
+            Self::KeychainOther(why) => write!(f, "the system keychain gave an error: {why}"),
+            Self::KeychainReadBack => write!(f, "the system keychain did not give back the key that was stored"),
         }
     }
 }
