@@ -20,11 +20,33 @@ use crate::private_fs;
 pub const LOCK_NAME: &str = "lock";
 
 /// How long a change waits for another copy to finish its own: far longer
-/// than the file work it guards.
-#[cfg(not(test))]
+/// than the file work it guards. The same in every build, so a slow disk
+/// under a test cannot make a busy folder look stuck.
 const WAIT: Duration = Duration::from_secs(10);
+
 #[cfg(test)]
-const WAIT: Duration = Duration::from_millis(400);
+thread_local! {
+    static SHORT_WAIT: std::cell::Cell<Option<Duration>> = const { std::cell::Cell::new(None) };
+}
+
+/// For a test of the refusal only: while `run` runs, changes made on THIS thread wait no longer than
+/// `wait`, so the refusal comes quickly; every other thread and test keeps the full wait.
+#[cfg(test)]
+pub(super) fn with_wait<T>(wait: Duration, run: impl FnOnce() -> T) -> T {
+    let before = SHORT_WAIT.replace(Some(wait));
+    let result = run();
+    SHORT_WAIT.set(before);
+    result
+}
+
+/// The wait a change gives another copy on this thread now.
+fn wait_limit() -> Duration {
+    #[cfg(test)]
+    if let Some(short) = SHORT_WAIT.get() {
+        return short;
+    }
+    WAIT
+}
 
 /// How often a waiting change looks again.
 const STEP: Duration = Duration::from_millis(10);
@@ -93,13 +115,14 @@ pub(super) fn acquire(dir: &Path, create: bool) -> Result<Option<FileLock>, Vaul
 /// Locks `file`, waiting a little for another copy to let go.
 fn wait_for(file: File) -> Result<FileLock, VaultError> {
     let started = Instant::now();
+    let limit = wait_limit();
     loop {
         if let Some(error) = lock_fault() {
             return Err(cannot(error));
         }
         match file.try_lock() {
             Ok(()) => return Ok(FileLock { _file: file }),
-            Err(TryLockError::WouldBlock) if started.elapsed() < WAIT => std::thread::sleep(STEP),
+            Err(TryLockError::WouldBlock) if started.elapsed() < limit => std::thread::sleep(STEP),
             Err(TryLockError::WouldBlock) => return Err(VaultError::LockBusy),
             Err(TryLockError::Error(error)) => return Err(cannot(error)),
         }
