@@ -37,6 +37,9 @@ pub enum OptionsAction {
     UseKeyFile,
     /// Keep the key of the saved passwords in the system keychain (confirmed).
     UseKeychain,
+    /// Set the vault that cannot be opened aside (kept, never deleted) and
+    /// start a new empty one that a key file protects (confirmed).
+    StartVaultOver,
     /// Look whether this computer has a keychain the program can use, and say
     /// so with `set_keychain`.
     CheckKeychain,

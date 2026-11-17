@@ -7,12 +7,15 @@
 //! handle's lock is never held across one on purpose: `unlock_keychain` and
 //! `switch_to_keychain` look at the file under the lock, let it go, call the
 //! keychain, and take it again for the file work; the old key of a vault that
-//! was left is removed after the lock is let go. The one exception is a
-//! keychain vault whose key nothing read at start (`keychain_source`): it
-//! reads under the lock, once, and the answer (the key or the failure) is
-//! kept until `lock`, so it can cost one wait and never one per save. The
-//! program reads the key at start, before any account, so that exception is
-//! not met in a run.
+//! was left is removed after the lock is let go. The folder's own lock, which
+//! keeps two copies of the program apart (`file_lock.rs`), is never held across
+//! a keychain call either: a change reads a keychain vault's key first, with
+//! nothing held, and only then takes it (`begin`). The one exception is a plain
+//! read (`load`) of a keychain vault whose key nothing read at start
+//! (`keychain_source`): it reads under the handle's lock, once, and the answer
+//! (the key or the failure) is kept until `lock`, so it can cost one wait and
+//! never one per save. The program reads the key at start, before any account,
+//! so that exception is not met in a run.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -76,6 +79,10 @@ impl SharedVault {
                 Err(error) => KeychainHold::Failed(id, error.clone()),
             };
         }
+        drop(held);
+        if read.is_ok() {
+            self.repair_marker(Mode::Keychain);
+        }
         read.map(|_| ())
     }
 
@@ -138,8 +145,8 @@ impl SharedVault {
 
     /// The file work of `switch_to_keychain`, under the lock.
     fn write_keychain_vault(&self, held: &mut Held, fresh: &FreshKey) -> Result<Switched, VaultError> {
-        let source = self.source(held)?;
-        let vault = Vault::open_or_create(&self.dir, source)?;
+        let (_lock, source) = self.begin(held, true)?;
+        let vault = Vault::open_or_create(&self.dir, source?)?;
         let (key, switched) = to_keychain(&vault, fresh)?;
         held.unlocked = None;
         held.keychain = KeychainHold::Key(key);
@@ -152,6 +159,11 @@ impl SharedVault {
         let Some(id) = old else {
             return;
         };
+        if switched.not_synced.is_some() {
+            // The new vault could not be flushed to disk: a power loss could bring the old one
+            // back, and its key must still be there.
+            return;
+        }
         if let Err(failure) = self.keychain().delete(&id) {
             switched.keychain_left = Some(failure.to_string());
         }

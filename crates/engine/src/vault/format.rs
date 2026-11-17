@@ -70,9 +70,12 @@ pub const MAX_VAULT_BYTES: u64 = 1024 * 1024;
 
 /// What the key derivation may ask of a file's parameters at most, so a
 /// hostile file cannot make the program allocate or compute wildly.
-pub(super) const MAX_M_KIB: u32 = 1024 * 1024;
-pub(super) const MAX_T: u32 = 10;
-pub(super) const MAX_P: u32 = 8;
+/// The caps are 256 MiB, 4 passes and 4 lanes: well above what the program
+/// writes (64 MiB, 3 passes, 1 lane) and low enough that unlocking a hostile
+/// file costs a second or two, not minutes and a gibibyte.
+pub(super) const MAX_M_KIB: u32 = 256 * 1024;
+pub(super) const MAX_T: u32 = 4;
+pub(super) const MAX_P: u32 = 4;
 
 /// How the key that opens the vault is obtained.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

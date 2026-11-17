@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use model::{Secret, wipe_bytes};
 
+use super::aside::{VAULT_ASIDE, set_aside};
 use super::crypto;
 use super::entries::Entries;
 use super::error::VaultError;
@@ -21,10 +22,6 @@ pub const VAULT_FILE_NAME: &str = "vault";
 /// The folder the vault and its key are in, inside the data folder (and beside
 /// the file for `--account <file>`).
 pub const SECRETS_FOLDER_NAME: &str = "secrets";
-
-/// The name an unreadable vault is set aside under when a fresh one is
-/// started.
-const UNREADABLE_NAME: &str = "vault.unreadable";
 
 /// The secrets of one data folder. Its debug output shows no entry.
 pub struct Vault {
@@ -73,20 +70,14 @@ impl Vault {
         Ok(Self { dir: dir.to_path_buf(), source, entries })
     }
 
-    /// Sets the vault file in `dir` aside as `vault.unreadable` (replacing an
-    /// earlier one) and returns an empty vault. For a vault whose key is lost
-    /// or that is damaged, when the user is giving its secrets again. Only a
-    /// plain file is moved; the key is kept, and made on the first save when
-    /// it is gone.
+    /// Sets the vault file in `dir` aside as `vault.unreadable` (or, when that
+    /// name is taken, `vault.unreadable.1`, `.2`, ... up to `.99`: an earlier
+    /// set-aside vault is never replaced) and returns an empty vault. For a
+    /// vault whose key is lost or that is damaged, when the user is giving its
+    /// secrets again. Only a plain file is moved; the key is kept, and made on
+    /// the first save when it is gone.
     pub fn start_over(dir: &Path, source: KeySource) -> Result<Self, VaultError> {
-        let path = dir.join(VAULT_FILE_NAME);
-        match std::fs::symlink_metadata(&path) {
-            Ok(meta) if meta.is_file() => std::fs::rename(&path, dir.join(UNREADABLE_NAME))
-                .map_err(|error| VaultError::Write(error.to_string()))?,
-            Ok(_) => return Err(VaultError::NotAFile),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(VaultError::Read(error.to_string())),
-        }
+        set_aside(dir, VAULT_FILE_NAME, VAULT_ASIDE, true)?;
         Ok(Self { dir: dir.to_path_buf(), source, entries: Entries::default() })
     }
 
@@ -164,6 +155,13 @@ impl Vault {
     /// renamed over the old one. A save that fails leaves the old vault as it
     /// was.
     pub fn save(&self) -> Result<(), VaultError> {
+        self.save_flushed().map(|_| ())
+    }
+
+    /// As `save`, and says whether the folder could be flushed after the
+    /// rename: `Some(why)` when it could not, so the new vault is in place but
+    /// a power loss could still bring the old one back (see `file_io::replace`).
+    pub(super) fn save_flushed(&self) -> Result<Option<String>, VaultError> {
         let master = self.source.key_for_saving()?;
         let file = self.sealed(&master, &self.source.binding())?;
         replace(&self.path(), &file)

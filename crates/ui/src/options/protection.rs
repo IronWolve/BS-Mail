@@ -14,7 +14,8 @@ pub enum Protection {
     /// A key made from a passphrase typed at start.
     Passphrase,
     /// A random key kept in the computer's own keychain: nothing to type, and
-    /// the folder alone reveals nothing, but it opens only on this computer.
+    /// the vault in a copy of the folder cannot be opened without it, but the
+    /// vault opens only on this computer.
     Keychain,
 }
 
@@ -49,27 +50,37 @@ pub enum KeychainState {
 const KEY_FILE_SAYS: &str = "A random key is kept in a file in this folder. Nothing to type, and the folder can be \
     copied to another computer and still work. It keeps casual eyes out (a file shown on screen, a pasted file, a \
     scanner) but not someone who holds the whole folder.";
-const PASSPHRASE_SAYS: &str = "The key is made from a passphrase you type each time the program starts. A stolen copy \
-    of the folder is protected as far as the passphrase is strong. The program cannot recover a forgotten passphrase: \
-    you would enter the passwords again. Mail is not lost; it is on the server.";
-const KEYCHAIN_SAYS: &str = "The key is kept in this computer's own keychain, not in the folder: nothing to type, and a \
-    copy of the folder alone reveals nothing. A copy will not open on another computer or user account; the \
-    passwords are entered again there. Mail is not lost; it is on the server.";
+const PASSPHRASE_SAYS: &str = "The key is made from a passphrase you type each time the program starts. The vault in a \
+    stolen copy of the folder is protected as far as the passphrase is strong (the rest of the folder is not \
+    encrypted). The program cannot recover a forgotten passphrase: you would enter the passwords again. Mail is not \
+    lost; it is on the server.";
+const KEYCHAIN_SAYS: &str = "The key is kept in this computer's own keychain, not in the folder: nothing to type, and \
+    the vault in a copy of the folder cannot be opened without it. The rest of the folder is not encrypted: account \
+    names and servers, the address list, unsent messages and any vault set aside earlier (under its old protection). \
+    A copy will not open on another computer or user account; the passwords are entered again there. Mail is not \
+    lost; it is on the server.";
 const KEYCHAIN_BACKUP: &str = "Backup incomplete: the vault key is outside the data folder, so a copy of this folder \
     cannot open its vault elsewhere. Deleting the folder leaves the key in the keychain; choosing another way here \
-    removes it.";
+    removes it. If the vault is ever set aside (started over), the key it used stays in the keychain.";
+const START_OVER_SAYS: &str = "Starting over keeps the old vault aside in the secrets folder (nothing is deleted), \
+    begins a new empty vault protected by a key file, and you enter the passwords and sign in again. Mail is not lost; \
+    it is on the server.";
 pub const KEYCHAIN_UNAVAILABLE: &str = "no system keychain was found here";
 pub const KEYCHAIN_NOT_BUILT: &str = "not available in this version";
 pub const KEYCHAIN_CHECKING: &str = "checking...";
 
-/// The "Protecting passwords" section: its heading, the way in use, and the
-/// three choices.
-pub fn rows(now: Protection, keychain: KeychainState, width: u16) -> Vec<Row> {
+/// The "Protecting passwords" section: its heading, the way in use, what is
+/// wrong with the vault when it cannot be opened (`trouble`) with the one
+/// action that is the way out, and the three choices.
+pub fn rows(now: Protection, keychain: KeychainState, trouble: Option<&str>, width: u16) -> Vec<Row> {
     let mut rows = vec![
         Row::text("Protecting passwords", Tone::Heading),
         Row::field("In use", Item::Text { text: now.label().to_string(), tone: Tone::Plain, cut: Cut::Right }),
         Row::blank(),
     ];
+    if let Some(why) = trouble {
+        rows.extend(trouble_rows(why, width));
+    }
     // Key file.
     rows.push(choice("Key file", now == Protection::KeyFile, Control::UseKeyFile, "Use a key file"));
     rows.extend(paragraph(KEY_FILE_SAYS, width, Tone::Dim));
@@ -91,6 +102,27 @@ pub fn rows(now: Protection, keychain: KeychainState, width: u16) -> Vec<Row> {
     if now == Protection::Keychain {
         rows.extend(paragraph(KEYCHAIN_BACKUP, width, Tone::Warn));
     }
+    rows
+}
+
+/// The program's words about the vault as a sentence of its own: they start
+/// in lower case ("the secrets vault could not be opened: ...") and have no stop.
+fn sentence(why: &str) -> String {
+    let mut chars = why.chars();
+    let first: String = chars.next().into_iter().flat_map(char::to_uppercase).collect();
+    format!("{first}{}.", chars.as_str())
+}
+
+/// What is wrong with the vault, and the button that starts it over (after a
+/// confirmation). Only shown while the vault cannot be opened.
+fn trouble_rows(why: &str, width: u16) -> Vec<Row> {
+    let mut rows = paragraph(&sentence(why), width, Tone::Warn);
+    rows.push(Row {
+        label: Some("Vault".to_string()),
+        items: vec![Item::button(Control::StartVaultOver, "Start the vault over...")],
+    });
+    rows.extend(paragraph(START_OVER_SAYS, width, Tone::Dim));
+    rows.push(Row::blank());
     rows
 }
 

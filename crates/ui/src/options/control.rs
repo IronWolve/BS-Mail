@@ -33,6 +33,8 @@ pub enum Control {
     UsePassphrase,
     ChangePassphrase,
     UseKeychain,
+    /// Set the vault that cannot be opened aside and start a new one.
+    StartVaultOver,
 }
 
 /// How a control is used.

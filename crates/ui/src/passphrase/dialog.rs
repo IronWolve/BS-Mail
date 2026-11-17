@@ -13,8 +13,9 @@ use super::frame::Focus;
 use super::layout::{Block, ButtonId, FieldId, Prompt, Tone};
 use super::line::SecretLine;
 
-const SET: &str = "A stolen copy of this folder is protected as far as this passphrase is strong. The program cannot \
-    recover a forgotten passphrase: you would enter the passwords again. Mail is not lost; it stays on the server.";
+const SET: &str = "The vault in a stolen copy of this folder is protected as far as this passphrase is strong (the \
+    rest of the folder is not encrypted). The program cannot recover a forgotten passphrase: you would enter the \
+    passwords again. Mail is not lost; it stays on the server.";
 const CHANGE: &str = "Choose a new passphrase for the saved passwords. The old one stops working at once. The program \
     cannot recover a forgotten passphrase.";
 const KEY_FILE: &str = "The saved passwords will be protected by a key file kept in this folder instead. Nothing is \
@@ -24,9 +25,13 @@ const KEY_FILE_FROM_KEYCHAIN: &str = "The saved passwords will be protected by a
     the key is removed from the system keychain. Nothing is typed at start, and the folder can be copied to another \
     computer and opened there, but anyone who holds the whole folder can read them.";
 const KEYCHAIN: &str = "The key to the saved passwords will be kept in this computer's own keychain instead of in this \
-    folder or a passphrase. Nothing is typed at start, and a copy of the folder alone reveals nothing. A copy will \
-    not open on another computer or user account: the passwords are entered again there. Mail is not lost; it \
-    stays on the server.";
+    folder or a passphrase. Nothing is typed at start, and the vault in a copy of the folder cannot be opened without \
+    the key (the rest of the folder is not encrypted). A copy will not open on another computer or user account: the \
+    passwords are entered again there. Mail is not lost; it stays on the server.";
+const START_OVER: &str = "The vault of saved passwords cannot be opened. If you start it over, the old vault file is kept \
+    aside in the secrets folder (as vault.unreadable, or the next free name: nothing is deleted), a new empty vault \
+    protected by a key file is started, and you enter each account's password again, or sign in again. A key kept in \
+    the system keychain stays there. Your mail is not lost: it stays on the server.";
 
 /// What the dialog is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,12 +46,15 @@ pub enum DialogKind {
     KeyFileFromKeychain,
     /// Keep the key in the system keychain: only a question.
     Keychain,
+    /// Set the vault that cannot be opened aside and start a new one: only a
+    /// question.
+    StartOver,
 }
 
 impl DialogKind {
     /// A question with two buttons, no text to type.
     pub(super) fn is_question(self) -> bool {
-        matches!(self, Self::KeyFile | Self::KeyFileFromKeychain | Self::Keychain)
+        matches!(self, Self::KeyFile | Self::KeyFileFromKeychain | Self::Keychain | Self::StartOver)
     }
 }
 
@@ -66,6 +74,8 @@ pub enum DialogStep {
     UseKeyFile,
     /// Switch to the system keychain.
     UseKeychain,
+    /// Start the vault that cannot be opened over.
+    StartOver,
 }
 
 pub struct PassphraseDialog {
@@ -88,7 +98,7 @@ impl PassphraseDialog {
     pub fn new(kind: DialogKind) -> Self {
         let focus = match kind {
             DialogKind::Set | DialogKind::Change => Focus { field: Some(FieldId::First), button: None },
-            DialogKind::KeyFile | DialogKind::KeyFileFromKeychain | DialogKind::Keychain => {
+            DialogKind::KeyFile | DialogKind::KeyFileFromKeychain | DialogKind::Keychain | DialogKind::StartOver => {
                 Focus { field: None, button: Some(ButtonId::Keep) }
             }
         };
@@ -145,6 +155,12 @@ impl PassphraseDialog {
                 " y switch   Esc keep it as it is ",
                 KEYCHAIN,
                 ("Use the system keychain", "Keep it as it is"),
+            ),
+            DialogKind::StartOver => question(
+                " Start the vault over ",
+                " y start over   Esc leave it as it is ",
+                START_OVER,
+                ("Start the vault over", "Leave it as it is"),
             ),
         }
     }

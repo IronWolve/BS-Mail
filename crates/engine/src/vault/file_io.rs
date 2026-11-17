@@ -18,8 +18,12 @@ pub(super) fn temp_path(path: &Path) -> PathBuf {
     PathBuf::from(name)
 }
 
-/// The vault file's bytes, or `None` when there is no file.
-pub(super) fn read_limited(path: &Path) -> Result<Option<Vec<u8>>, VaultError> {
+/// Opens the plain file at `path` for reading, or `None` when there is no
+/// file. A link, or anything that is not a plain file, is refused by name
+/// first and then again by the handle that was opened (what was opened is
+/// what is read, whatever the name was swapped for in between); with `limit`,
+/// a file over it is `TooBig` before any of it is read.
+fn open_plain(path: &Path, limit: Option<u64>) -> Result<Option<std::fs::File>, VaultError> {
     let meta = match std::fs::symlink_metadata(path) {
         Ok(meta) => meta,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -28,10 +32,29 @@ pub(super) fn read_limited(path: &Path) -> Result<Option<Vec<u8>>, VaultError> {
     if !meta.is_file() {
         return Err(VaultError::NotAFile);
     }
-    if meta.len() > MAX_VAULT_BYTES {
+    let file = std::fs::File::open(path).map_err(|error| VaultError::Read(error.to_string()))?;
+    check_handle(&file, limit)?;
+    Ok(Some(file))
+}
+
+/// Refuses an open file that is not a plain file, or is over `limit`: what the
+/// handle is, which is what will be read, whatever its name was a moment ago.
+fn check_handle(file: &std::fs::File, limit: Option<u64>) -> Result<(), VaultError> {
+    let opened = file.metadata().map_err(|error| VaultError::Read(error.to_string()))?;
+    if !opened.is_file() {
+        return Err(VaultError::NotAFile);
+    }
+    if limit.is_some_and(|limit| opened.len() > limit) {
         return Err(VaultError::TooBig);
     }
-    let file = std::fs::File::open(path).map_err(|error| VaultError::Read(error.to_string()))?;
+    Ok(())
+}
+
+/// The vault file's bytes, or `None` when there is no file.
+pub(super) fn read_limited(path: &Path) -> Result<Option<Vec<u8>>, VaultError> {
+    let Some(file) = open_plain(path, Some(MAX_VAULT_BYTES))? else {
+        return Ok(None);
+    };
     let mut bytes = Vec::new();
     file.take(MAX_VAULT_BYTES + 1).read_to_end(&mut bytes).map_err(|error| VaultError::Read(error.to_string()))?;
     if bytes.len() as u64 > MAX_VAULT_BYTES {
@@ -44,22 +67,20 @@ pub(super) fn read_limited(path: &Path) -> Result<Option<Vec<u8>>, VaultError> {
 /// same refusals as `read_limited` for a link or something that is not a
 /// plain file. For looking at a header without reading the whole vault.
 pub(super) fn read_prefix(path: &Path, limit: u64) -> Result<Option<Vec<u8>>, VaultError> {
-    let meta = match std::fs::symlink_metadata(path) {
-        Ok(meta) => meta,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(VaultError::Read(error.to_string())),
+    let Some(file) = open_plain(path, None)? else {
+        return Ok(None);
     };
-    if !meta.is_file() {
-        return Err(VaultError::NotAFile);
-    }
-    let file = std::fs::File::open(path).map_err(|error| VaultError::Read(error.to_string()))?;
     let mut bytes = Vec::new();
     file.take(limit).read_to_end(&mut bytes).map_err(|error| VaultError::Read(error.to_string()))?;
     Ok(Some(bytes))
 }
 
-/// Puts `bytes` in place of the file at `path`, all or nothing.
-pub(super) fn replace(path: &Path, bytes: &[u8]) -> Result<(), VaultError> {
+/// Puts `bytes` in place of the file at `path`, all or nothing. `Ok(None)`
+/// means the new file is in place and its folder entry is flushed to disk;
+/// `Ok(Some(why))` that it is in place but the folder could not be flushed (the
+/// system's words), so a power loss could still bring the old file back: a
+/// caller that is about to remove what the old file needed keeps it then.
+pub(super) fn replace(path: &Path, bytes: &[u8]) -> Result<Option<String>, VaultError> {
     let fail = |error: std::io::Error| VaultError::Write(error.to_string());
     if bytes.len() as u64 > MAX_VAULT_BYTES {
         return Err(VaultError::TooBig);
@@ -79,8 +100,13 @@ pub(super) fn replace(path: &Path, bytes: &[u8]) -> Result<(), VaultError> {
         let _ = std::fs::remove_file(&temp);
         return Err(error);
     }
-    let _ = private_fs::sync_folder(folder);
-    Ok(())
+    Ok(sync_folder(folder).err())
+}
+
+/// Flushes `folder`; the system's words when it could not be.
+pub(super) fn sync_folder(folder: &Path) -> Result<(), String> {
+    reach(Step::SyncVault).map_err(|error| error.to_string())?;
+    private_fs::sync_folder(folder).map_err(|error| error.to_string())
 }
 
 #[cfg(test)]

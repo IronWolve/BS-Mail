@@ -16,6 +16,8 @@ use super::unlock::{EMPTY, UnlockStage, UnlockStep, UnlockView};
 const RING: [Option<ButtonId>; 4] = [None, Some(ButtonId::Unlock), Some(ButtonId::Forgot), Some(ButtonId::Quit)];
 /// And on the second question.
 const CONFIRM_RING: [ButtonId; 2] = [ButtonId::Back, ButtonId::SetAside];
+/// And when the vault is missing or damaged: the safe answer first.
+const LOST_RING: [ButtonId; 2] = [ButtonId::Quit, ButtonId::SetAside];
 
 impl UnlockView {
     /// What the program is to do after `event` on a grid of `grid` cells.
@@ -54,6 +56,28 @@ impl UnlockView {
         match self.stage {
             UnlockStage::Entering => self.entering_key(key),
             UnlockStage::ConfirmForget => self.confirming_key(key),
+            UnlockStage::Lost => self.lost_key(key),
+        }
+    }
+
+    /// Keys on the screen for a vault that is missing or damaged: Escape and
+    /// `n` quit, `y` carries on, nothing else has any effect on the vault.
+    fn lost_key(&mut self, key: &KeyEvent) -> UnlockStep {
+        let held = key.modifiers;
+        match key.key {
+            LogicalKey::Named(NamedKey::Escape) | LogicalKey::Char('n' | 'N') => {
+                self.paired = key_char(key);
+                UnlockStep::Quit
+            }
+            LogicalKey::Char('y' | 'Y') => {
+                self.paired = key_char(key);
+                UnlockStep::Forget
+            }
+            LogicalKey::Named(NamedKey::Enter) => self.activate(),
+            LogicalKey::Named(NamedKey::Tab) => self.step(!held.shift),
+            LogicalKey::Named(NamedKey::Left | NamedKey::Up) => self.step(false),
+            LogicalKey::Named(NamedKey::Right | NamedKey::Down) => self.step(true),
+            _ => UnlockStep::Nothing,
         }
     }
 
@@ -122,12 +146,17 @@ impl UnlockView {
 
     /// Moves the keyboard one stop round the ring of the question showing.
     fn step(&mut self, forward: bool) -> UnlockStep {
-        let count = if self.stage == UnlockStage::Entering { RING.len() } else { CONFIRM_RING.len() };
+        let count = match self.stage {
+            UnlockStage::Entering => RING.len(),
+            UnlockStage::ConfirmForget => CONFIRM_RING.len(),
+            UnlockStage::Lost => LOST_RING.len(),
+        };
         let at = self.ring_position();
         let to = if forward { (at + 1) % count } else { (at + count - 1) % count };
         self.focus = match self.stage {
             UnlockStage::Entering => Focus { field: RING[to].is_none().then_some(FieldId::First), button: RING[to] },
             UnlockStage::ConfirmForget => Focus { field: None, button: Some(CONFIRM_RING[to]) },
+            UnlockStage::Lost => Focus { field: None, button: Some(LOST_RING[to]) },
         };
         UnlockStep::Redraw
     }
@@ -136,6 +165,7 @@ impl UnlockView {
         match self.stage {
             UnlockStage::Entering => RING.iter().position(|stop| *stop == self.focus.button).unwrap_or(0),
             UnlockStage::ConfirmForget => CONFIRM_RING.iter().position(|stop| Some(*stop) == self.focus.button).unwrap_or(0),
+            UnlockStage::Lost => LOST_RING.iter().position(|stop| Some(*stop) == self.focus.button).unwrap_or(0),
         }
     }
 

@@ -174,7 +174,11 @@ impl PassphraseDialog {
 
     /// What a yes to the question means.
     fn confirmed(&self) -> DialogStep {
-        if self.kind == DialogKind::Keychain { DialogStep::UseKeychain } else { DialogStep::UseKeyFile }
+        match self.kind {
+            DialogKind::Keychain => DialogStep::UseKeychain,
+            DialogKind::StartOver => DialogStep::StartOver,
+            _ => DialogStep::UseKeyFile,
+        }
     }
 
     /// Checks the two boxes against the rule and, when they pass, hands the

@@ -43,6 +43,19 @@ impl AppView {
         self.options_host.protection
     }
 
+    /// Why the vault cannot be opened (`Some`, the program's sentence), when
+    /// only the explicit "Start the vault over" is the way out; `None` once it
+    /// opens. The Data page offers the action only while this is set.
+    pub fn set_vault_trouble(&mut self, trouble: Option<String>) {
+        self.options_host.vault_trouble = trouble;
+        self.settle_open_options();
+    }
+
+    /// What the program last said about the vault that cannot be opened.
+    pub fn vault_trouble(&self) -> Option<&str> {
+        self.options_host.vault_trouble.as_deref()
+    }
+
     /// What the program found out about the system keychain: the Data page
     /// offers it only when it is `Available`.
     pub fn set_keychain(&mut self, state: KeychainState) {
@@ -111,6 +124,7 @@ impl AppView {
             line: self.options_host.line.as_ref(),
             protection: self.options_host.protection,
             keychain: self.options_host.keychain,
+            vault_trouble: self.options_host.vault_trouble.as_deref(),
         }
     }
 

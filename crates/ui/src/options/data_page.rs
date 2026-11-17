@@ -21,19 +21,20 @@ pub const KEPT: &str = "Kept in the data folder and nowhere else: each account's
 /// passphrase the key is not in the folder at all.
 pub const KEPT_PASSPHRASE: &str = "Kept in the data folder and nowhere else: each account's file, with its passwords, its \
     browser sign-in tokens and any client secret kept encrypted in the secrets vault (the key to it is made from your \
-    passphrase, which is not stored anywhere: a stolen copy of the folder is protected as far as the passphrase is \
-    strong, and the program cannot recover a forgotten one), your settings and window sizes, the addresses your mail \
-    was from, to or copied to (to complete recipients as you type), and sent messages not yet saved on the server. \
-    Mail itself is not kept on disk.";
+    passphrase, which is not stored anywhere: the vault in a stolen copy of the folder is protected as far as the \
+    passphrase is strong, and the program cannot recover a forgotten one; the rest of the folder is not encrypted), \
+    your settings and window sizes, the addresses your mail was from, to or copied to (to complete recipients as you \
+    type), and sent messages not yet saved on the server. Mail itself is not kept on disk.";
 
 /// What is kept, said for the system keychain: the key is not in the folder,
 /// and a copy of the folder opens only on this computer.
 pub const KEPT_KEYCHAIN: &str = "Kept in the data folder and nowhere else: each account's file, with its passwords, its \
     browser sign-in tokens and any client secret kept encrypted in the secrets vault (the key to it is in this \
-    computer's system keychain, not in the folder: a copy of the folder alone reveals nothing, and it will not open \
-    on another computer or user account, where the passwords are entered again), your settings and window sizes, \
-    the addresses your mail was from, to or copied to (to complete recipients as you type), and sent messages not yet \
-    saved on the server. Mail itself is not kept on disk.";
+    computer's system keychain, not in the folder: the vault in a copy of the folder cannot be opened without it, \
+    and it will not open on another computer or user account, where the passwords are entered again; the rest of \
+    the folder is not encrypted, and any vault set aside earlier stays under its old protection), your settings \
+    and window sizes, the addresses your mail was from, to or copied to (to complete recipients as you type), and \
+    sent messages not yet saved on the server. Mail itself is not kept on disk.";
 
 /// The text about what is kept, for the way the passwords are protected.
 pub fn kept_text(protection: Option<Protection>) -> &'static str {
@@ -43,6 +44,12 @@ pub fn kept_text(protection: Option<Protection>) -> &'static str {
         Some(Protection::KeyFile) | None => KEPT,
     }
 }
+
+/// What the vault does not cover: an account file that holds its password in
+/// plain text is never moved into it when it is run with `--account`.
+pub const PLAIN_FILE_NOTE: &str = "An account file run with --account that holds its password in plain text (written by an \
+    older version or by hand) is left as it is: it is never moved into the vault, so that password stays readable in \
+    that file.";
 
 /// Who the program talks to.
 pub const CONTACTED: &str = "Contacted: your mail servers and, for a browser sign-in, the provider's sign-in service. \
@@ -54,13 +61,19 @@ pub const REMOVE: &str = "To remove everything, close the program and delete the
     their secrets) and the address list.";
 
 pub fn rows(paths: &OptionsPaths, width: u16) -> Vec<Row> {
-    rows_for(paths, None, KeychainState::default(), width)
+    rows_for(paths, None, KeychainState::default(), None, width)
 }
 
 /// The page with the section on how the passwords are protected, when the
 /// program says (`Some`), the keychain as the program found it, and the text
 /// about what is kept for that way.
-pub fn rows_for(paths: &OptionsPaths, protection: Option<Protection>, keychain: KeychainState, width: u16) -> Vec<Row> {
+pub fn rows_for(
+    paths: &OptionsPaths,
+    protection: Option<Protection>,
+    keychain: KeychainState,
+    trouble: Option<&str>,
+    width: u16,
+) -> Vec<Row> {
     let path = |text: &str| {
         let text = if text.is_empty() { UNKNOWN } else { text };
         Item::Text { text: text.to_string(), tone: Tone::Plain, cut: Cut::Left }
@@ -76,9 +89,9 @@ pub fn rows_for(paths: &OptionsPaths, protection: Option<Protection>, keychain: 
     rows.extend(paragraph(NOTE, width, Tone::Dim));
     if let Some(now) = protection {
         rows.push(Row::blank());
-        rows.extend(protection_rows(now, keychain, width));
+        rows.extend(protection_rows(now, keychain, trouble, width));
     }
-    for text in [kept_text(protection), CONTACTED, REMOVE] {
+    for text in [kept_text(protection), PLAIN_FILE_NOTE, CONTACTED, REMOVE] {
         rows.push(Row::blank());
         rows.extend(paragraph(text, width, Tone::Dim));
     }

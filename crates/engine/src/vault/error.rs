@@ -59,14 +59,75 @@ pub enum VaultError {
     /// A key was stored in the system keychain and what it gave back was not
     /// that key, so it was not used and no vault was written for it.
     KeychainReadBack,
+    /// The folder says its vault is protected by a passphrase or the system
+    /// keychain, and there is no vault file in it.
+    Missing,
+    /// The secrets folder is a link or not a folder; holds what is wrong.
+    BadFolder(&'static str),
+    /// The secrets folder, the vault or the key file can be used by other
+    /// users and its permissions could not be tightened; holds which one.
+    Permissions(&'static str),
+    /// The secrets folder cannot be locked against another copy of the
+    /// program changing the vault at the same moment; holds why.
+    NoLock(String),
+    /// Another copy of the program held the lock on the secrets folder for
+    /// longer than a change is allowed to wait.
+    LockBusy,
+    /// Every name a set-aside vault or key file is kept under is taken.
+    TooManySetAside,
+    /// A start-over was asked for a vault that opens fine.
+    OpensFine,
 }
 
+/// What to do when a vault cannot be set up again by a save of its own (the
+/// caller adds what comes after: enter it again, or sign in again).
+pub const START_OVER_ADVICE: &str = "open Options, go to the Data page and choose \"Start the vault over...\"";
+
 impl VaultError {
-    /// Whether the vault can be set aside and a fresh one started: the file or
-    /// its key is lost, not merely out of reach (an unreadable folder, a key
-    /// file of the wrong length or a newer format are never overwritten).
+    /// Whether the vault is lost: the file or its key is gone or does not
+    /// match, not merely out of reach (an unreadable folder, a key file of the
+    /// wrong length or a newer format are not lost). A key-file vault that is
+    /// lost is set aside by the next save of a secret given now; a vault of
+    /// any other kind never is (`SharedVault::update_or_start_over`).
     pub fn can_start_over(&self) -> bool {
-        matches!(self, Self::Damaged | Self::KeyMissing | Self::KeyMismatch | Self::Contents | Self::KeychainKeyMissing)
+        matches!(
+            self,
+            Self::Damaged | Self::KeyMissing | Self::KeyMismatch | Self::Contents | Self::KeychainKeyMissing | Self::Missing
+        )
+    }
+
+    /// Whether the explicit, confirmed "Start the vault over" is the way out:
+    /// the vault cannot be opened and nothing a save does will change that.
+    /// Not when it is only locked (the passphrase has not been given) or the
+    /// keychain is only out of reach (both are put right by themselves), not
+    /// when the system could not read, write or lock the folder, and not when
+    /// the passphrase is only wrong.
+    pub fn offers_start_over(&self) -> bool {
+        self.can_start_over()
+            || matches!(
+                self,
+                Self::NotAFile
+                    | Self::TooBig
+                    | Self::UnknownVersion
+                    | Self::UnknownMode
+                    | Self::BadKeyFile(_)
+                    | Self::KdfRefused
+                    | Self::KeychainOther(_)
+            )
+    }
+
+    /// Whether a save of a secret given now deals with this by itself, when
+    /// the vault is a key-file vault: it is set aside and a new one started.
+    /// (For any other vault, and for every other error, only the explicit
+    /// choice does.)
+    pub fn saves_start_over(&self) -> bool {
+        matches!(self, Self::Damaged | Self::KeyMissing | Self::KeyMismatch | Self::Contents)
+    }
+
+    /// What to tell the person when this is why a secret they gave could not
+    /// be saved: the way out, when there is one.
+    pub fn advice(&self) -> Option<&'static str> {
+        self.offers_start_over().then_some(START_OVER_ADVICE)
     }
 
     /// Whether the error is one of writing the vault (as against opening it),
@@ -110,6 +171,30 @@ impl fmt::Display for VaultError {
             Self::KeychainUnavailable => write!(f, "there is no system keychain here (or it is locked)"),
             Self::KeychainOther(why) => write!(f, "the system keychain gave an error: {why}"),
             Self::KeychainReadBack => write!(f, "the system keychain did not give back the key that was stored"),
+            Self::Missing => write!(
+                f,
+                "{OPEN}: the vault file is missing, though this folder was protected by a passphrase or the system keychain"
+            ),
+            Self::BadFolder(why) => write!(f, "{OPEN}: the secrets folder {why}"),
+            Self::Permissions(what) => write!(
+                f,
+                "{OPEN}: {what} can be used by other users and its permissions could not be tightened"
+            ),
+            Self::NoLock(why) => write!(
+                f,
+                "the secrets vault could not be changed: the secrets folder cannot be locked ({why}), so two copies of \
+                 the program could overwrite each other's changes"
+            ),
+            Self::LockBusy => write!(
+                f,
+                "the secrets vault could not be changed: another copy of the program is changing it; try again in a moment"
+            ),
+            Self::TooManySetAside => write!(
+                f,
+                "the secrets vault could not be set aside: the secrets folder already holds 100 set-aside files \
+                 (vault.unreadable up to vault.unreadable.99); delete or move some of them first"
+            ),
+            Self::OpensFine => write!(f, "the secrets vault opens fine, so there is nothing to start over"),
         }
     }
 }

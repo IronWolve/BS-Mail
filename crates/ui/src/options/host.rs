@@ -30,6 +30,10 @@ pub struct OptionsHost {
     pub protection: Option<Protection>,
     /// What the program found out about the system keychain.
     pub keychain: KeychainState,
+    /// Why the vault cannot be opened, in the program's words, when only the
+    /// explicit "Start the vault over" is the way out; `None` when it opens,
+    /// is only locked, or its keychain is only out of reach.
+    pub vault_trouble: Option<String>,
 }
 
 impl OptionsHost {

@@ -25,10 +25,13 @@ use model::Secret;
 /// a browser sign-in saves its tokens before the account is saved, and those
 /// are this account's own. An edit that gives no password or client secret
 /// takes the old one out (the account no longer uses one). A secret that is
-/// already there is not written again. A vault that is lost (its key is gone) or damaged is set
-/// aside and a new one started, since the user is giving a secret now and the
-/// other accounts ask for theirs in their own words. Nothing is changed when
-/// the vault cannot be saved, and the error is a sentence for the form.
+/// already there is not written again. A key-file vault that is lost (its key
+/// is gone) or damaged is set aside (never over an earlier set-aside one) and a
+/// new one started, since the user is giving a secret now and the other
+/// accounts ask for theirs in their own words. A passphrase or keychain vault is
+/// never set aside by this: the error says so, and says the way out (the
+/// explicit "Start the vault over..." in Options). Nothing is changed when the
+/// vault cannot be saved, and the error is a sentence for the form.
 pub fn put(
     dir: &Path,
     id: &str,
@@ -60,7 +63,7 @@ pub fn put(
         Ok(held) => Ok(held),
         // Nothing to write and nothing readable: the account has no entry to keep.
         Err(error) if !given && !error.while_saving() => Ok(false),
-        Err(error) => Err(error.to_string()),
+        Err(error) => Err(with_way_out(&error)),
     }
 }
 
@@ -101,7 +104,17 @@ pub fn put_provider_secret(dir: &Path, provider: &str, secret: Secret) -> Result
             let changed = put_entry(vault, &name, secret);
             (changed, changed)
         })
-        .map_err(|error: VaultError| error.to_string())
+        .map_err(|error: VaultError| with_way_out(&error))
+}
+
+/// The sentence for a secret that could not be saved, with the way out when
+/// there is one: a vault no save can start over (any but a key-file vault that
+/// is lost, and the errors no save deals with) is started over from Options.
+fn with_way_out(error: &VaultError) -> String {
+    match error.advice() {
+        Some(advice) => format!("{error}; {advice}, then enter it again"),
+        None => error.to_string(),
+    }
 }
 
 /// The client secret kept for `provider`; `None` when there is none or the

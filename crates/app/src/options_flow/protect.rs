@@ -11,7 +11,7 @@
 //! wait on the system, so they run on a thread of their own (`Background`) and
 //! the line says it is working; the others take a moment and are done at once.
 
-use engine::vault::{SharedVault, Switched, VaultError};
+use engine::vault::{SharedVault, StartedOver, Switched, VaultError};
 use model::Secret;
 use ui::AppView;
 use ui::options::{KeychainState, Protection};
@@ -82,6 +82,37 @@ pub(super) fn use_keychain(view: &mut AppView, live: Option<&Live>, jobs: &mut B
     run_apart(view, jobs, "Moving the key into the system keychain...", work);
 }
 
+/// Starts the vault over, after the person confirmed it: the vault that cannot
+/// be opened is set aside (kept, never deleted, never over an earlier one) and
+/// the passwords are protected by a key file again, so a password given next
+/// makes a new empty vault. A vault that opens, is only locked or whose keychain
+/// is only out of reach is refused with its own sentence and left as it is.
+pub(super) fn start_vault_over(view: &mut AppView, live: Option<&Live>) {
+    let Some(live) = live_or_problem(view, live) else {
+        return;
+    };
+    let vault = vault_of(live);
+    match vault.start_vault_over() {
+        Ok(done) => {
+            view.set_protection(Protection::KeyFile);
+            view.set_vault_trouble(vault.unopenable().map(|error| error.to_string()));
+            view.options_info(&started_over(&done));
+        }
+        Err(error) => view.options_problem(&format!("Nothing was changed: {error}.")),
+    }
+}
+
+/// What was set aside, in words, and what happens next.
+fn started_over(done: &StartedOver) -> String {
+    let kept = match (&done.vault_kept_as, &done.key_kept_as) {
+        (Some(vault), Some(key)) => format!("The old vault is kept as secrets/{vault} and its key file as secrets/{key}."),
+        (Some(vault), None) => format!("The old vault is kept as secrets/{vault}."),
+        (None, Some(key)) => format!("The old key file is kept as secrets/{key}."),
+        (None, None) => "There was no vault file to keep.".to_string(),
+    };
+    format!("Started over. {kept} Enter each password again, or sign in again. Mail is not lost.")
+}
+
 /// Looks whether this computer has a keychain the program can use, and tells
 /// the Data page. The look can wait on the system, so it is made apart.
 pub(super) fn check_keychain(view: &mut AppView, live: Option<&Live>, jobs: &mut Background) {
@@ -122,13 +153,18 @@ fn done(view: &mut AppView, result: Result<Switched, VaultError>, now: Protectio
     match result {
         Ok(switched) => {
             view.set_protection(now);
-            match (switched.key_file_left, switched.keychain_left) {
-                (None, None) => view.options_info(said),
-                (Some(why), _) => view.options_problem(&format!(
+            match (switched.key_file_left, switched.keychain_left, switched.not_synced) {
+                (None, None, None) => view.options_info(said),
+                (Some(why), _, _) => view.options_problem(&format!(
                     "Done, but the old key file could not be removed ({why}): delete it. It opens nothing now."
                 )),
-                (None, Some(why)) => view.options_problem(&format!(
+                (None, Some(why), _) => view.options_problem(&format!(
                     "Done, but the old key is still in the system keychain ({why}); it opens nothing now."
+                )),
+                (None, None, Some(why)) => view.options_problem(&format!(
+                    "Done, but the change could not be flushed to disk ({why}), so the old key was kept in case it is \
+                     lost. Once the passwords open after the next start, remove the old key yourself (secrets/key, or \
+                     the entry in the system keychain)."
                 )),
             }
         }

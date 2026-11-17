@@ -21,6 +21,14 @@ const INTRO: &str = "The saved passwords of your accounts are protected by a pas
 const FORGOT: &str = "A forgotten passphrase cannot be recovered. The saved passwords and sign-ins are set aside \
     (the old file is kept as secrets/vault.unreadable), and you enter each account's password again, or sign in \
     again. Your mail is not lost: it stays on the server.";
+const LOST_MISSING: &str = "The saved passwords should be protected by a passphrase, but their vault file is not there, \
+    so no passphrase can open it. If you carry on, a new vault with a key file is started and you enter each \
+    password again, or sign in again. Your mail is not lost: it stays on the server. To try a copy, quit and put it \
+    back.";
+const LOST_DAMAGED: &str = "The saved passwords should be protected by a passphrase, but their vault file is damaged. If \
+    you carry on, it is set aside as secrets/vault.unreadable (or the next free name), a new vault with a key file is \
+    started and you enter each password again, or sign in again. Your mail is not lost. To try a copy, quit and put \
+    it back.";
 pub const WRONG: &str = "That passphrase does not open the vault. Try again.";
 pub const EMPTY: &str = "Type the passphrase first.";
 
@@ -32,6 +40,10 @@ pub enum UnlockStage {
     /// "Forgot the passphrase" was chosen: the cost is stated, and the second
     /// confirmation is awaited.
     ConfirmForget,
+    /// The vault of a passphrase folder is missing or damaged, so there is no
+    /// passphrase to ask for: what carrying on costs is stated, and the safe
+    /// answer (Quit, which changes nothing) has the keyboard.
+    Lost,
 }
 
 /// What the program is to do after an input.
@@ -44,7 +56,8 @@ pub enum UnlockStep {
     /// Try this passphrase. The program answers with `wrong_passphrase`,
     /// `failed`, or goes on.
     Unlock(model::Secret),
-    /// The second confirmation was given: set the vault aside.
+    /// The second confirmation was given: set the vault aside (or, for a
+    /// vault that is missing or damaged, carry on without it).
     Forget,
     /// Leave the program.
     Quit,
@@ -60,6 +73,9 @@ pub struct UnlockView {
     pub(super) problem: Option<String>,
     /// The letter of a command key just handled, whose text is still to come.
     pub(super) paired: Option<char>,
+    /// For the `Lost` stage: the vault file is not there at all (as against
+    /// being damaged).
+    pub(super) missing: bool,
 }
 
 impl fmt::Debug for UnlockView {
@@ -80,7 +96,20 @@ impl UnlockView {
             focus: Focus { field: Some(FieldId::First), button: None },
             problem: None,
             paired: None,
+            missing: false,
         }
+    }
+
+    /// The screen for a passphrase folder whose vault is missing (`missing`) or
+    /// damaged: there is nothing a passphrase could open, so none is asked for.
+    /// Carrying on (never the default) sets what is there aside and starts a
+    /// key-file vault; Quit changes nothing.
+    pub fn lost(theme: Theme, config: Config, kind: IconKind, missing: bool) -> Self {
+        let mut view = Self::new(theme, config, kind);
+        view.stage = UnlockStage::Lost;
+        view.focus = Focus { field: None, button: Some(ButtonId::Quit) };
+        view.missing = missing;
+        view
     }
 
     /// What the host showing the prompt can do, for the colours.
@@ -116,8 +145,13 @@ impl UnlockView {
     /// Something else went wrong (the vault could not be read, or could not
     /// be set aside); the words come from the program and carry no secret.
     pub fn failed(&mut self, text: &str) {
-        self.stage = UnlockStage::Entering;
-        self.focus = Focus { field: Some(FieldId::First), button: None };
+        if self.stage == UnlockStage::Lost {
+            // No passphrase to go back to: the safe answer has the keyboard again.
+            self.focus = Focus { field: None, button: Some(ButtonId::Quit) };
+        } else {
+            self.stage = UnlockStage::Entering;
+            self.focus = Focus { field: Some(FieldId::First), button: None };
+        }
         self.problem = Some(text.to_string());
     }
 
@@ -137,6 +171,20 @@ impl UnlockView {
                     Block::Buttons(vec![
                         (ButtonId::Unlock, "Unlock"),
                         (ButtonId::Forgot, "Forgot the passphrase"),
+                        (ButtonId::Quit, "Quit"),
+                    ]),
+                ],
+            },
+            UnlockStage::Lost => Prompt {
+                title: if self.missing { " Vault missing " } else { " Vault damaged " },
+                hint: " y carry on   Esc quit ",
+                blocks: vec![
+                    Block::Blank,
+                    Block::Text((if self.missing { LOST_MISSING } else { LOST_DAMAGED }).to_string(), Tone::Plain),
+                    // One row that is the gap above the buttons until a failure needs it.
+                    Block::Notice(1, self.problem.clone().map(|text| (text, Tone::Problem))),
+                    Block::Buttons(vec![
+                        (ButtonId::SetAside, if self.missing { "Start a new vault" } else { "Set the passwords aside" }),
                         (ButtonId::Quit, "Quit"),
                     ]),
                 ],

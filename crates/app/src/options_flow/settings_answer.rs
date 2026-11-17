@@ -40,6 +40,7 @@ impl Settings {
                 | OptionsAction::ChangePassphrase(_)
                 | OptionsAction::UseKeyFile
                 | OptionsAction::UseKeychain
+                | OptionsAction::StartVaultOver
                 | OptionsAction::CheckKeychain => None,
             };
             grid = changed.or(grid);

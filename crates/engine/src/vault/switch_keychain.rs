@@ -8,10 +8,11 @@
 //! key as they were; the caller removes the entry it made.
 
 use super::error::VaultError;
+use super::format::Mode;
 use super::key_source::{KeySource, KeychainKey, MasterKey};
 use super::keychain::{KeyId, StoredKey};
 use super::store::Vault;
-use super::switch::{Switched, remove_old_key};
+use super::switch::{Switched, record, remove_old_key};
 
 /// A new key and the key id it is kept under, not yet in any vault.
 pub(super) struct FreshKey {
@@ -35,12 +36,14 @@ impl FreshKey {
 /// hold. The old key file goes only after the new vault is in place.
 pub(super) fn to_keychain(vault: &Vault, fresh: &FreshKey) -> Result<(KeychainKey, Switched), VaultError> {
     let held = fresh.for_vault()?;
-    vault.moved_to(KeySource::Keychain(held.clone())).save()?;
-    let key_file_left = match vault.source() {
-        KeySource::KeyFile(path) => remove_old_key(path),
-        KeySource::Passphrase(_) | KeySource::Keychain(_) => None,
+    let not_synced = vault.moved_to(KeySource::Keychain(held.clone())).save_flushed()?;
+    record(vault.dir(), Mode::Keychain);
+    // The old key file goes only after the new vault is in place and the folder is flushed.
+    let key_file_left = match (vault.source(), &not_synced) {
+        (KeySource::KeyFile(path), None) => remove_old_key(path),
+        _ => None,
     };
-    Ok((held, Switched { key_file_left, keychain_left: None }))
+    Ok((held, Switched { key_file_left, keychain_left: None, not_synced }))
 }
 
 #[cfg(test)]

@@ -7,7 +7,7 @@ use crate::accounts::{Live, MOCK_RUN};
 
 use super::edit::{add_account, edit_account};
 use super::background::Background;
-use super::protect::{change_passphrase, check_keychain, use_key_file, use_keychain, use_passphrase};
+use super::protect::{change_passphrase, check_keychain, start_vault_over, use_key_file, use_keychain, use_passphrase};
 use super::remove::remove_account;
 
 /// Which account form, if any, the answers opened. The caller makes the flow
@@ -51,6 +51,7 @@ pub fn answer(
             OptionsAction::ChangePassphrase(secret) => change_passphrase(view, live, &secret),
             OptionsAction::UseKeyFile => use_key_file(view, live, jobs),
             OptionsAction::UseKeychain => use_keychain(view, live, jobs),
+            OptionsAction::StartVaultOver => start_vault_over(view, live),
             OptionsAction::CheckKeychain => check_keychain(view, live, jobs),
             OptionsAction::SetTheme(_)
             | OptionsAction::SetIcons(_)

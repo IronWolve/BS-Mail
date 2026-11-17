@@ -10,7 +10,7 @@
 use model::Secret;
 
 use crate::account_config::ConfigError;
-use crate::vault::{VaultError, VaultView, client_secret_name, password_name, smtp_password_name};
+use crate::vault::{START_OVER_ADVICE, VaultError, VaultView, client_secret_name, password_name, smtp_password_name};
 
 /// The key that says the passwords are in the vault.
 pub const MARKER_KEY: &str = "secrets";
@@ -71,12 +71,15 @@ pub(crate) fn resolve(
 }
 
 fn from_vault(vault: &VaultView, name: &str, oauth: bool) -> Result<Option<Secret>, ConfigError> {
-    vault.get(name).map_err(|error| ConfigError::Vault(unavailable(&error, oauth)))
+    vault.get(name).map_err(|error| ConfigError::Vault(unavailable(&error, oauth, vault.needs_explicit_start_over())))
 }
 
 /// The sentence for a vault that could not be opened. An OAuth2 account has no
-/// password to enter again: it signs in again, and the mail is safe.
-fn unavailable(error: &VaultError, oauth: bool) -> String {
+/// password to enter again: it signs in again, and the mail is safe. When only
+/// the explicit "Start the vault over" in Options deals with the vault (a
+/// passphrase or keychain vault, or an error no save deals with), the sentence
+/// says so: entering the password again would fail the same way.
+fn unavailable(error: &VaultError, oauth: bool, explicit_only: bool) -> String {
     if *error == VaultError::Locked {
         // Not lost: the passphrase has simply not been given in this run.
         return format!("the secrets of this account cannot be read yet: {error}; start the program again and enter it");
@@ -88,12 +91,14 @@ fn unavailable(error: &VaultError, oauth: bool) -> String {
         return format!("{error}, so the secrets of this account cannot be read now; the program asks again the next time it starts");
     }
     if oauth {
+        let way = if explicit_only { format!("{}, then edit the account and sign in again", START_OVER_ADVICE) } else { "edit the account and sign in again".to_owned() };
         return format!(
             "the sign-in details of this account cannot be read: {error}; the mail is on the server and nothing \
-             is lost; edit the account and sign in again"
+             is lost; {way}"
         );
     }
-    format!("the password of this account cannot be read: {error}; edit the account and enter it again")
+    let way = if explicit_only { format!("{}, then edit the account and enter it again", START_OVER_ADVICE) } else { "edit the account and enter it again".to_owned() };
+    format!("the password of this account cannot be read: {error}; {way}")
 }
 
 #[cfg(test)]

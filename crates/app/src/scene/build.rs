@@ -100,11 +100,13 @@ pub fn build_holding(options: &Options, capabilities: Capabilities, held: Option
     let note_is_about_settings = scanned.problems.is_empty() && !loaded.problems.is_empty();
     // What the move into the vault did comes last: it is said once, and what
     // needs the user's attention comes before it.
-    let problems: Vec<String> = scanned.problems.iter().cloned().chain(loaded.problems).chain(moved.notes).collect();
+    let vault = inspect_vault(&source);
+    let problems: Vec<String> =
+        scanned.problems.iter().cloned().chain(loaded.problems).chain(moved.notes).chain(vault.notes).collect();
     view.set_config_problem(config_io::footer_note(&problems));
     view.set_capabilities(capabilities);
     view.set_options_paths(options_paths(data.as_deref(), &source));
-    tell_how_the_vault_is_kept(&mut view, &source);
+    tell_how_the_vault_is_kept(&mut view, &source, vault.trouble);
     let mut scene = scene_for(&source, view, base, &scanned)?;
     scene.lock = lock;
     scene.font = font;
@@ -142,13 +144,38 @@ fn hold_data_folder(source: &Source) -> Result<Option<DataLock>, AppError> {
     data_lock::hold(&folder)
 }
 
+/// What looking at the vault of a run found.
+struct VaultFacts {
+    /// Why it cannot be opened, when only the explicit "Start the vault over"
+    /// is the way out (not when it is merely locked or its keychain is out of
+    /// reach); the program's sentence.
+    trouble: Option<String>,
+    /// What the secrets folder's checks had to say (its permissions were
+    /// tightened), for the footer.
+    notes: Vec<String>,
+}
+
+/// Opens the vault of this run once more, now that the accounts have been read
+/// and any keychain key has been asked for, and collects what it found. Nothing
+/// is written but the tightening of loose permissions. Mock mail has no vault.
+fn inspect_vault(source: &Source) -> VaultFacts {
+    let Some(folder) = source.secrets_folder() else {
+        return VaultFacts { trouble: None, notes: Vec::new() };
+    };
+    let vault = engine::vault::SharedVault::for_dir(&folder);
+    let trouble = vault.unopenable().map(|error| error.to_string());
+    VaultFacts { trouble, notes: vault.take_notes() }
+}
+
 /// What the Data page is told at start about the vault: the way it is
-/// protected (nothing for mock mail, which has no vault) and, on a system this
-/// version has no code for a keychain on, that a keychain is not available.
-fn tell_how_the_vault_is_kept(view: &mut AppView, source: &Source) {
+/// protected (nothing for mock mail, which has no vault), why it cannot be
+/// opened when it cannot, and, on a system this version has no code for a
+/// keychain on, that a keychain is not available.
+fn tell_how_the_vault_is_kept(view: &mut AppView, source: &Source, trouble: Option<String>) {
     if let Some(protection) = protection_of(source) {
         view.set_protection(protection);
     }
+    view.set_vault_trouble(trouble);
     if !engine::vault::keychain_built() {
         view.set_keychain(KeychainState::NotBuilt);
     }

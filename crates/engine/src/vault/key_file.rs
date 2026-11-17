@@ -29,12 +29,22 @@ pub(super) fn read(path: &Path) -> Result<Option<MasterKey>, VaultError> {
         return Err(VaultError::BadKeyFile("is not a plain file"));
     }
     let file = std::fs::File::open(path).map_err(|error| VaultError::Read(error.to_string()))?;
+    check_handle(&file)?;
     let mut bytes = Vec::with_capacity(KEY_LEN + 1);
     // One byte more than a key, so a longer file is seen as longer.
     file.take(KEY_LEN as u64 + 1).read_to_end(&mut bytes).map_err(|error| VaultError::Read(error.to_string()))?;
     let key = MasterKey::from_slice(&bytes);
     model::wipe_bytes(&mut bytes);
     key.map(Some).ok_or(VaultError::BadKeyFile("is not 32 bytes long"))
+}
+
+/// What was opened, not what the name was when it was looked at, must be a
+/// plain file.
+fn check_handle(file: &std::fs::File) -> Result<(), VaultError> {
+    if !file.metadata().map_err(|error| VaultError::Read(error.to_string()))?.is_file() {
+        return Err(VaultError::BadKeyFile("is not a plain file"));
+    }
+    Ok(())
 }
 
 /// The key in the file, made first when there is no file.

@@ -30,6 +30,8 @@ pub struct OptionsView<'a> {
     pub protection: Option<Protection>,
     /// What the program found out about the system keychain.
     pub keychain: KeychainState,
+    /// Why the vault cannot be opened, when the explicit start-over is the way out.
+    pub vault_trouble: Option<&'a str>,
 }
 
 impl OptionsView<'_> {

@@ -38,16 +38,22 @@ pub fn is_pending(place: &TokenPlace) -> bool {
 /// Sets the account's tokens aside before a new sign-in replaces them. A
 /// marker that is already there belongs to an earlier try of the same attempt
 /// and is kept. This is the start of a sign-in the person asked for, which is
-/// also the way out of a lost vault ("sign in again"): a vault whose key is
-/// lost or that is damaged is set aside as `vault.unreadable` and a new one
-/// started, as when a password is given again.
+/// also the way out of a lost key-file vault ("sign in again"): a key-file
+/// vault whose key is lost or that is damaged is set aside as `vault.unreadable`
+/// (never over an earlier one) and a new one started, as when a password is
+/// given again. A passphrase or keychain vault is never set aside by this: it
+/// fails with its own sentence, and the way out is the explicit, confirmed
+/// "Start the vault over" in Options (the sentence says so).
 pub fn keep(place: &TokenPlace) -> Result<(), String> {
     let id = place.id();
     let older = (!place.legacy_file().as_os_str().is_empty()).then(|| token_file::read(place.legacy_file()).ok()).flatten();
     let from_legacy = place
         .vault()
         .update_or_start_over(true, |vault| aside(vault, id, older.as_ref()))
-        .map_err(|error| format!("cannot keep the earlier sign-in of this account aside: {error}"))?;
+        .map_err(|error| {
+            let advice = error.advice().map(|advice| format!("; {advice}, then sign in again")).unwrap_or_default();
+            format!("cannot keep the earlier sign-in of this account aside: {error}{advice}")
+        })?;
     if from_legacy {
         // Its tokens wait in the vault now; the file must not keep a second copy.
         token_file::remove(place.legacy_file());

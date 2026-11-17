@@ -55,6 +55,7 @@ impl AppView {
                 self.open_passphrase_dialog(if from_keychain { DialogKind::KeyFileFromKeychain } else { DialogKind::KeyFile });
             }
             Control::UseKeychain => self.open_passphrase_dialog(DialogKind::Keychain),
+            Control::StartVaultOver => self.open_passphrase_dialog(DialogKind::StartOver),
             Control::AccountList => {}
         }
     }

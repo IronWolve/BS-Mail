@@ -4,6 +4,7 @@
 //! sign-in for the account, and removed once the tokens are in the vault. On
 //! Unix a file that others can read is refused, as it always was.
 
+use std::io::Read;
 use std::path::Path;
 
 use model::Secret;
@@ -19,16 +20,36 @@ struct OnDisk {
     expires_at: i64,
 }
 
-/// Reads the token file at `path`.
+/// The most a token file may hold: far more than two tokens and a number.
+pub const MAX_TOKEN_FILE_BYTES: u64 = 64 * 1024;
+
+/// Reads the token file at `path`. A link or anything that is not a plain file
+/// is refused (by its name, and again by the handle that was opened), and so is
+/// a file over `MAX_TOKEN_FILE_BYTES`, before any of it is read.
 pub fn read(path: &Path) -> Result<TokenRecord, StoreError> {
-    let meta = match std::fs::metadata(path) {
-        Ok(meta) => meta,
+    let failed = |why: String| StoreError::Failed(format!("cannot read the token file {}: {why}", path.display()));
+    let not_plain = || StoreError::Failed(format!("the token file {} is a link or not a plain file; {}", path.display(), sign_in_again()));
+    match std::fs::symlink_metadata(path) {
+        Ok(meta) if meta.is_file() => {}
+        Ok(_) => return Err(not_plain()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Err(StoreError::Missing),
-        Err(error) => return Err(StoreError::Failed(format!("cannot read the token file {}: {error}", path.display()))),
-    };
+        Err(error) => return Err(failed(error.to_string())),
+    }
+    let file = std::fs::File::open(path).map_err(|error| failed(error.to_string()))?;
+    let meta = file.metadata().map_err(|error| failed(error.to_string()))?;
+    if !meta.is_file() {
+        return Err(not_plain());
+    }
     check_private(path, &meta)?;
-    let text = std::fs::read_to_string(path)
-        .map_err(|error| StoreError::Failed(format!("cannot read the token file {}: {error}", path.display())))?;
+    if meta.len() > MAX_TOKEN_FILE_BYTES {
+        return Err(StoreError::Failed(format!(
+            "the token file {} is larger than a token file can be; {}",
+            path.display(),
+            sign_in_again()
+        )));
+    }
+    let mut text = String::new();
+    file.take(MAX_TOKEN_FILE_BYTES + 1).read_to_string(&mut text).map_err(|error| failed(error.to_string()))?;
     let parsed: OnDisk = toml::from_str(&text).map_err(|_| {
         StoreError::Failed(format!("the token file {} is not valid; {}", path.display(), sign_in_again()))
     })?;

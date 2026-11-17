@@ -38,7 +38,8 @@ pub struct Gate {
 
 impl Gate {
     /// The prompt this run needs: `Some` only when its vault is protected by a
-    /// passphrase that has not been given. A second copy of the program is
+    /// passphrase that has not been given, or the folder says so and the vault
+    /// is missing or damaged (the screen then says that and asks for nothing). A second copy of the program is
     /// turned away here, before it asks for anything.
     pub fn for_run(options: &Options) -> Result<Option<Self>, AppError> {
         let Some(folder) = vault_folder(options) else {
@@ -55,7 +56,13 @@ impl Gate {
         };
         let loaded = config_io::load(data_dir(options.data_dir.as_ref()).as_deref())?;
         let icons = options.icons.unwrap_or_else(|| icon_kind(loaded.config.appearance.icons));
-        Ok(Some(Self { view: UnlockView::new(loaded.theme, loaded.config, icons), vault, held }))
+        // A passphrase folder whose vault is missing or damaged has nothing a passphrase could open:
+        // it is shown as that, never taken for a fresh folder, and only the confirmed choice goes on.
+        let view = match vault.passphrase_vault_lost() {
+            Some(lost) => UnlockView::lost(loaded.theme, loaded.config, icons, lost == VaultError::Missing),
+            None => UnlockView::new(loaded.theme, loaded.config, icons),
+        };
+        Ok(Some(Self { view, vault, held }))
     }
 
     /// The lock on the data folder, for the build that follows.
@@ -97,7 +104,7 @@ impl Gate {
                 }
             },
             UnlockStep::Forget => match self.vault.forget_passphrase() {
-                Ok(()) => GateStep::Open,
+                Ok(_) => GateStep::Open,
                 Err(error) => {
                     self.view.failed(&format!("The vault could not be set aside: {error}"));
                     self.stay_and_redraw(host)
