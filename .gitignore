@@ -27,6 +27,10 @@
 !crates/**/build.rs
 !crates/**/*.rs
 
+# The pictures the README shows (made-up mail only).
+!screenshots/
+!screenshots/*.png
+
 # Tests are never tracked. These come after the allow rules on purpose.
 *.tests.rs
 **/tests/
