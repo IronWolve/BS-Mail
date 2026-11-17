@@ -13,12 +13,12 @@ Get the latest release from the [Releases page](../../releases).
 
 | System | File |
 | --- | --- |
-| Linux, 64-bit (Ubuntu 22.04 or newer, and most other current distributions) | `BS-Mail_linux-x64_v0.9.1.AppImage` |
-| Windows 10 or 11, 64-bit | `BS-Mail_windows-x64_v0.9.1.zip` |
+| Linux, 64-bit (Ubuntu 22.04 or newer, and most other current distributions) | `BS-Mail_linux-x64_v0.9.2.AppImage` |
+| Windows 10 or 11, 64-bit | `BS-Mail_windows-x64_v0.9.2.zip` |
 
 Each file has a `.sha256` file beside it so you can check the download.
 
-- **Linux:** make the file executable (`chmod +x BS-Mail_linux-x64_v0.9.1.AppImage`) and run it
+- **Linux:** make the file executable (`chmod +x BS-Mail_linux-x64_v0.9.2.AppImage`) and run it
   in your terminal. If it does not start, your system may need FUSE: install `libfuse2`
   (`libfuse2t64` on Ubuntu 24.04).
 - **Windows:** unzip, then run `bs-mail.exe` in Windows Terminal, PowerShell or the Command
@@ -88,7 +88,13 @@ it needs a client ID that you make once with the provider.
   you use the browser sign-in, and to your browser for links you click. It sends nothing to
   its author: no usage figures, no crash reports, no update checks, and it never loads remote
   images from messages.
-- To remove everything, delete the program and that folder.
+- Passwords, sign-in tokens and saved client secrets are kept encrypted in a vault in that
+  folder. You choose how it is protected in Options: a key file in the folder (the default:
+  nothing to type and the folder stays portable, but anyone who gets the whole folder can
+  read it), a passphrase you type at start, or the system keychain on Windows and Linux
+  (nothing to type, and a copy of the folder is useless on another computer).
+- To remove everything, delete the program and that folder. If you used the system keychain,
+  switch to another way in Options first, so its key is removed too.
 
 ## Licence
 
