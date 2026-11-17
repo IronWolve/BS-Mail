@@ -54,3 +54,12 @@ checks, and it loads no remote images or content from messages.
   copies, backup) is deleted. Your settings, the saved client ids and the address list stay.
 - **Everything:** close the program and delete the data folder. The program
   itself is a single file; delete it too.
+
+## Licence
+
+BS Mail is not open source. It is free for your own personal, non-commercial
+use: you may build it and run it on your own computers and read its source.
+You may not copy or share it, change it, sell it, offer it as a service, or use
+it commercially, without written permission. See `LICENSE`. The fonts and
+libraries it uses keep their own licenses, which are kept in the `licenses`
+folder beside the program.
