@@ -5,6 +5,9 @@
 A fast, keyboard-first mail client for any IMAP and SMTP account that runs in your
 terminal. Everything works with the mouse too.
 
+For Outlook, Hotmail, Microsoft 365 and other accounts that require OAuth 2.0, use an OAuth
+proxy: see the [OAuth 2.0 section](#outlook-hotmail-microsoft-365-and-oauth-20) below.
+
 ![BS-Mail: folders, message list and the open message](screenshots/main.png)
 
 ## Download
