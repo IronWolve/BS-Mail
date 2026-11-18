@@ -38,8 +38,9 @@ instead, on Linux or Windows.
 3. Type your email address and pick your provider from the list: Gmail, iCloud, Yahoo,
    Fastmail, GMX, Zoho, Proton Mail Bridge, 1&1 / IONOS and many more fill in the servers
    for you. Enter your password. If your provider asks for an app password, make one in your
-   account settings and use that. Outlook.com, Hotmail and Microsoft 365 take no password at
-   all: see [Outlook, Hotmail, Microsoft 365 and OAuth 2.0](#outlook-hotmail-microsoft-365-and-oauth-20).
+   account settings and use that. Outlook.com, Hotmail and Microsoft 365 do not take a
+   password: they need an OAuth proxy, see
+   [Outlook, Hotmail, Microsoft 365 and OAuth 2.0](#outlook-hotmail-microsoft-365-and-oauth-20).
 4. Your mail appears. Press `?` for every key.
 
 ## What it does
@@ -52,14 +53,15 @@ instead, on Linux or Windows.
 - **HTML mail** opens as a safe copy in your browser: scripts, frames, forms and everything that
   would load from the internet are left out, and it tells you how many items were removed.
 - **Find and arrange:** search, sort by any column, group into threads, tag, star and mark alerts.
-  The Starred and Alerts views search the whole account.
+  The Starred and Alerts views search the whole account. Find inside a message, and view its
+  headers or the whole source.
 - **Many at once:** mark several messages (`Space`, Ctrl or Shift click) and delete, move, tag,
   mark read, star or archive them together. Delete always asks first.
 - **Folders:** make, rename and delete them, mark all read, empty the Trash or Spam.
 - **Keyboard first:** read a whole mailbox with `Space` and `N`, jump to any folder with `g` `g`,
   and step through the links of a message with `l`. The pane that has the keys is marked in its title.
-- **Mouse and keyboard:** right-click menus, drag messages onto a folder, click links and addresses,
-  select and copy text, find inside a message, view the headers or the whole source.
+- **Mouse too:** right-click menus, drag messages onto a folder, click links and addresses, select
+  and copy text.
 - **Make it yours:** layout and panels in Options, any key rebound in `config.toml`, your own themes.
 
 ![Writing a reply](screenshots/reply.png)
@@ -93,10 +95,11 @@ instead, on Linux or Windows.
 - Everything BS-Mail keeps is in one folder and nowhere else: the `data` folder next to the
   program on Windows, and `~/.bs-mail` for the Linux AppImage. Mail itself is not stored on
   your computer; it is read from the server when you open it.
-- It talks only to the mail servers you set up (over TLS), to your provider's sign-in page if
-  you use the browser sign-in, and to your browser for links you click. It sends nothing to
-  its author: no usage figures, no crash reports, no update checks, and it never loads remote
-  images from messages.
+- It talks only to the mail servers you set up (over TLS; or, if you use an OAuth proxy on your
+  own computer, to that proxy without encryption, which never leaves the computer), to your
+  provider's sign-in page if you use the browser sign-in, and to your browser for links you
+  click. It sends nothing to its author: no usage figures, no crash reports, no update checks,
+  and it never loads remote images from messages.
 - Passwords, sign-in tokens and saved client secrets are kept encrypted in a vault in that
   folder. You choose how it is protected in Options: a key file in the folder (the default:
   nothing to type and the folder stays portable, but anyone who gets the whole folder can
@@ -109,59 +112,74 @@ instead, on Linux or Windows.
 
 ## Outlook, Hotmail, Microsoft 365 and OAuth 2.0
 
-Some email providers, including Microsoft Outlook (Outlook.com, Hotmail, Live, Microsoft 365)
-and Gmail, require OAuth 2.0 sign-in instead of a password. Outlook accepts no password from
-any mail program; Gmail also accepts an app password, which is much simpler. There are two
-ways to use OAuth with BS-Mail.
+Outlook.com, Hotmail, Live and Microsoft 365 no longer accept a password from any mail program:
+they need OAuth 2.0 sign-in, and so do some other providers. Gmail takes OAuth 2.0 or an app
+password, and the app password is much simpler (turn on two-step verification, make an app
+password, and enter it as your password). For OAuth, use an OAuth proxy. BS-Mail can also sign
+in through your web browser by itself, but that is new and less tried; see
+[Sign in through your web browser](#sign-in-through-your-web-browser).
 
-**1. Sign in through your web browser.** BS-Mail has no client ID of its own, because only the
-owner of a Microsoft or Google account can register one. You make one once, free, under your
-own account and paste it in; after that every account of that provider opens its sign-in page
-in your browser by itself. Add the account, leave **Sign in with** on *your web browser
-(OAuth2)* and press **Sign in and save**: BS-Mail opens the provider's page for making a
-client ID and waits for you to paste it into **Client id**.
+### Use an OAuth proxy
 
-- Microsoft (Entra admin center, App registrations, New registration): accounts in any
+An external IMAP and SMTP OAuth proxy signs in to your provider for you, so BS-Mail keeps using
+standard IMAP and SMTP. Options:
+
+* [Email OAuth2 Proxy](https://github.com/simonrob/email-oauth2-proxy): free, open-source proxy
+  that runs locally on Windows, Linux or macOS. Supports IMAP, POP3 and SMTP. It handles OAuth
+  authentication transparently, using your own OAuth application registration or, where
+  permitted, an existing registered client ID (see [Making a client ID](#making-a-client-id)).
+* [Auth-Email](https://auth-email.com/): hosted, managed OAuth proxy service with a free trial
+  and paid plans. No local proxy installation or OAuth application registration required.
+  Supports Outlook, Microsoft 365, Gmail, Yahoo and other providers.
+
+Set up your account in the proxy and authorize access through your provider's secure login.
+Then add the account in BS-Mail:
+
+1. Type your email address and set **Sign in with** to password.
+2. Open **Account settings**. Set **Incoming server** to `127.0.0.1` with the proxy's IMAP port
+   and **Outgoing server** to `127.0.0.1` with its SMTP port (the Email OAuth2 Proxy's sample
+   setup uses 1993 and 1587), and set both securities to *not encrypted (this machine only)*.
+3. Enter your address as the user name, and any password you make up. It is not your real
+   password: the proxy uses it to keep its saved sign-in safe, so always use the same one.
+
+BS-Mail allows an unencrypted connection only to your own computer, so a local proxy must run
+on the same machine; the proxy itself talks to your provider over TLS. The proxy keeps its saved
+sign-in in its own settings file, so keep that file private. For a hosted service, use the
+server names and ports it gives you, with normal encryption.
+
+Note: these are optional third-party solutions, not bundled with this application. Local
+proxies offer greater control over your mail traffic, while hosted services provide simpler
+setup but require trusting an external provider with your email connection.
+
+### Sign in through your web browser
+
+BS-Mail has no client ID of its own, because only the owner of a Microsoft or Google account
+can register one, so you make one first ([Making a client ID](#making-a-client-id)). Then add
+the account, leave **Sign in with** on *your web browser (OAuth2)* and press **Sign in and
+save**. BS-Mail opens the provider's page for making a client ID if you have none, waits for you
+to paste it into **Client id**, and then opens the provider's sign-in page in your browser. The
+client ID is kept, so later accounts of that provider need no new one.
+
+This sign-in is new: it has been tried against a stand-in provider, not yet against a real
+Microsoft or Google account. If it gives you trouble, use a proxy.
+
+### Making a client ID
+
+A client ID says which program is asking; it is not a password. You make one once, free, under
+your own account. The browser sign-in needs one, and so does a local proxy; a hosted proxy does
+not.
+
+- **Microsoft** (Entra admin center, App registrations, New registration): accounts in any
   organizational directory and personal Microsoft accounts; redirect URI of type *Mobile and
   desktop applications* set to `http://localhost`; under Authentication, turn on *Allow public
   client flows*; under API permissions add the delegated permissions `IMAP.AccessAsUser.All`,
   `SMTP.Send` and `offline_access` of Office 365 Exchange Online; copy the Application (client)
   ID. No client secret is needed. Outlook.com must have IMAP switched on in its settings, and a
   work or school account may need an administrator to allow it.
-- Google (Cloud console): set up the OAuth consent screen (External, your own address as a test
-  user), add the scope `https://mail.google.com/`, then create an OAuth client ID of type
-  *Desktop app* and paste both the client ID and the client secret. Google shows a "hasn't
+- **Google** (Cloud console): set up the OAuth consent screen (External, your own address as a
+  test user), add the scope `https://mail.google.com/`, then create an OAuth client ID of type
+  *Desktop app* and copy both the client ID and the client secret. Google shows a "hasn't
   verified this app" page for it.
-
-This sign-in is new: it has been tried against a stand-in provider, not yet against a real
-Microsoft or Google account. If it gives you trouble, use a proxy.
-
-**2. Use an OAuth proxy.** If your account requires OAuth 2.0, you can use an external IMAP
-OAuth proxy to connect without changing the email client. Available options:
-
-* [Email OAuth2 Proxy](https://github.com/simonrob/email-oauth2-proxy): free, open-source proxy
-  that runs locally on Windows, Linux or macOS. Supports IMAP, POP3 and SMTP. It handles OAuth
-  authentication transparently, using your own OAuth application registration or, where
-  permitted, an existing registered client ID.
-* [Auth-Email](https://auth-email.com/): hosted, managed OAuth proxy service with a free trial
-  and paid plans. No local proxy installation or OAuth application registration required.
-  Supports Outlook, Microsoft 365, Gmail, Yahoo and other providers.
-
-How it works: set up your account with the proxy, authorize access through your provider's
-secure login, and point BS-Mail at the proxy's IMAP and SMTP servers and ports. The proxy
-manages the OAuth tokens while BS-Mail keeps using standard IMAP. With a local proxy: add the
-account, set **Sign in with** to password, open **Account settings** and set **Incoming
-server** to `127.0.0.1` with the proxy's IMAP port and **Outgoing server** to `127.0.0.1` with
-its SMTP port (the Email OAuth2 Proxy's sample setup uses 1993 and 1587), both with security
-*not encrypted (this machine only)*. BS-Mail allows an unencrypted connection only to your own
-computer, so the proxy must run on the same machine; the proxy itself talks to your provider
-over TLS. The password you type is not your real one: the proxy uses it to keep its saved
-sign-in safe, so make one up and always use the same one. For a hosted service, use the server
-names and ports it gives you, with normal encryption.
-
-Note: these are optional third-party solutions, not bundled with this application. Local
-proxies offer greater control over your mail traffic, while hosted services provide simpler
-setup but require trusting an external provider with your email connection.
 
 ## Licence
 
