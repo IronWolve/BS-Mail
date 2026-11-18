@@ -2,8 +2,9 @@
 
 *Mail for Power Users*
 
-A fast, keyboard-first mail client for any IMAP and SMTP account that runs in your
-terminal. Everything works with the mouse too.
+A fast, keyboard-first mail client for any IMAP and SMTP account. It is a terminal (TUI)
+program: it runs in the terminal you start it from, or in a window of its own with `--window`,
+on Linux and Windows. Everything works with the mouse too.
 
 For Outlook, Hotmail, Microsoft 365 and other accounts that require OAuth 2.0, use an OAuth
 proxy: see the [OAuth 2.0 section](#outlook-hotmail-microsoft-365-and-oauth-20) below.
