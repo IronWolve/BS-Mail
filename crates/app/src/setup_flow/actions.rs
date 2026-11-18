@@ -6,7 +6,7 @@ use ui::setup::SetupAction;
 use super::flow::SetupFlow;
 
 const NO_BROWSER_FOR_REGISTRATION: &str =
-    "no browser could be opened here; open your provider's app registration page yourself (docs/oauth-setup.md)";
+    "no browser could be opened here; open your provider's app registration page yourself (see the README on the project page)";
 const OPENED: &str = "Your browser should be opening. If nothing appears, press c to copy the link and open it yourself.";
 
 impl SetupFlow {

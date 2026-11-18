@@ -148,7 +148,7 @@ fn browser_only() -> Preset {
             "smtp.office365.com",
             587,
             Security::Starttls,
-            "This provider no longer takes a password here: sign in through your browser. It needs a client id you register once (see docs/oauth-setup.md).",
+            "This provider no longer takes a password here: sign in through your browser. It needs a client id you register once (see the README on the project page).",
         )
     }
 }

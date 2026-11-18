@@ -15,9 +15,9 @@ use super::local_host::is_local_host;
 const MAX_CLIENT_TEXT: usize = 512;
 
 const NO_BROWSER_FOR_PROVIDER: &str = "signing in through the browser is built in for some providers only; for this \
-     one, set the oauth keys in the account file by hand (see docs/oauth-setup.md)";
+     one, set the oauth keys in the account file by hand (see the README on the project page)";
 const NO_CLIENT_ID: &str =
-    "type the client id: this program's own ID from Google or Microsoft, made once (see docs/oauth-setup.md)";
+    "type the client id: this program's own ID from Google or Microsoft, made once (see the README on the project page)";
 
 impl SetupForm {
     /// The id the account gets: the one being edited, or one made from the
